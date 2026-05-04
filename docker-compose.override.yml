@@ -1,0 +1,16 @@
+# docker-compose.override.yml — auto-loaded by `docker compose up`
+# Mounts source code into each container for live-reload during development.
+# Do NOT commit production secrets or override settings here.
+services:
+  sim_adapter:
+    volumes:
+      - .:/app
+  control_core:
+    volumes:
+      - .:/app
+  orchestration:
+    volumes:
+      - .:/app
+  llm_agent:
+    volumes:
+      - .:/app

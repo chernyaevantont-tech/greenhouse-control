@@ -1,0 +1,157 @@
+version: "3.9"
+
+# ──────────────────────────────────────────────
+# Shared environment variables for all services
+# ──────────────────────────────────────────────
+x-common-env: &common-env
+  MQTT_HOST: mqtt_broker
+  MQTT_PORT: 1883
+  START_DATE: "2010-02-28"
+  N_DAYS: "60"
+  PERIOD: "900"
+  MPC_HORIZON: "20"
+
+services:
+
+  # ─── 1. MQTT Broker ─────────────────────────
+  mqtt_broker:
+    image: eclipse-mosquitto:2
+    container_name: mqtt_broker
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    networks:
+      - greenhouse_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/#", "-C", "1", "-i", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ─── 2. SINDy Bootstrap (runs once, then exits) ────
+  sindy_bootstrap:
+    build: .
+    container_name: sindy_bootstrap
+    command: python -m greenhouse_mvp.sindy_pipeline.bootstrap
+    environment:
+      <<: *common-env
+      MODEL_PATH: /app/models/sindy_model.pkl
+      SEASON_LENGTH: "60"
+      SINDY_THRESHOLD: "0.05"
+      SINDY_ALPHA: "0.01"
+    volumes:
+      - model_store:/app/models
+    networks:
+      - greenhouse_net
+    restart: "no"
+
+  # ─── 3. Simulation Adapter ──────────────────
+  sim_adapter:
+    build: .
+    container_name: sim_adapter
+    command: python -m greenhouse_mvp.environment.sim_adapter
+    environment:
+      <<: *common-env
+    depends_on:
+      mqtt_broker:
+        condition: service_healthy
+      control_core:
+        condition: service_started
+      orchestration:
+        condition: service_started
+    networks:
+      - greenhouse_net
+    restart: on-failure
+
+  # ─── 3. Control Core (SINDy + MPC) ─────────
+  control_core:
+    build: .
+    container_name: control_core
+    command: python -m greenhouse_mvp.control_core.mpc_controller
+    environment:
+      <<: *common-env
+      SINDY_MODEL_PATH: /app/models/sindy_model.pkl
+      OOD_THRESHOLD: "3.0"
+    volumes:
+      - model_store:/app/models
+    depends_on:
+      mqtt_broker:
+        condition: service_healthy
+      sindy_bootstrap:
+        condition: service_completed_successfully
+    networks:
+      - greenhouse_net
+    restart: on-failure
+
+  # ─── 4. Orchestration (LangGraph) ───────────
+  orchestration:
+    build: .
+    container_name: orchestration
+    command: python -m greenhouse_mvp.orchestration.graph_workflow
+    environment:
+      <<: *common-env
+      SINDY_MODEL_PATH: /app/models/sindy_model.pkl
+      MAX_RETRIES: "2"
+      RETRAIN_INTERVAL: "96"
+      LLM_BACKEND: "openai"
+      LLM_MODEL: "${LLM_MODEL:-gpt-4o-mini}"
+      AGENT_ENABLED_DEFAULT: "${AGENT_ENABLED_DEFAULT:-false}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      OPENAI_BASE_URL: "${OPENAI_BASE_URL:-}"
+    volumes:
+      - model_store:/app/models
+    depends_on:
+      mqtt_broker:
+        condition: service_healthy
+      control_core:
+        condition: service_started
+      sindy_bootstrap:
+        condition: service_completed_successfully
+    networks:
+      - greenhouse_net
+    restart: on-failure
+
+  # ─── 5. LLM Agent (Supervisor) ──────────────
+  llm_agent:
+    build: .
+    container_name: llm_agent
+    command: python -m greenhouse_mvp.agents.notebooklm_agent
+    environment:
+      <<: *common-env
+      LLM_BACKEND: "openai"
+      LLM_MODEL: "${LLM_MODEL:-gpt-4o-mini}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      OPENAI_BASE_URL: "${OPENAI_BASE_URL:-}"
+      AGENT_PORT: "8081"
+    ports:
+      - "8081:8081"
+    depends_on:
+      mqtt_broker:
+        condition: service_healthy
+    networks:
+      - greenhouse_net
+    restart: on-failure
+
+  # ─── 6. Dashboard (React + nginx) ──────────────────────
+  dashboard:
+    build: ./dashboard
+    container_name: dashboard
+    ports:
+      - "8080:8080"
+    depends_on:
+      mqtt_broker:
+        condition: service_healthy
+    networks:
+      - greenhouse_net
+    restart: unless-stopped
+
+# ──────────────────────────────────────────────
+networks:
+  greenhouse_net:
+    driver: bridge
+
+volumes:
+  model_store:
