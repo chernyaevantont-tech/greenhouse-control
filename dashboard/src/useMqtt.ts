@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import mqtt, { MqttClient } from 'mqtt';
-import type { DashboardState, SimControl, AgentControl } from './types';
+import type { DashboardState, SimControl, AgentControl, ControllerSelect, SimReset } from './types';
 
 const MAX_BUF = 600;
 
@@ -19,10 +19,12 @@ const INIT: DashboardState = {
   connected: false,
   timestamps: [], steps: [], t_in: [], T_out: [], co2: [], rh: [], rad: [], mahal: [],
   oodThreshold: 6.0, inDistribution: null, agentEnabled: true,
+  controllerMode: 'mpc',
   latestTelemetry: null, latestOOD: null,
   uBoil: [], uCO2: [], uThScr: [], uVent: [], uLamp: [], uBlScr: [],
   latestAction: null,
   supervisorLog: [],
+  llmLog: [],
 };
 
 export function useMqtt(brokerUrl: string) {
@@ -44,6 +46,7 @@ export function useMqtt(brokerUrl: string) {
         'greenhouse/action/approved',
         'greenhouse/ood/metrics',
         'greenhouse/supervisor/verdict',
+        'greenhouse/llm/action',
       ].forEach(t => client.subscribe(t, { qos: 1 }));
     });
 
@@ -94,6 +97,11 @@ export function useMqtt(brokerUrl: string) {
               ...prev,
               supervisorLog: [p, ...prev.supervisorLog].slice(0, 50),
             };
+          case 'greenhouse/llm/action':
+            return {
+              ...prev,
+              llmLog: [p, ...prev.llmLog].slice(0, 50),
+            };
           default:
             return prev;
         }
@@ -122,5 +130,21 @@ export function useMqtt(brokerUrl: string) {
     );
   }, []);
 
-  return { state, publishControl, publishAgentControl };
+  const publishControllerSelect = useCallback((ctrl: ControllerSelect) => {
+    clientRef.current?.publish(
+      'greenhouse/control/controller',
+      JSON.stringify(ctrl),
+      { qos: 1 },
+    );
+  }, []);
+
+  const publishReset = useCallback((payload: SimReset) => {
+    clientRef.current?.publish(
+      'greenhouse/control/reset',
+      JSON.stringify(payload),
+      { qos: 1 },
+    );
+  }, []);
+
+  return { state, publishControl, publishAgentControl, publishControllerSelect, publishReset };
 }

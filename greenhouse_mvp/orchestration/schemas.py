@@ -95,8 +95,14 @@ class GraphState(TypedDict):
     last_supervisor_step: int    # step index of the last LLM supervisor call (cooldown)
     retry_count: int             # Number of times MPC was asked to re-plan
     max_retries: int             # Config: abort to fallback after N retries
+    # Active controller: "mpc" or "llm"
+    controller_mode: str
+    # LLM controller reasoning text from the last step
+    llm_reasoning: str | None
     # Accumulator for logging / DAgger data collection
     episode_log: list[dict]
+    # Set to True when the simulation episode terminates
+    _terminated: bool
 
 
 class SimControlPayload(BaseModel):
@@ -110,3 +116,32 @@ class AgentControlPayload(BaseModel):
     """Published by the dashboard to enable/disable the LLM supervisor agent."""
 
     enabled: bool = True
+
+
+class ControllerSelectPayload(BaseModel):
+    """Published by the dashboard to switch between MPC and LLM controllers."""
+
+    mode: Literal["mpc", "llm"] = "mpc"
+
+
+class SimResetPayload(BaseModel):
+    """Published by the dashboard to restart the simulation episode."""
+
+    requested: bool = True
+
+
+class LLMActionPayload(BaseModel):
+    """
+    Published on ``greenhouse/llm/action`` each step the LLM controller is active.
+    Carries the reasoning string alongside the chosen actuator values.
+    """
+
+    step: int
+    reasoning: str
+    # Actuator signals [0.0, 1.0] — mirror of ActionPayload fields
+    uBoil: float
+    uCO2: float
+    uThScr: float
+    uVent: float
+    uLamp: float
+    uBlScr: float

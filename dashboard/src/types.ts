@@ -47,6 +47,25 @@ export interface AgentControl {
   enabled: boolean;
 }
 
+export interface ControllerSelect {
+  mode: 'mpc' | 'llm';
+}
+
+export interface SimReset {
+  requested: boolean;
+}
+
+export interface LLMActionPayload {
+  step: number;
+  reasoning: string;
+  uBoil: number;
+  uCO2: number;
+  uThScr: number;
+  uVent: number;
+  uLamp: number;
+  uBlScr: number;
+}
+
 export interface DashboardState {
   connected: boolean;
   timestamps: string[];   // HH:MM derived from timestamp_sim
@@ -60,6 +79,7 @@ export interface DashboardState {
   oodThreshold: number;
   inDistribution: boolean | null;
   agentEnabled: boolean;
+  controllerMode: 'mpc' | 'llm';
   latestTelemetry: TelemetryPayload | null;
   latestOOD: OODMetrics | null;
   uBoil: number[];
@@ -70,4 +90,5 @@ export interface DashboardState {
   uBlScr: number[];
   latestAction: ActionPayload | null;
   supervisorLog: SupervisorVerdict[];
+  llmLog: LLMActionPayload[];
 }

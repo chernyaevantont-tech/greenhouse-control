@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import type { ChartOptions, ChartDataset } from 'chart.js';
 import { useMqtt } from './useMqtt';
-import type { SupervisorVerdict } from './types';
+import type { SupervisorVerdict, LLMActionPayload } from './types';
 
 // -- Constants ---------------------------------------------------------------
 const BROKER_URL     = `ws://${window.location.hostname}:9001`;
@@ -136,6 +136,18 @@ function LogEntry({ entry }: { entry: SupervisorVerdict }) {
   );
 }
 
+function LLMLogEntry({ entry }: { entry: LLMActionPayload }) {
+  return (
+    <div className="log-entry">
+      <div className="log-header">
+        <span className="log-step">Step {entry.step}</span>
+        <span className="badge badge--APPROVE">LLM</span>
+      </div>
+      {entry.reasoning && <div className="log-reason">{entry.reasoning}</div>}
+    </div>
+  );
+}
+
 function ChartCard({ title, height, children }: {
   title: string; height: number; children: React.ReactNode;
 }) {
@@ -149,16 +161,20 @@ function ChartCard({ title, height, children }: {
 
 // -- Main App ----------------------------------------------------------------
 export default function App() {
-  const { state, publishControl, publishAgentControl } = useMqtt(BROKER_URL);
-  const [windowSize, setWindowSize] = useState<number>(120);
-  const [activeTab,  setActiveTab]  = useState<Tab>('thermals');
-  const [paused,     setPaused]     = useState(false);
-  const [speed,      setSpeed]      = useState(1);
-  const [agentOn,    setAgentOn]    = useState(false);
+  const { state, publishControl, publishAgentControl, publishControllerSelect, publishReset } = useMqtt(BROKER_URL);
+  const [windowSize,      setWindowSize]      = useState<number>(120);
+  const [activeTab,       setActiveTab]       = useState<Tab>('thermals');
+  const [paused,          setPaused]          = useState(false);
+  const [speed,           setSpeed]           = useState(1);
+  const [agentOn,         setAgentOn]         = useState(false);
+  const [controllerMode,  setControllerMode]  = useState<'mpc' | 'llm'>('mpc');
 
-  // Sync initial agent-disabled state to backend on first connect
+  // Sync initial states to backend on first connect
   useEffect(() => {
-    if (state.connected) publishAgentControl({ enabled: agentOn });
+    if (state.connected) {
+      publishAgentControl({ enabled: agentOn });
+      publishControllerSelect({ mode: controllerMode });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.connected]);
 
@@ -179,6 +195,15 @@ export default function App() {
     setAgentOn(next);
     publishAgentControl({ enabled: next });
   }, [agentOn, publishAgentControl]);
+
+  const handleControllerSwitch = useCallback((mode: 'mpc' | 'llm') => {
+    setControllerMode(mode);
+    publishControllerSelect({ mode });
+  }, [publishControllerSelect]);
+
+  const handleReset = useCallback(() => {
+    publishReset({ requested: true });
+  }, [publishReset]);
 
   const n      = windowSize;
   const labels = state.timestamps.slice(-n);
@@ -327,49 +352,104 @@ export default function App() {
                 </button>
               ))}
             </div>
+            <div style={{ marginTop: 10 }}>
+              <button
+                className="btn btn--warning"
+                onClick={handleReset}
+                style={{ width: '100%' }}
+                title="Restart the simulation episode from the beginning"
+              >
+                &#x21BA; Restart Simulation
+              </button>
+            </div>
           </div>
 
           <div className="card">
-            <div className="card__title">AI Supervisor</div>
-            <div className="pause-row">
+            <div className="card__title">Controller</div>
+            <div className="speed-btns">
               <button
-                className={`btn${agentOn ? ' btn--active' : ' btn--warning'}`}
-                onClick={handleAgentToggle}
-                style={{ minWidth: 110 }}
+                className={`btn${controllerMode === 'mpc' ? ' btn--active' : ''}`}
+                onClick={() => handleControllerSwitch('mpc')}
+                style={{ flex: 1 }}
+                title="Physics-Informed SINDy MPC controller"
               >
-                {agentOn ? '\u2705 Enabled' : '\u274c Disabled'}
+                MPC
               </button>
-              <span style={{ color: 'var(--muted)', fontSize: 12 }}>
-                {agentOn ? 'LLM active' : 'Auto-approve'}
-              </span>
+              <button
+                className={`btn${controllerMode === 'llm' ? ' btn--active' : ''}`}
+                onClick={() => handleControllerSwitch('llm')}
+                style={{ flex: 1 }}
+                title="Large Language Model autonomous controller"
+              >
+                LLM
+              </button>
             </div>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
-              When disabled, all MPC actions are approved automatically.
+              {controllerMode === 'mpc'
+                ? 'Physics-Informed SINDy MPC with OOD detection.'
+                : 'LLM autonomously decides all actuators from sensor data.'}
             </div>
           </div>
 
-          <div className="card">
-            <div className="card__title">OOD Monitor</div>
-            <div className="ood-center">
-              <div className="ood-value"
-                style={{ color: state.inDistribution === false ? 'var(--red)' : 'var(--text)' }}>
-                {ood?.mahalanobis_distance?.toFixed(2) ?? '\u2014'}
+          {controllerMode === 'mpc' && (
+            <div className="card">
+              <div className="card__title">AI Supervisor</div>
+              <div className="pause-row">
+                <button
+                  className={`btn${agentOn ? ' btn--active' : ' btn--warning'}`}
+                  onClick={handleAgentToggle}
+                  style={{ minWidth: 110 }}
+                >
+                  {agentOn ? '\u2705 Enabled' : '\u274c Disabled'}
+                </button>
+                <span style={{ color: 'var(--muted)', fontSize: 12 }}>
+                  {agentOn ? 'LLM active' : 'Auto-approve'}
+                </span>
               </div>
-              <div className="ood-sub">Mahalanobis distance</div>
-              <span className={`ood-badge ${state.inDistribution === false ? 'ood-badge--ood' : 'ood-badge--safe'}`}>
-                {state.inDistribution === false ? 'OUT OF DIST.' : 'IN DISTRIBUTION'}
-              </span>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
+                When disabled, all MPC actions are approved automatically.
+              </div>
             </div>
-          </div>
+          )}
+
+          {controllerMode === 'mpc' && (
+            <div className="card">
+              <div className="card__title">OOD Monitor</div>
+              <div className="ood-center">
+                <div className="ood-value"
+                  style={{ color: state.inDistribution === false ? 'var(--red)' : 'var(--text)' }}>
+                  {ood?.mahalanobis_distance?.toFixed(2) ?? '\u2014'}
+                </div>
+                <div className="ood-sub">Mahalanobis distance</div>
+                <span className={`ood-badge ${state.inDistribution === false ? 'ood-badge--ood' : 'ood-badge--safe'}`}>
+                  {state.inDistribution === false ? 'OUT OF DIST.' : 'IN DISTRIBUTION'}
+                </span>
+              </div>
+            </div>
+          )}
 
           <div className="card" style={{ flex: 1 }}>
-            <div className="card__title">Supervisor Decisions</div>
-            <div className="log-scroll">
-              {state.supervisorLog.length === 0
-                ? <div className="no-data">Waiting for decisions\u2026</div>
-                : state.supervisorLog.map((e, i) => <LogEntry key={i} entry={e} />)
-              }
-            </div>
+            {controllerMode === 'mpc' ? (
+              <>
+                <div className="card__title">Supervisor Decisions</div>
+                <div className="log-scroll">
+                  {state.supervisorLog.length === 0
+                    ? <div className="no-data">Waiting for decisions\u2026</div>
+                    : state.supervisorLog.map((e, i) => <LogEntry key={i} entry={e} />)
+                  }
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="card__title">LLM Actions</div>
+                <div className="log-scroll">
+                  {state.llmLog.length === 0
+                    ? <div className="no-data">Waiting for LLM decisions\u2026</div>
+                    : state.llmLog.map((e, i) => <LLMLogEntry key={i} entry={e} />)
+                  }
+                </div>
+              </>
+            )}
           </div>
 
         </div>

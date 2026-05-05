@@ -55,6 +55,8 @@ services:
     command: python -m greenhouse_mvp.environment.sim_adapter
     environment:
       <<: *common-env
+      # Empty = wait indefinitely for the action (needed for slow local LLMs).
+      ACTION_TIMEOUT: "${ACTION_TIMEOUT:-}"
     depends_on:
       mqtt_broker:
         condition: service_healthy
@@ -99,6 +101,9 @@ services:
       LLM_BACKEND: "openai"
       LLM_MODEL: "${LLM_MODEL:-gpt-4o-mini}"
       AGENT_ENABLED_DEFAULT: "${AGENT_ENABLED_DEFAULT:-false}"
+      CONTROLLER_MODE: "${CONTROLLER_MODE:-mpc}"
+      LLM_CALL_INTERVAL: "${LLM_CALL_INTERVAL:-4}"
+      LLM_TIMEOUT: "${LLM_TIMEOUT:-}"
       OPENAI_API_KEY: "${OPENAI_API_KEY}"
       OPENAI_BASE_URL: "${OPENAI_BASE_URL:-}"
     volumes:

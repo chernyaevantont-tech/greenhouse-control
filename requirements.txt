@@ -17,6 +17,7 @@ paho-mqtt>=2.0
 # Orchestration
 langgraph>=0.1
 langchain-core>=0.1
+langchain-openai>=0.1
 
 # LLM agent HTTP client
 httpx>=0.27

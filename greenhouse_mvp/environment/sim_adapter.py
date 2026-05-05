@@ -17,7 +17,12 @@ import gymnasium as gym
 import numpy as np
 
 from greenhouse_mvp.orchestration.mqtt_bus import MQTTBus
-from greenhouse_mvp.orchestration.schemas import ActionPayload, SimControlPayload, TelemetryPayload
+from greenhouse_mvp.orchestration.schemas import (
+    ActionPayload,
+    SimControlPayload,
+    SimResetPayload,
+    TelemetryPayload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +53,7 @@ class SimAdapter:
         start_date: str = "2010-02-28",
         n_days: int = 60,
         period: int = 900,
-        action_timeout_s: float = 30.0,
+        action_timeout_s: float | None = None,
     ) -> None:
         self._bus = bus
         self._env_id = env_id
@@ -68,6 +73,11 @@ class SimAdapter:
         self._pause_event.set()          # start unpaused
         self._step_sleep_s: float = 0.5  # at 1× speed: 0.5 s between steps
 
+        # Reset flag: set from the MQTT thread, consumed by the main loop.
+        self._reset_requested: bool = False
+        # Unblocks _action_event.wait() when a reset arrives mid-step.
+        self._reset_interrupt = threading.Event()
+
         # Register MQTT subscription for approved actions.
         bus.subscribe(
             topic="greenhouse/action/approved",
@@ -81,6 +91,14 @@ class SimAdapter:
             topic="greenhouse/control/speed",
             schema=SimControlPayload,
             handler=self._on_speed_control,
+            qos=1,
+        )
+
+        # Simulation reset from dashboard
+        bus.subscribe(
+            topic="greenhouse/control/reset",
+            schema=SimResetPayload,
+            handler=self._on_reset,
             qos=1,
         )
 
@@ -118,8 +136,21 @@ class SimAdapter:
         self._publish_telemetry(obs, step=0)
 
         while not self._done:
+            # Wait for an approved action; also wake up on reset.
+            self._reset_interrupt.clear()
             arrived = self._action_event.wait(timeout=self._action_timeout_s)
             self._action_event.clear()
+
+            # Handle simulation reset (initiated from dashboard).
+            if self._reset_requested:
+                self._reset_requested = False
+                logger.info("sim_adapter: resetting episode at step %d", self._step)
+                obs, _ = self._env.reset(options={"start_date": self._start_date}, seed=42)
+                self._step = 0
+                self._done = False
+                self._pending_action = None
+                self._publish_telemetry(obs, step=0)
+                continue
 
             if not arrived:
                 logger.warning(
@@ -196,6 +227,14 @@ class SimAdapter:
             # BASE = 0.5 s at 1×; divide by multiplier for higher speeds
             self._step_sleep_s = 0.5 / mult
             logger.info("sim_adapter: speed set to %.2f× (sleep=%.3fs)", mult, self._step_sleep_s)
+
+    def _on_reset(self, msg: SimResetPayload) -> None:
+        """Called from Paho network thread when dashboard requests a simulation reset."""
+        if msg.requested:
+            self._reset_requested = True
+            # Unblock the action_event.wait() so the main loop can react immediately.
+            self._action_event.set()
+            logger.info("sim_adapter: reset requested by dashboard")
 
     def on_action_approved(self, msg: ActionPayload) -> None:
         """
@@ -288,6 +327,7 @@ if __name__ == "__main__":
         start_date=_start_date,
         n_days=_n_days,
         period=_period,
+        action_timeout_s=float(os.environ["ACTION_TIMEOUT"]) if os.environ.get("ACTION_TIMEOUT") else None,
     )
 
     # Give control_core and orchestration time to connect and subscribe

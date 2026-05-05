@@ -19,7 +19,9 @@ from langgraph.graph import END, StateGraph
 from greenhouse_mvp.orchestration.schemas import (
     ActionPayload,
     AgentControlPayload,
+    ControllerSelectPayload,
     GraphState,
+    LLMActionPayload,
     OODMetrics,
     SupervisorVerdict,
     TelemetryPayload,
@@ -27,6 +29,7 @@ from greenhouse_mvp.orchestration.schemas import (
 
 if TYPE_CHECKING:
     from greenhouse_mvp.agents.notebooklm_agent import NotebookLMAgent
+    from greenhouse_mvp.control_core.llm_controller import LLMController
     from greenhouse_mvp.control_core.mpc_controller import MPCController
     from greenhouse_mvp.orchestration.mqtt_bus import MQTTBus
 
@@ -38,11 +41,12 @@ RETRAIN_INTERVAL: int = 96  # ≈ 1 day at 15-min timesteps
 # Prevents concurrent DAgger retrains: acquired non-blocking inside the worker thread.
 _dagger_lock = threading.Lock()
 
-# Mutable config updated from MQTT dashboard control messages.
+# Mutable configs updated from MQTT dashboard control messages.
 # Safe to mutate from Paho network thread; reads happen on the graph thread.
-# Default matches the dashboard default (disabled). Override via AGENT_ENABLED_DEFAULT=true env var.
 import os as _os
 _agent_cfg: dict = {"enabled": _os.environ.get("AGENT_ENABLED_DEFAULT", "false").lower() == "true"}
+# Active controller: "mpc" or "llm". Switched by dashboard via greenhouse/control/controller.
+_controller_cfg: dict = {"mode": _os.environ.get("CONTROLLER_MODE", "mpc").lower()}
 
 
 # ---------------------------------------------------------------------------
@@ -58,6 +62,14 @@ def make_ingest_node(telemetry_queue: "Queue[TelemetryPayload]"):
 
     def ingest_telemetry(state: GraphState) -> GraphState:
         tel = telemetry_queue.get(timeout=60.0)
+        # Detect simulation reset: step rolls back to 0 after a running episode.
+        episode_log = state.get("episode_log", [])
+        if tel.step == 0 and len(episode_log) > 0:
+            logger.info(
+                "ingest_telemetry: simulation reset detected after %d steps — clearing episode log",
+                len(episode_log),
+            )
+            episode_log = []
         return {
             **state,
             "telemetry": tel,
@@ -67,6 +79,10 @@ def make_ingest_node(telemetry_queue: "Queue[TelemetryPayload]"):
             "final_action": None,
             "ood_metrics": None,
             "ood_detected": False,
+            "llm_reasoning": None,
+            "episode_log": episode_log,
+            # Mirror the current global controller mode into state.
+            "controller_mode": _controller_cfg["mode"],
         }
 
     return ingest_telemetry
@@ -77,10 +93,44 @@ def make_mpc_node(mpc_ctrl: "MPCController"):
 
     def run_mpc(state: GraphState) -> GraphState:
         telemetry: TelemetryPayload = state["telemetry"]
+        # Re-initialise the MPC when the simulation resets so its internal
+        # state stays consistent with the new episode.
+        if telemetry.step == 0:
+            import numpy as np
+            x0 = np.array(
+                [telemetry.t_in, telemetry.co2, telemetry.rh], dtype=np.float64
+            )
+            try:
+                mpc_ctrl.initialise(x0)
+            except Exception:  # noqa: BLE001
+                logger.warning("run_mpc: MPC re-init on reset failed — continuing anyway")
         action, ood = mpc_ctrl.step(telemetry)
         return {**state, "proposed_action": action, "ood_metrics": ood}
 
     return run_mpc
+
+
+def make_llm_node(llm_ctrl: "LLMController", bus: "MQTTBus"):
+    """Returns a node that calls LLMController.step() and stores the result."""
+
+    def run_llm(state: GraphState) -> GraphState:
+        telemetry: TelemetryPayload = state["telemetry"]
+        action, reasoning = llm_ctrl.step(telemetry)
+        # Publish reasoning payload for the dashboard.
+        llm_payload = LLMActionPayload(
+            step=telemetry.step,
+            reasoning=reasoning,
+            uBoil=action.uBoil,
+            uCO2=action.uCO2,
+            uThScr=action.uThScr,
+            uVent=action.uVent,
+            uLamp=action.uLamp,
+            uBlScr=action.uBlScr,
+        )
+        bus.publish("greenhouse/llm/action", llm_payload, qos=0)
+        return {**state, "proposed_action": action, "llm_reasoning": reasoning}
+
+    return run_llm
 
 
 def check_ood_node(state: GraphState) -> GraphState:
@@ -142,7 +192,7 @@ def make_log_node(
     """
     Returns a log_step node that records telemetry + action (including weather
     fields needed for DAgger feature reconstruction), and triggers DAgger
-    retraining every RETRAIN_INTERVAL steps.
+    retraining every RETRAIN_INTERVAL steps (MPC mode only).
     """
 
     def log_step(state: GraphState) -> GraphState:
@@ -163,18 +213,20 @@ def make_log_node(
             "cos_h": telemetry.cos_h if telemetry else None,
             "action": final.model_dump() if final else None,
             "ood": ood.model_dump() if ood else None,
-            "verdict": verdict.decision if verdict else "AUTO_APPROVE",
+            "controller": state.get("controller_mode", "mpc"),
+            "verdict": verdict.decision if verdict else state.get("llm_reasoning") or "AUTO_APPROVE",
         }
 
         new_log = list(state["episode_log"]) + [entry]
 
-        if len(new_log) % RETRAIN_INTERVAL == 0:
+        # DAgger retraining only makes sense when running in MPC mode.
+        if (
+            len(new_log) % RETRAIN_INTERVAL == 0
+            and state.get("controller_mode", "mpc") == "mpc"
+        ):
             _trigger_dagger_retrain(new_log, mpc_ctrl, dagger_dataset, weather_cfg, bus)
 
-        # Mark episode as terminated if the simulation signals it via telemetry
-        terminated = bool(getattr(telemetry, "_terminated", False)) if telemetry else False
-
-        return {**state, "episode_log": new_log, "_terminated": terminated}
+        return {**state, "episode_log": new_log, "_terminated": False}
 
     return log_step
 
@@ -235,8 +287,14 @@ def route_after_supervisor(state: GraphState) -> str:
 # ---------------------------------------------------------------------------
 
 
+def route_by_controller(state: GraphState) -> str:
+    """Dispatch to the correct controller node based on the current mode."""
+    return "run_llm" if state.get("controller_mode", "mpc") == "llm" else "run_mpc"
+
+
 def build_graph(
     mpc_ctrl: "MPCController",
+    llm_ctrl: "LLMController",
     agent: "NotebookLMAgent",
     bus: "MQTTBus",
     telemetry_queue: "Queue[TelemetryPayload]",
@@ -245,6 +303,10 @@ def build_graph(
 ):
     """
     Construct and compile the LangGraph StateGraph.
+
+    After ``ingest_telemetry`` the graph branches:
+      - controller_mode == "mpc"  →  run_mpc → check_ood → [supervisor_review] → approve
+      - controller_mode == "llm"  →  run_llm → approve
 
     Returns
     -------
@@ -255,6 +317,7 @@ def build_graph(
 
     sg.add_node("ingest_telemetry", make_ingest_node(telemetry_queue))
     sg.add_node("run_mpc", make_mpc_node(mpc_ctrl))
+    sg.add_node("run_llm", make_llm_node(llm_ctrl, bus))
     sg.add_node("check_ood", check_ood_node)
     sg.add_node("supervisor_review", make_supervisor_node(agent))
     sg.add_node("apply_override", apply_override_node)
@@ -263,9 +326,19 @@ def build_graph(
     sg.add_node("log_step", make_log_node(mpc_ctrl, dagger_dataset or {}, weather_cfg or {}, bus))
 
     sg.set_entry_point("ingest_telemetry")
-    sg.add_edge("ingest_telemetry", "run_mpc")
-    sg.add_edge("run_mpc", "check_ood")
 
+    # Route to MPC or LLM controller based on current mode.
+    sg.add_conditional_edges(
+        "ingest_telemetry",
+        route_by_controller,
+        {
+            "run_mpc": "run_mpc",
+            "run_llm": "run_llm",
+        },
+    )
+
+    # MPC path
+    sg.add_edge("run_mpc", "check_ood")
     sg.add_conditional_edges(
         "check_ood",
         route_after_check_ood,
@@ -274,7 +347,6 @@ def build_graph(
             "approve_action": "approve_action",
         },
     )
-
     sg.add_conditional_edges(
         "supervisor_review",
         route_after_supervisor,
@@ -284,9 +356,13 @@ def build_graph(
             "reject_replan": "reject_replan",
         },
     )
-
     sg.add_edge("apply_override", "approve_action")
     sg.add_edge("reject_replan", "run_mpc")
+
+    # LLM path — direct to approve
+    sg.add_edge("run_llm", "approve_action")
+
+    # Shared tail
     sg.add_edge("approve_action", "log_step")
     sg.add_edge("log_step", END)
 
@@ -645,10 +721,10 @@ if __name__ == "__main__":
     )
 
     from greenhouse_mvp.agents.notebooklm_agent import NotebookLMAgent
+    from greenhouse_mvp.control_core.llm_controller import LLMController
     from greenhouse_mvp.control_core.mpc_controller import MPCController
     from greenhouse_mvp.environment.tvp_forecast import WeatherForecastTVP
     from greenhouse_mvp.orchestration.mqtt_bus import MQTTBus
-    from greenhouse_mvp.orchestration.schemas import GraphState, TelemetryPayload
 
     _host = os.environ.get("MQTT_HOST", "localhost")
     _port = int(os.environ.get("MQTT_PORT", "1883"))
@@ -699,6 +775,16 @@ if __name__ == "__main__":
         model=os.environ.get("LLM_MODEL", "gpt-4o-mini"),
     )
 
+    _llm_timeout_raw = os.environ.get("LLM_TIMEOUT", "")
+    _llm_ctrl = LLMController(
+        backend=os.environ.get("LLM_BACKEND", "openai"),
+        api_key=os.environ.get("OPENAI_API_KEY", ""),
+        base_url=os.environ.get("OPENAI_BASE_URL") or "https://api.openai.com/v1",
+        model=os.environ.get("LLM_MODEL", "gpt-4o-mini"),
+        timeout=float(_llm_timeout_raw) if _llm_timeout_raw else None,
+        call_interval=int(os.environ.get("LLM_CALL_INTERVAL", "1")),
+    )
+
     _dagger_dataset: dict = {
         "x_in": _bundle.get("x_in_raw"),
         "u_in": _bundle.get("u_in_raw"),
@@ -720,7 +806,7 @@ if __name__ == "__main__":
         "n_days": _n_days,
         "dagger_episode_days": 5,
     }
-    _graph = build_graph(_ctrl, _agent, _bus, _telemetry_queue, _dagger_dataset, _weather_cfg)
+    _graph = build_graph(_ctrl, _llm_ctrl, _agent, _bus, _telemetry_queue, _dagger_dataset, _weather_cfg)
 
     # --- Agent on/off control from dashboard ---
     def _on_agent_control(msg: AgentControlPayload) -> None:
@@ -734,6 +820,18 @@ if __name__ == "__main__":
         qos=1,
     )
 
+    # --- Controller mode selection from dashboard ---
+    def _on_controller_select(msg: ControllerSelectPayload) -> None:
+        _controller_cfg["mode"] = msg.mode
+        logger.info("Controller switched to '%s' by dashboard", msg.mode)
+
+    _bus.subscribe(
+        topic="greenhouse/control/controller",
+        schema=ControllerSelectPayload,
+        handler=_on_controller_select,
+        qos=1,
+    )
+
     _initial_state: GraphState = {
         "telemetry": None,
         "proposed_action": None,
@@ -744,7 +842,10 @@ if __name__ == "__main__":
         "last_supervisor_step": -SUPERVISOR_COOLDOWN_STEPS,
         "retry_count": 0,
         "max_retries": _max_retries,
+        "controller_mode": _controller_cfg["mode"],
+        "llm_reasoning": None,
         "episode_log": [],
+        "_terminated": False,
     }
 
     logger.info("orchestration: graph ready, waiting for sim_adapter to publish telemetry...")
@@ -752,4 +853,5 @@ if __name__ == "__main__":
         run_episode(_graph, _initial_state)
     finally:
         _agent.close()
+        _llm_ctrl.close()
         _bus.loop_stop()
