@@ -1,43 +1,46 @@
 ﻿"""
-llm_controller.py — Pure LLM-based greenhouse actuator controller.
+llm_controller.py — LLM-based greenhouse actuator controller.
 
-Uses the raw openai SDK (not LangChain) to support extra_body parameters
-needed to disable Qwen3 extended thinking mode in LM Studio.
+Uses LangGraph create_react_agent with a set_actuators tool.
+The LLM reasons about current telemetry and calls set_actuators exactly once,
+mirroring the native tool-calling pattern used by NotebookLMAgent.
 """
 
 from __future__ import annotations
 
-import ast
-import json
 import logging
-import re
-from typing import Literal
+from typing import Annotated, Literal
 
-import openai
-from pydantic import BaseModel, Field
+from langchain_core.messages import HumanMessage
+from langchain_core.tools import tool
+from langchain_openai import ChatOpenAI
+from langgraph.prebuilt import create_react_agent
 
-from greenhouse_mvp.orchestration.schemas import (
-    ActionPayload,
-    LLMActionPayload,
-    TelemetryPayload,
-)
+from greenhouse_mvp.orchestration.schemas import ActionPayload, TelemetryPayload
 
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Output schema
+# Tool definition — the agent calls this to emit actuator values
 # ---------------------------------------------------------------------------
 
-class ActuatorOutput(BaseModel):
-    """Structured output schema for LLM actuator decisions."""
-    uBoil: float = Field(ge=0.0, le=1.0, description="Boiler heating fraction [0=off, 1=full]")
-    uCO2: float = Field(ge=0.0, le=1.0, description="CO2 injection rate [0=off, 1=max]")
-    uThScr: float = Field(ge=0.0, le=1.0, description="Thermal screen [0=open, 1=closed]")
-    uVent: float = Field(ge=0.0, le=1.0, description="Roof ventilation [0=closed, 1=open]")
-    uLamp: float = Field(ge=0.0, le=1.0, description="Supplemental lamps [0=off, 1=full]")
-    uBlScr: float = Field(ge=0.0, le=1.0, description="Blackout screen [0=open, 1=closed]")
-    reasoning: str = Field(description="One-sentence explanation of the control decision")
+@tool
+def set_actuators(
+    uBoil: Annotated[float, "Boiler heating fraction [0=off, 1=full heat]"],
+    uCO2: Annotated[float, "CO2 injection rate [0=off, 1=max]"],
+    uThScr: Annotated[float, "Thermal screen [0=open, 1=closed]"],
+    uVent: Annotated[float, "Roof ventilation [0=closed, 1=open]"],
+    uLamp: Annotated[float, "Supplemental lamps [0=off, 1=full]"],
+    uBlScr: Annotated[float, "Blackout screen [0=open, 1=closed]"],
+    reasoning: Annotated[str, "One-sentence explanation of the control decision"],
+) -> str:
+    """
+    Set greenhouse actuator signals for the current control step.
+    Call this exactly once after reasoning about the sensor readings.
+    All actuator values must be in range [0.0, 1.0].
+    """
+    return "Actuators set successfully."
 
 
 # ---------------------------------------------------------------------------
@@ -46,7 +49,7 @@ class ActuatorOutput(BaseModel):
 
 _SYSTEM_PROMPT = """\
 You are an autonomous greenhouse climate controller.
-Given current sensor readings, output ONLY a JSON object with the optimal actuator signals.
+Analyse the current sensor readings and call set_actuators with optimal values.
 
 Target ranges:
   Indoor temperature : 18-22 C    (setpoint 20 C)
@@ -62,8 +65,7 @@ Actuator guide (all values in range [0.0, 1.0]):
   uBlScr - blackout screen    (0=open, 1=closed; blocks natural light at night)
 
 Time hint: sin_h > 0 means daytime; sin_h < 0 means nighttime.
-
-Respond ONLY with a JSON object with keys: uBoil, uCO2, uThScr, uVent, uLamp, uBlScr, reasoning."""
+Always call set_actuators — do not just respond with text."""
 
 _USER_TEMPLATE = """\
 === Sensor Readings (Step {step}) ===
@@ -73,7 +75,9 @@ _USER_TEMPLATE = """\
   Outdoor Temperature: {T_out:.2f} C
   Solar Radiation    : {rad:.1f} W/m2
   Outdoor CO2        : {co2_out:.1f} ppm
-  Time encoding      : sin(h)={sin_h:.3f}  cos(h)={cos_h:.3f}  (sin>0 ~ daytime)"""
+  Time encoding      : sin(h)={sin_h:.3f}  cos(h)={cos_h:.3f}  (sin>0 ~ daytime)
+
+Review the above and call set_actuators with your control decision."""
 
 
 # ---------------------------------------------------------------------------
@@ -82,7 +86,7 @@ _USER_TEMPLATE = """\
 
 class LLMController:
     """
-    Pure LLM actuator controller using structured output for reliability.
+    LLM actuator controller using LangGraph create_react_agent with set_actuators tool.
 
     Parameters
     ----------
@@ -109,12 +113,20 @@ class LLMController:
         self._last_call_step: int = -999
         self._model = model
 
-        self._client = openai.OpenAI(
-            base_url=base_url,
-            api_key=api_key or "no-key",
+        llm = ChatOpenAI(
+            model=model,
+            openai_api_key=api_key or "no-key",
+            openai_api_base=base_url,
+            temperature=0.2,
+            max_tokens=1024,
             timeout=timeout,
             max_retries=0,
+            # Disable Qwen3 extended thinking — reasoning_tokens consume the entire
+            # token budget before the model can emit a tool call (finish_reason=length).
+            # extra_body is forwarded as-is by the openai SDK to the request body.
+            model_kwargs={"extra_body": {"enable_thinking": False}},
         )
+        self._agent = create_react_agent(llm, [set_actuators])
 
     # ------------------------------------------------------------------
     # Public API
@@ -143,7 +155,7 @@ class LLMController:
             return cached, f"[cached from step {self._last_call_step}] {self._last_reasoning}"
 
         try:
-            action, reasoning = self._call_llm(telemetry)
+            action, reasoning = self._call_agent(telemetry)
             self._last_action = action
             self._last_reasoning = reasoning
             self._last_call_step = current_step
@@ -153,15 +165,15 @@ class LLMController:
             return self._fallback(current_step), f"Fallback: {exc}"
 
     def close(self) -> None:
-        pass  # Nothing to close with HTTP-based clients
+        pass
 
     # ------------------------------------------------------------------
     # Private
     # ------------------------------------------------------------------
 
-    def _call_llm(self, telemetry: TelemetryPayload) -> tuple[ActionPayload, str]:
-        """Invoke the LLM via raw openai SDK and parse JSON from the response."""
-        user_msg = _USER_TEMPLATE.format(
+    def _call_agent(self, telemetry: TelemetryPayload) -> tuple[ActionPayload, str]:
+        """Invoke the LangGraph ReAct agent and extract the set_actuators tool call."""
+        prompt = _SYSTEM_PROMPT + "\n\n" + _USER_TEMPLATE.format(
             step=telemetry.step,
             t_in=telemetry.t_in,
             co2=telemetry.co2,
@@ -173,85 +185,35 @@ class LLMController:
             cos_h=telemetry.cos_h,
         )
 
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": user_msg},
-                # Assistant prefill forces the model to complete the JSON directly,
-                # bypassing Qwen3 extended-thinking mode (which burns all tokens on reasoning)
-                {"role": "assistant", "content": "{"},
-            ],
-            temperature=0.2,
-            max_tokens=512,
-            extra_body={"enable_thinking": False},
+        result = self._agent.invoke(
+            {"messages": [HumanMessage(content=prompt)]},
+            config={"recursion_limit": 10},
         )
+        return self._extract_action(result["messages"], telemetry.step)
 
-        usage = response.usage
-        logger.info(
-            "LLM usage: prompt=%s completion=%s reasoning=%s",
-            usage.prompt_tokens if usage else "?",
-            usage.completion_tokens if usage else "?",
-            getattr(getattr(usage, "completion_tokens_details", None), "reasoning_tokens", "?") if usage else "?",
-        )
-
-        msg = response.choices[0].message
-        content: str = msg.content or ""
-
-        # Qwen3 extended thinking: final answer may be in reasoning_content
-        if not content:
-            content = getattr(msg, "reasoning_content", "") or ""
-        if not content:
-            raise ValueError(f"Empty response from LLM (reasoning_tokens may have consumed all budget)")
-
-        # Strip <think>...</think> blocks
-        content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
-
-        # Restore the prefilled '{' that was stripped from the completion
-        if content and not content.startswith("{"):
-            content = "{" + content
-
-        logger.debug("LLM raw content (first 400): %s", content[:400])
-
-        # Extract JSON: prefer markdown code block, then find object with actuator keys
-        # Search from the END — the model's final decision JSON is the last one
-        data: dict | None = None
-        md_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", content, re.DOTALL)
-        candidates: list[str] = [md_match.group(1)] if md_match else []
-        # All {...} blobs reversed (last first = most likely to be the final answer)
-        all_blobs = re.findall(r"\{[^{}]+\}", content, re.DOTALL)
-        candidates += list(reversed(all_blobs))
-
-        for candidate in candidates:
-            try:
-                d = json.loads(candidate)
-            except json.JSONDecodeError:
-                try:
-                    d = ast.literal_eval(candidate)
-                except Exception:
-                    continue
-            if "uBoil" in d:
-                data = d
-                break
-
-        if data is None:
-            raise ValueError(f"No valid actuator JSON in LLM response: {content[:300]}")
-
-        result = ActuatorOutput(**data)
-        action = ActionPayload(
-            step=telemetry.step,
-            approved=False,
-            uBoil=max(0.0, min(1.0, result.uBoil)),
-            uCO2=max(0.0, min(1.0, result.uCO2)),
-            uThScr=max(0.0, min(1.0, result.uThScr)),
-            uVent=max(0.0, min(1.0, result.uVent)),
-            uLamp=max(0.0, min(1.0, result.uLamp)),
-            uBlScr=max(0.0, min(1.0, result.uBlScr)),
-        )
-        logger.info(
-            "LLMController step=%d reasoning=%s", telemetry.step, result.reasoning[:80]
-        )
-        return action, result.reasoning
+    def _extract_action(self, messages, step: int) -> tuple[ActionPayload, str]:
+        """Extract set_actuators tool call args from agent messages."""
+        for msg in messages:
+            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                for tc in msg.tool_calls:
+                    if tc["name"] == "set_actuators":
+                        args = tc["args"]
+                        reasoning = args.get("reasoning", "")
+                        action = ActionPayload(
+                            step=step,
+                            approved=False,
+                            uBoil=float(max(0.0, min(1.0, args.get("uBoil", 0.3)))),
+                            uCO2=float(max(0.0, min(1.0, args.get("uCO2", 0.0)))),
+                            uThScr=float(max(0.0, min(1.0, args.get("uThScr", 1.0)))),
+                            uVent=float(max(0.0, min(1.0, args.get("uVent", 0.0)))),
+                            uLamp=float(max(0.0, min(1.0, args.get("uLamp", 0.0)))),
+                            uBlScr=float(max(0.0, min(1.0, args.get("uBlScr", 0.0)))),
+                        )
+                        logger.info(
+                            "LLMController step=%d reasoning=%s", step, reasoning[:80]
+                        )
+                        return action, reasoning
+        raise ValueError("No set_actuators tool call found in agent response")
 
     def _fallback(self, step: int) -> ActionPayload:
         """Safe fallback action: minimal heating, screen closed."""
