@@ -200,6 +200,12 @@ function ConfigPanel({
           value={local.llm_call_interval}
           onChange={e => setLocal({ ...local, llm_call_interval: parseInt(e.target.value, 10) || 1 })} />
       </div>
+      <div className="cfg-row">
+        <label>LLM history window</label>
+        <input className="cfg-input" type="number" min={1} max={96}
+          value={local.llm_history_window}
+          onChange={e => setLocal({ ...local, llm_history_window: parseInt(e.target.value, 10) || 1 })} />
+      </div>
       <button className="btn btn--primary" style={{ marginTop: 4 }}
         onClick={() => onSave(local)}>
         Save & Apply

@@ -59,6 +59,7 @@ export interface SimConfig {
   speed_multiplier: number;
   mpc_horizon: number;
   llm_call_interval: number;
+  llm_history_window: number;
 }
 
 export interface SimStatus {

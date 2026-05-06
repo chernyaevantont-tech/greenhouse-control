@@ -9,6 +9,7 @@ mirroring the native tool-calling pattern used by NotebookLMAgent.
 from __future__ import annotations
 
 import logging
+from collections import deque
 from typing import Annotated, Literal
 
 from langchain_core.messages import HumanMessage
@@ -49,7 +50,7 @@ def set_actuators(
 
 _SYSTEM_PROMPT = """\
 You are an autonomous greenhouse climate controller.
-Analyse the current sensor readings and call set_actuators with optimal values.
+Analyse the sensor readings and call set_actuators with optimal values.
 
 Target ranges:
   Indoor temperature : 18-22 C    (setpoint 20 C)
@@ -67,17 +68,11 @@ Actuator guide (all values in range [0.0, 1.0]):
 Time hint: sin_h > 0 means daytime; sin_h < 0 means nighttime.
 Always call set_actuators — do not just respond with text."""
 
-_USER_TEMPLATE = """\
-=== Sensor Readings (Step {step}) ===
-  Indoor Temperature : {t_in:.2f} C      (target 18-22, setpoint 20)
-  CO2 Concentration  : {co2:.1f} ppm    (target 600-1000, setpoint 800)
-  Relative Humidity  : {rh:.1f} %       (target 40-85, max 85)
-  Outdoor Temperature: {T_out:.2f} C
-  Solar Radiation    : {rad:.1f} W/m2
-  Outdoor CO2        : {co2_out:.1f} ppm
-  Time encoding      : sin(h)={sin_h:.3f}  cos(h)={cos_h:.3f}  (sin>0 ~ daytime)
-
-Review the above and call set_actuators with your control decision."""
+# Single-step block used for each history entry and the current reading
+_STEP_TEMPLATE = """\
+  Step {step} | sin(h)={sin_h:.3f}  cos(h)={cos_h:.3f}
+    t_in={t_in:.2f} C   co2={co2:.1f} ppm   rh={rh:.1f} %
+    T_out={T_out:.2f} C   rad={rad:.1f} W/m2   co2_out={co2_out:.1f} ppm"""
 
 
 # ---------------------------------------------------------------------------
@@ -96,6 +91,8 @@ class LLMController:
     model : Model identifier
     timeout : HTTP request timeout in seconds (None = no timeout)
     call_interval : Steps between LLM calls (hold cached action between)
+    history_window : How many past telemetry steps to include in the prompt
+                     (1 = current step only; N = current + N-1 previous)
     """
 
     def __init__(
@@ -106,8 +103,11 @@ class LLMController:
         model: str = "gpt-4o-mini",
         timeout: float | None = None,
         call_interval: int = 1,
+        history_window: int = 1,
     ) -> None:
         self._call_interval: int = max(1, call_interval)
+        self._history_window: int = max(1, history_window)
+        self._history: deque[TelemetryPayload] = deque(maxlen=self._history_window)
         self._last_action: ActionPayload | None = None
         self._last_reasoning: str = ""
         self._last_call_step: int = -999
@@ -173,23 +173,52 @@ class LLMController:
 
     def _call_agent(self, telemetry: TelemetryPayload) -> tuple[ActionPayload, str]:
         """Invoke the LangGraph ReAct agent and extract the set_actuators tool call."""
-        prompt = _SYSTEM_PROMPT + "\n\n" + _USER_TEMPLATE.format(
-            step=telemetry.step,
-            t_in=telemetry.t_in,
-            co2=telemetry.co2,
-            rh=telemetry.rh,
-            T_out=telemetry.T_out,
-            rad=telemetry.rad,
-            co2_out=telemetry.co2_out,
-            sin_h=telemetry.sin_h,
-            cos_h=telemetry.cos_h,
-        )
+        # Append current reading to history before building the prompt
+        self._history.append(telemetry)
+
+        prompt = _SYSTEM_PROMPT + "\n\n" + self._build_user_prompt()
 
         result = self._agent.invoke(
             {"messages": [HumanMessage(content=prompt)]},
             config={"recursion_limit": 10},
         )
         return self._extract_action(result["messages"], telemetry.step)
+
+    def _build_user_prompt(self) -> str:
+        """Build the user-facing part of the prompt from the rolling history."""
+        history = list(self._history)  # oldest first
+        n = len(history)
+
+        if n == 1:
+            # Single step — concise single-block format
+            t = history[0]
+            lines = [
+                f"=== Sensor Readings (Step {t.step}) ===",
+                _STEP_TEMPLATE.format(
+                    step=t.step, t_in=t.t_in, co2=t.co2, rh=t.rh,
+                    T_out=t.T_out, rad=t.rad, co2_out=t.co2_out,
+                    sin_h=t.sin_h, cos_h=t.cos_h,
+                ),
+                "",
+                "  Targets: t_in 18-22 C (set 20) | co2 600-1000 ppm (set 800) | rh ≤ 85%",
+            ]
+        else:
+            lines = [
+                f"=== Sensor History (last {n} steps, newest last) ===",
+                "  Targets: t_in 18-22 C (set 20) | co2 600-1000 ppm (set 800) | rh ≤ 85%",
+                "",
+            ]
+            for i, t in enumerate(history):
+                tag = "[CURRENT]" if i == n - 1 else f"[t-{n - 1 - i}]"
+                lines.append(f"{tag}" + _STEP_TEMPLATE.format(
+                    step=t.step, t_in=t.t_in, co2=t.co2, rh=t.rh,
+                    T_out=t.T_out, rad=t.rad, co2_out=t.co2_out,
+                    sin_h=t.sin_h, cos_h=t.cos_h,
+                ))
+
+        lines.append("")
+        lines.append("Review the above and call set_actuators with your control decision.")
+        return "\n".join(lines)
 
     def _extract_action(self, messages, step: int) -> tuple[ActionPayload, str]:
         """Extract set_actuators tool call args from agent messages."""

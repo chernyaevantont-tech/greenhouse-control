@@ -59,6 +59,7 @@ class SimulationRunner:
             controller_mode=os.environ.get("CONTROLLER_MODE", "mpc").lower(),
             agent_enabled=os.environ.get("AGENT_ENABLED_DEFAULT", "false").lower() == "true",
             llm_call_interval=int(os.environ.get("LLM_CALL_INTERVAL", "1")),
+            llm_history_window=int(os.environ.get("LLM_HISTORY_WINDOW", "1")),
         )
 
         # Live mutable config (safe to update at runtime)
@@ -419,6 +420,7 @@ class SimulationRunner:
             model=model_name,
             timeout=timeout,
             call_interval=cfg.llm_call_interval,
+            history_window=cfg.llm_history_window,
         )
 
         supervisor = NotebookLMAgent(

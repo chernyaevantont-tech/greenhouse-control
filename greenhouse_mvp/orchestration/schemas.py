@@ -166,6 +166,7 @@ class SimConfig(BaseModel):
     speed_multiplier: float = 1.0
     mpc_horizon: int = 20
     llm_call_interval: int = 1
+    llm_history_window: int = 1  # Number of past telemetry steps to include in LLM prompt (1 = current only)
 
 
 class SimStatus(BaseModel):
