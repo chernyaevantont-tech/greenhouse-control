@@ -27,7 +27,10 @@ const BASE_OPTS: ChartOptions<'line'> = {
   plugins: {
     legend: {
       position: 'top' as const,
-      labels: { boxWidth: 12, color: '#8b949e', font: { size: 11 } },
+      labels: {
+        boxWidth: 12, color: '#8b949e', font: { size: 11 },
+        filter: (item) => !item.text.startsWith('__'),
+      },
     },
     tooltip: {
       backgroundColor: '#1c2128', borderColor: '#30363d', borderWidth: 1,
@@ -67,6 +70,18 @@ function lds(label: string, data: number[], color: string, fill = false): ChartD
     backgroundColor: fill ? `${color}28` : 'transparent',
     borderWidth: 2, pointRadius: 0, tension: 0.3, fill,
   } as ChartDataset<'line'>;
+}
+
+/** Two datasets that render a filled band between lo and hi. Upper dataset is hidden from legend. */
+function bandLds(
+  label: string, n: number, lo: number, hi: number, color: string,
+): [ChartDataset<'line'>, ChartDataset<'line'>] {
+  const flat = (v: number) => Array(n).fill(v) as number[];
+  const base = { pointRadius: 0, borderWidth: 0, tension: 0, borderColor: 'transparent' as const };
+  return [
+    { ...base, label: '__band_hi', data: flat(hi), backgroundColor: 'transparent', fill: false } as unknown as ChartDataset<'line'>,
+    { ...base, label, data: flat(lo), backgroundColor: `${color}28`, fill: '-1' } as unknown as ChartDataset<'line'>,
+  ];
 }
 
 function flatLds(label: string, n: number, value: number, color: string): ChartDataset<'line'> {
@@ -303,6 +318,7 @@ export default function App() {
               <div className="chart-col">
                 <ChartCard title="Temperature (°C)" height={160}>
                   <Line data={{ labels, datasets: [
+                    ...bandLds('Comfort zone (18–22°C)', labels.length, 18, 22, '#58a6ff'),
                     lds('Indoor', state.t_in.slice(-n), '#58a6ff', true),
                     lds('Outdoor', state.T_out.slice(-n), '#8b949e'),
                     flatLds('Setpoint 20°C', labels.length, 20, '#3fb950'),
@@ -310,13 +326,14 @@ export default function App() {
                 </ChartCard>
                 <ChartCard title="CO₂ (ppm)" height={140}>
                   <Line data={{ labels, datasets: [
+                    ...bandLds('Optimal range (600–1000 ppm)', labels.length, 600, 1000, '#d2a8ff'),
                     lds('CO₂', state.co2.slice(-n), '#d2a8ff', true),
-                    flatLds('Setpoint 800', labels.length, 800, '#3fb950'),
-                    flatLds('Max 1000', labels.length, 1000, '#f85149'),
+                    flatLds('Setpoint 800 ppm', labels.length, 800, '#3fb950'),
                   ]}} options={chartOpts('ppm', 300, 1200)} />
                 </ChartCard>
                 <ChartCard title="Relative Humidity (%)" height={140}>
                   <Line data={{ labels, datasets: [
+                    ...bandLds('Safe zone (40–85%)', labels.length, 40, 85, '#79c0ff'),
                     lds('RH', state.rh.slice(-n), '#79c0ff', true),
                     flatLds('Max 85%', labels.length, 85, '#f85149'),
                   ]}} options={chartOpts('%', 0, 100)} />
