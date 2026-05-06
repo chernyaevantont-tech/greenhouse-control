@@ -11,21 +11,17 @@ do-mpc>=4.6
 casadi>=3.6
 pysindy>=1.7
 
-# MQTT
-paho-mqtt>=2.0
+# Web API (replaces MQTT + streamlit)
+fastapi>=0.111
+uvicorn[standard]>=0.29
 
 # Orchestration
 langgraph>=0.1
 langchain-core>=0.1
 langchain-openai>=0.1
 
-# LLM agent HTTP client
+# HTTP client (used internally by langchain-openai)
 httpx>=0.27
 
 # Schema validation
 pydantic>=2.6
-
-# Dashboard
-streamlit>=1.34
-streamlit-autorefresh>=1.0
-plotly>=5.20

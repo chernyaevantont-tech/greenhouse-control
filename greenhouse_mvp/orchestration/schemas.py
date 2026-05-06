@@ -97,6 +97,8 @@ class GraphState(TypedDict):
     max_retries: int             # Config: abort to fallback after N retries
     # Active controller: "mpc" or "llm"
     controller_mode: str
+    # Whether the LLM supervisor agent is enabled (MPC path only)
+    agent_enabled: bool
     # LLM controller reasoning text from the last step
     llm_reasoning: str | None
     # Accumulator for logging / DAgger data collection
@@ -145,3 +147,34 @@ class LLMActionPayload(BaseModel):
     uVent: float
     uLamp: float
     uBlScr: float
+
+
+# ---------------------------------------------------------------------------
+# REST API / HTTP schemas (replace MQTT control topics)
+# ---------------------------------------------------------------------------
+
+
+class SimConfig(BaseModel):
+    """Simulation configuration — can be updated at runtime before (re)start."""
+
+    env_id: str = "gl_gym/GreenLightTomato-v0"
+    start_date: str = "2010-02-28"
+    n_days: int = 60
+    period: int = 900
+    controller_mode: Literal["mpc", "llm"] = "mpc"
+    agent_enabled: bool = False
+    speed_multiplier: float = 1.0
+    mpc_horizon: int = 20
+    llm_call_interval: int = 1
+
+
+class SimStatus(BaseModel):
+    """Returned by GET /api/status."""
+
+    running: bool
+    paused: bool
+    step: int
+    config: SimConfig
+    latest_telemetry: TelemetryPayload | None = None
+    latest_action: ActionPayload | None = None
+    latest_ood: OODMetrics | None = None

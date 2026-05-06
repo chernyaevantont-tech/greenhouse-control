@@ -1,23 +1,22 @@
-"""
-notebooklm_agent.py — Backend-agnostic LLM supervisor for greenhouse control.
+﻿"""
+notebooklm_agent.py — LangGraph-based LLM supervisor for greenhouse control.
 
-Supports:
-  - "openai"    : OpenAI-compatible chat/completions (default: GPT-4o-mini)
-  - "ollama"    : Local Ollama endpoint (OpenAI-compatible)
-  - "notebooklm": Google NotebookLM HTTP endpoint (when available)
+Uses LangChain create_react_agent with a submit_verdict tool.
+This is the native LangGraph tool calling mechanism — the LLM autonomously
+reasons about the telemetry and MPC proposal, then calls submit_verdict.
 
-The rest of the LangGraph is completely decoupled from which backend is active.
-See plan/04_langgraph_orchestration.md §5 for the full design spec.
+Supports: openai, ollama, notebooklm backends.
 """
 
 from __future__ import annotations
 
-import json
 import logging
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
-import httpx
-from pydantic import ValidationError
+from langchain_core.messages import HumanMessage
+from langchain_core.tools import tool
+from langchain_openai import ChatOpenAI
+from langgraph.prebuilt import create_react_agent
 
 from greenhouse_mvp.orchestration.schemas import (
     ActionPayload,
@@ -27,10 +26,31 @@ from greenhouse_mvp.orchestration.schemas import (
     TelemetryPayload,
 )
 
-if TYPE_CHECKING:
-    pass
-
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Tool definition — the agent calls this to submit its verdict
+# ---------------------------------------------------------------------------
+
+@tool
+def submit_verdict(
+    decision: Annotated[Literal["APPROVE", "REJECT", "OVERRIDE"], "Control decision"],
+    reason: Annotated[str, "Brief explanation of the decision (1-2 sentences)"],
+    confidence: Annotated[float, "Confidence level in this decision [0.0 = unsure, 1.0 = certain]"],
+    uBoil: Annotated[float, "Override boiler heating [0-1]. Used only when decision=OVERRIDE."] = -1.0,
+    uCO2: Annotated[float, "Override CO2 injection [0-1]. Used only when decision=OVERRIDE."] = -1.0,
+    uThScr: Annotated[float, "Override thermal screen [0-1]. Used only when decision=OVERRIDE."] = -1.0,
+    uVent: Annotated[float, "Override ventilation [0-1]. Used only when decision=OVERRIDE."] = -1.0,
+    uLamp: Annotated[float, "Override lamps [0-1]. Used only when decision=OVERRIDE."] = -1.0,
+    uBlScr: Annotated[float, "Override blackout screen [0-1]. Used only when decision=OVERRIDE."] = -1.0,
+) -> str:
+    """
+    Submit your supervision verdict for the current MPC-proposed greenhouse action.
+    Call this exactly once after reasoning about the telemetry and proposed action.
+    """
+    return "Verdict submitted successfully."
+
 
 # ---------------------------------------------------------------------------
 # Prompt templates
@@ -38,25 +58,28 @@ logger = logging.getLogger(__name__)
 
 _SYSTEM_PROMPT = """\
 You are a greenhouse climate control supervisor.
-You receive sensor telemetry, an MPC-proposed actuator action, \
-and out-of-distribution (OOD) metrics.
-Your task: decide whether to APPROVE, OVERRIDE, or REJECT the action.
-Respond ONLY with a valid JSON object matching this schema:
-{{
-  "step": <int>,
-  "decision": "APPROVE" | "REJECT" | "OVERRIDE",
-  "override_action": <ActionPayload JSON or null>,
-  "reason": "<brief explanation>",
-  "confidence": <float 0-1>
-}}"""
+You receive sensor telemetry, an MPC-proposed actuator action, and out-of-distribution (OOD) metrics.
+
+Your task: evaluate the proposed action and call submit_verdict with one of:
+  - APPROVE  : Accept the MPC action as-is
+  - REJECT   : Reject it (triggers MPC replanning)
+  - OVERRIDE : Replace it with your own values (provide all six actuator signals)
+
+Key setpoints:
+  Indoor temperature : 18-22 C (setpoint 20 C)
+  CO2 concentration  : 600-1000 ppm (setpoint 800 ppm)
+  Relative humidity  : 40-85 % (max 85 %)
+
+Prefer APPROVE unless the action is clearly wrong or the system is OOD.
+Always call submit_verdict — do not just respond with text."""
 
 _USER_TEMPLATE = """\
 === Telemetry (Step {step}) ===
-  Indoor Temperature : {t_in:.2f} °C   (setpoint: 20°C)
-  CO2 Concentration  : {co2:.1f} ppm  (setpoint: 800 ppm)
-  Relative Humidity  : {rh:.1f} %     (max: 85%)
-  Outdoor Temp       : {T_out:.2f} °C
-  Solar Radiation    : {rad:.1f} W/m²
+  Indoor Temperature : {t_in:.2f} C     (setpoint 20 C, range 18-22)
+  CO2 Concentration  : {co2:.1f} ppm   (setpoint 800, range 600-1000)
+  Relative Humidity  : {rh:.1f} %      (max 85%)
+  Outdoor Temp       : {T_out:.2f} C
+  Solar Radiation    : {rad:.1f} W/m2
 
 === MPC Proposed Action ===
   Boiler (uBoil)       : {uBoil:.3f}
@@ -69,7 +92,10 @@ _USER_TEMPLATE = """\
 === OOD Metrics ===
   Mahalanobis Distance : {mahalanobis:.3f}  (threshold: {threshold:.1f})
   In Distribution      : {in_distribution}
-  Max SINDy Residual   : {max_residual:.4f}"""
+  Max SINDy Residual   : {max_residual:.4f}
+
+Review the above and call submit_verdict with your decision."""
+
 
 # ---------------------------------------------------------------------------
 # Agent
@@ -78,20 +104,15 @@ _USER_TEMPLATE = """\
 
 class NotebookLMAgent:
     """
-    Supervisor agent that wraps a configurable LLM backend.
+    Supervisor agent using LangGraph create_react_agent with a verdict tool.
 
     Parameters
     ----------
-    backend:
-        One of ``"openai"``, ``"ollama"``, or ``"notebooklm"``.
-    api_key:
-        API key for OpenAI / NotebookLM backends. Ignored for Ollama.
-    base_url:
-        Base URL of the chat/completions endpoint.
-    model:
-        Model identifier forwarded to the backend.
-    timeout:
-        HTTP request timeout in seconds.
+    backend : "openai", "ollama", or "notebooklm"
+    api_key : API key (ignored for Ollama)
+    base_url : Chat/completions endpoint
+    model : Model identifier
+    timeout : HTTP request timeout in seconds
     """
 
     def __init__(
@@ -102,19 +123,19 @@ class NotebookLMAgent:
         model: str = "gpt-4o-mini",
         timeout: float = 30.0,
     ) -> None:
-        self._backend = backend
-        self._model = model
-        self._timeout = timeout
+        self._model_name = model
 
-        headers = {"Content-Type": "application/json"}
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
-
-        self._http = httpx.Client(
-            base_url=base_url,
-            headers=headers,
+        llm = ChatOpenAI(
+            model=model,
+            openai_api_key=api_key or "no-key",
+            openai_api_base=base_url,
+            temperature=0.1,
+            max_tokens=1024,
             timeout=timeout,
+            max_retries=0,
         )
+        # create_react_agent: LLM reasons then calls submit_verdict
+        self._agent = create_react_agent(llm, [submit_verdict])
 
     # ------------------------------------------------------------------
     # Public API
@@ -122,137 +143,96 @@ class NotebookLMAgent:
 
     def review(self, state: GraphState) -> SupervisorVerdict:
         """
-        Run the supervisor review for the current graph state.
+        Run supervisor review for the current graph state.
 
-        Never raises — on any failure the returned verdict defaults to APPROVE
-        (fail-safe) so the simulation is never stalled.
-
-        Parameters
-        ----------
-        state:
-            The current LangGraph GraphState (telemetry + proposed_action + OOD).
-
-        Returns
-        -------
-        SupervisorVerdict
+        Never raises — on any failure defaults to APPROVE (fail-safe).
         """
         step = state["telemetry"].step if state.get("telemetry") else 0
         try:
-            system_prompt, user_prompt = self._build_prompt(state)
-            raw = self._call_backend(system_prompt, user_prompt)
-            return self._parse_verdict(raw, step)
-        except httpx.TimeoutException:
-            logger.warning("NotebookLMAgent: request timed out at step %d – defaulting APPROVE", step)
-            return self._safe_approve(step, "Network timeout – defaulting to approve", confidence=0.0)
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code == 429:
-                logger.warning("NotebookLMAgent: rate-limited at step %d – defaulting APPROVE", step)
-                return self._safe_approve(step, "Rate-limited – defaulting to approve", confidence=0.0)
-            logger.error("NotebookLMAgent: HTTP %d at step %d", exc.response.status_code, step)
-            return self._safe_approve(step, f"HTTP {exc.response.status_code} – defaulting to approve")
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("NotebookLMAgent: unexpected error at step %d: %s", step, exc)
-            return self._safe_approve(step, f"Unexpected error: {exc}")
+            prompt = self._build_prompt(state)
+            result = self._agent.invoke(
+                {"messages": [HumanMessage(content=prompt)]},
+                config={"recursion_limit": 10},
+            )
+            return self._extract_verdict(result["messages"], step, state)
+        except Exception as exc:
+            logger.warning("NotebookLMAgent: error at step %d: %s — defaulting APPROVE", step, exc)
+            return self._safe_approve(step, f"Agent error: {exc}", confidence=0.0)
 
     # ------------------------------------------------------------------
-    # Private helpers
+    # Private
     # ------------------------------------------------------------------
 
-    def _build_prompt(self, state: GraphState) -> tuple[str, str]:
-        """Format system and user prompts from the current state."""
+    def _build_prompt(self, state: GraphState) -> str:
         tel: TelemetryPayload = state["telemetry"]
-        act: ActionPayload = state["proposed_action"]
-        ood: OODMetrics = state["ood_metrics"]
+        action: ActionPayload = state["proposed_action"]
+        ood: OODMetrics | None = state.get("ood_metrics")
 
-        user_prompt = _USER_TEMPLATE.format(
+        return _SYSTEM_PROMPT + "\n\n" + _USER_TEMPLATE.format(
             step=tel.step,
             t_in=tel.t_in,
             co2=tel.co2,
             rh=tel.rh,
             T_out=tel.T_out,
             rad=tel.rad,
-            uBoil=act.uBoil,
-            uCO2=act.uCO2,
-            uThScr=act.uThScr,
-            uVent=act.uVent,
-            uLamp=act.uLamp,
-            uBlScr=act.uBlScr,
-            mahalanobis=ood.mahalanobis_distance,
-            threshold=ood.threshold_used,
-            in_distribution=ood.in_distribution,
-            max_residual=ood.max_residual,
+            uBoil=action.uBoil,
+            uCO2=action.uCO2,
+            uThScr=action.uThScr,
+            uVent=action.uVent,
+            uLamp=action.uLamp,
+            uBlScr=action.uBlScr,
+            mahalanobis=ood.mahalanobis_distance if ood else 0.0,
+            threshold=ood.threshold_used if ood else 6.0,
+            in_distribution=ood.in_distribution if ood else True,
+            max_residual=ood.max_residual if ood else 0.0,
         )
-        return _SYSTEM_PROMPT, user_prompt
 
-    def _call_backend(self, system_prompt: str, user_prompt: str) -> str:
-        """
-        Call the configured backend and return the raw text response.
+    def _extract_verdict(self, messages, step: int, state: GraphState) -> SupervisorVerdict:
+        """Extract submit_verdict tool call args from agent messages."""
+        proposed: ActionPayload = state.get("proposed_action")
 
-        All three backends expose an OpenAI-compatible ``/chat/completions``
-        endpoint so the same request body works for all of them.
-        """
-        payload = {
-            "model": self._model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            "temperature": 0.0,
-        }
+        for msg in messages:
+            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                for tc in msg.tool_calls:
+                    if tc["name"] == "submit_verdict":
+                        args = tc["args"]
+                        decision = args.get("decision", "APPROVE")
+                        reason = args.get("reason", "")
+                        confidence = float(args.get("confidence", 0.8))
 
-        response = self._http.post("/chat/completions", json=payload)
-        response.raise_for_status()
-        data = response.json()
-        return data["choices"][0]["message"]["content"]
+                        override_action = None
+                        if decision == "OVERRIDE" and proposed is not None:
+                            def _safe(v, fallback):
+                                return float(v) if isinstance(v, (int, float)) and v >= 0 else fallback
+                            override_action = proposed.model_copy(update={
+                                "approved": False,
+                                "uBoil": _safe(args.get("uBoil"), proposed.uBoil),
+                                "uCO2": _safe(args.get("uCO2"), proposed.uCO2),
+                                "uThScr": _safe(args.get("uThScr"), proposed.uThScr),
+                                "uVent": _safe(args.get("uVent"), proposed.uVent),
+                                "uLamp": _safe(args.get("uLamp"), proposed.uLamp),
+                                "uBlScr": _safe(args.get("uBlScr"), proposed.uBlScr),
+                            })
 
-    def _parse_verdict(self, raw_json: str, step: int) -> SupervisorVerdict:
-        """
-        Parse the LLM text into a SupervisorVerdict.
+                        logger.info(
+                            "Supervisor step=%d decision=%s confidence=%.2f reason=%s",
+                            step, decision, confidence, reason[:60],
+                        )
+                        return SupervisorVerdict(
+                            step=step,
+                            decision=decision,
+                            override_action=override_action,
+                            reason=reason,
+                            confidence=confidence,
+                        )
 
-        On any parse / validation failure, defaults to APPROVE (fail-safe).
-        Never raises an exception.
-        """
-        try:
-            # Some models wrap JSON in markdown code blocks or add extra text;
-            # try to extract the first {...} block if direct parse fails.
-            text = raw_json.strip()
-            try:
-                obj = json.loads(text)
-            except json.JSONDecodeError:
-                import re as _re
-                m = _re.search(r"\{.*\}", text, _re.DOTALL)
-                if m:
-                    obj = json.loads(m.group())
-                else:
-                    raise
-            # Inject step if the LLM omitted it
-            obj.setdefault("step", step)
-            # Validate decision value
-            if obj.get("decision") not in {"APPROVE", "REJECT", "OVERRIDE"}:
-                raise ValueError(f"Unknown decision: {obj.get('decision')!r}")
-            # If OVERRIDE, validate the nested action
-            if obj.get("decision") == "OVERRIDE" and obj.get("override_action"):
-                try:
-                    obj["override_action"] = ActionPayload(**obj["override_action"])
-                except (ValidationError, TypeError):
-                    logger.warning(
-                        "NotebookLMAgent: invalid override_action at step %d; falling back to APPROVE",
-                        step,
-                    )
-                    obj["decision"] = "APPROVE"
-                    obj["override_action"] = None
-            return SupervisorVerdict(**obj)
-        except (json.JSONDecodeError, ValidationError, ValueError, KeyError) as exc:
-            logger.warning("NotebookLMAgent: parse error at step %d (%s); defaulting APPROVE", step, exc)
-            logger.debug("Raw response was: %s", raw_json)
-            return self._safe_approve(step, "Parse error – defaulting to approve")
+        # No tool call found — default to APPROVE
+        logger.warning(
+            "NotebookLMAgent: no tool call found in response at step %d — defaulting APPROVE", step
+        )
+        return self._safe_approve(step, "No tool call returned by LLM", confidence=0.0)
 
-    @staticmethod
-    def _safe_approve(
-        step: int,
-        reason: str,
-        confidence: float = 1.0,
-    ) -> SupervisorVerdict:
+    def _safe_approve(self, step: int, reason: str, confidence: float = 1.0) -> SupervisorVerdict:
         return SupervisorVerdict(
             step=step,
             decision="APPROVE",
@@ -260,76 +240,3 @@ class NotebookLMAgent:
             reason=reason,
             confidence=confidence,
         )
-
-    def close(self) -> None:
-        """Release the underlying HTTP client."""
-        self._http.close()
-
-    def __enter__(self) -> "NotebookLMAgent":
-        return self
-
-    def __exit__(self, *_: object) -> None:
-        self.close()
-
-
-if __name__ == "__main__":
-    import json
-    import os
-    from http.server import BaseHTTPRequestHandler, HTTPServer
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(name)s %(levelname)s %(message)s",
-    )
-
-    from greenhouse_mvp.orchestration.schemas import (
-        ActionPayload,
-        GraphState,
-        OODMetrics,
-        TelemetryPayload,
-    )
-
-    _agent = NotebookLMAgent(
-        backend=os.environ.get("LLM_BACKEND", "openai"),
-        api_key=os.environ.get("OPENAI_API_KEY", ""),
-        base_url=os.environ.get("OPENAI_BASE_URL") or "https://api.openai.com/v1",
-        model=os.environ.get("LLM_MODEL", "gpt-4o-mini"),
-    )
-
-    class _Handler(BaseHTTPRequestHandler):
-        def log_message(self, fmt: str, *args: object) -> None:  # noqa: D102
-            logger.info(fmt, *args)
-
-        def do_POST(self) -> None:  # noqa: N802
-            if self.path != "/review":
-                self.send_response(404)
-                self.end_headers()
-                return
-            length = int(self.headers.get("Content-Length", 0))
-            body = json.loads(self.rfile.read(length))
-            state: GraphState = {
-                "telemetry": TelemetryPayload(**body["telemetry"]),
-                "proposed_action": ActionPayload(**body["proposed_action"]),
-                "ood_metrics": OODMetrics(**body["ood_metrics"]),
-                "supervisor_verdict": None,
-                "final_action": None,
-                "ood_detected": True,
-                "retry_count": 0,
-                "max_retries": 2,
-                "episode_log": [],
-            }
-            verdict = _agent.review(state)
-            payload = verdict.model_dump_json().encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(payload)))
-            self.end_headers()
-            self.wfile.write(payload)
-
-    _http_port = int(os.environ.get("AGENT_PORT", "8081"))
-    _server = HTTPServer(("0.0.0.0", _http_port), _Handler)
-    logger.info("NotebookLMAgent HTTP server listening on :%d /review", _http_port)
-    try:
-        _server.serve_forever()
-    finally:
-        _agent.close()

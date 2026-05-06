@@ -1,4 +1,4 @@
-export interface TelemetryPayload {
+﻿export interface TelemetryPayload {
   step: number;
   timestamp_sim: number;
   t_in: number;
@@ -38,23 +38,6 @@ export interface SupervisorVerdict {
   confidence: number;
 }
 
-export interface SimControl {
-  paused: boolean;
-  speed_multiplier: number;
-}
-
-export interface AgentControl {
-  enabled: boolean;
-}
-
-export interface ControllerSelect {
-  mode: 'mpc' | 'llm';
-}
-
-export interface SimReset {
-  requested: boolean;
-}
-
 export interface LLMActionPayload {
   step: number;
   reasoning: string;
@@ -66,9 +49,31 @@ export interface LLMActionPayload {
   uBlScr: number;
 }
 
+export interface SimConfig {
+  env_id: string;
+  start_date: string;
+  n_days: number;
+  period: number;
+  controller_mode: 'mpc' | 'llm';
+  agent_enabled: boolean;
+  speed_multiplier: number;
+  mpc_horizon: number;
+  llm_call_interval: number;
+}
+
+export interface SimStatus {
+  running: boolean;
+  paused: boolean;
+  step: number;
+  config: SimConfig;
+  latest_telemetry: TelemetryPayload | null;
+  latest_action: ActionPayload | null;
+  latest_ood: OODMetrics | null;
+}
+
 export interface DashboardState {
   connected: boolean;
-  timestamps: string[];   // HH:MM derived from timestamp_sim
+  timestamps: string[];
   steps: number[];
   t_in: number[];
   T_out: number[];
@@ -91,4 +96,9 @@ export interface DashboardState {
   latestAction: ActionPayload | null;
   supervisorLog: SupervisorVerdict[];
   llmLog: LLMActionPayload[];
+  // Simulation control
+  simRunning: boolean;
+  simPaused: boolean;
+  simStep: number;
+  serverConnected: boolean;
 }

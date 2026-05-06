@@ -1,11 +1,10 @@
-import { useState, useCallback, useEffect } from 'react';
+﻿import { useState, useCallback, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import type { ChartOptions, ChartDataset } from 'chart.js';
-import { useMqtt } from './useMqtt';
-import type { SupervisorVerdict, LLMActionPayload } from './types';
+import { useApi } from './useApi';
+import type { SimConfig, SupervisorVerdict, LLMActionPayload } from './types';
 
 // -- Constants ---------------------------------------------------------------
-const BROKER_URL     = `ws://${window.location.hostname}:9001`;
 const WINDOW_OPTIONS = [60, 120, 300, 600] as const;
 const SPEED_OPTIONS  = [0.25, 0.5, 1, 2, 5, 10] as const;
 
@@ -14,6 +13,8 @@ const SP = {
   co2:  { lo: 600, hi: 1000, set: 800 },
   rh:   { lo: 40,  hi: 85,   set: 85  },
 } as const;
+
+const STORAGE_KEY = 'gh_ctrl_settings';
 
 type Tab = 'thermals' | 'actuators' | 'weather' | 'ood';
 
@@ -29,11 +30,8 @@ const BASE_OPTS: ChartOptions<'line'> = {
       labels: { boxWidth: 12, color: '#8b949e', font: { size: 11 } },
     },
     tooltip: {
-      backgroundColor: '#1c2128',
-      borderColor: '#30363d',
-      borderWidth: 1,
-      titleColor: '#e6edf3',
-      bodyColor: '#8b949e',
+      backgroundColor: '#1c2128', borderColor: '#30363d', borderWidth: 1,
+      titleColor: '#e6edf3', bodyColor: '#8b949e',
     },
   },
   scales: {
@@ -65,27 +63,17 @@ function chartOpts(yLabel: string, yMin?: number, yMax?: number): ChartOptions<'
 
 function lds(label: string, data: number[], color: string, fill = false): ChartDataset<'line'> {
   return {
-    label, data,
-    borderColor: color,
+    label, data, borderColor: color,
     backgroundColor: fill ? `${color}28` : 'transparent',
-    borderWidth: 2,
-    pointRadius: 0,
-    tension: 0.3,
-    fill,
+    borderWidth: 2, pointRadius: 0, tension: 0.3, fill,
   } as ChartDataset<'line'>;
 }
 
 function flatLds(label: string, n: number, value: number, color: string): ChartDataset<'line'> {
   return {
-    label,
-    data: Array(n).fill(value) as number[],
-    borderColor: color,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderDash: [5, 5],
-    pointRadius: 0,
-    fill: false,
-    tension: 0,
+    label, data: Array(n).fill(value) as number[],
+    borderColor: color, backgroundColor: 'transparent',
+    borderWidth: 1, borderDash: [5, 5], pointRadius: 0, fill: false, tension: 0,
   } as unknown as ChartDataset<'line'>;
 }
 
@@ -159,51 +147,106 @@ function ChartCard({ title, height, children }: {
   );
 }
 
+// -- Config panel ------------------------------------------------------------
+function ConfigPanel({
+  config, onSave,
+}: {
+  config: SimConfig | null;
+  onSave: (c: SimConfig) => void;
+}) {
+  const [local, setLocal] = useState<SimConfig | null>(config);
+
+  useEffect(() => { if (config && !local) setLocal(config); }, [config]);
+
+  if (!local) return <div style={{ color: 'var(--muted)', fontSize: 12 }}>Loading config...</div>;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="cfg-row">
+        <label>Start date</label>
+        <input className="cfg-input" value={local.start_date}
+          onChange={e => setLocal({ ...local, start_date: e.target.value })} />
+      </div>
+      <div className="cfg-row">
+        <label>Season length (days)</label>
+        <input className="cfg-input" type="number" min={1} max={365}
+          value={local.n_days}
+          onChange={e => setLocal({ ...local, n_days: parseInt(e.target.value, 10) || 60 })} />
+      </div>
+      <div className="cfg-row">
+        <label>MPC horizon (steps)</label>
+        <input className="cfg-input" type="number" min={5} max={96}
+          value={local.mpc_horizon}
+          onChange={e => setLocal({ ...local, mpc_horizon: parseInt(e.target.value, 10) || 20 })} />
+      </div>
+      <div className="cfg-row">
+        <label>LLM call interval</label>
+        <input className="cfg-input" type="number" min={1} max={96}
+          value={local.llm_call_interval}
+          onChange={e => setLocal({ ...local, llm_call_interval: parseInt(e.target.value, 10) || 1 })} />
+      </div>
+      <button className="btn btn--primary" style={{ marginTop: 4 }}
+        onClick={() => onSave(local)}>
+        Save & Apply
+      </button>
+    </div>
+  );
+}
+
 // -- Main App ----------------------------------------------------------------
 export default function App() {
-  const { state, publishControl, publishAgentControl, publishControllerSelect, publishReset } = useMqtt(BROKER_URL);
-  const [windowSize,      setWindowSize]      = useState<number>(120);
-  const [activeTab,       setActiveTab]       = useState<Tab>('thermals');
-  const [paused,          setPaused]          = useState(false);
-  const [speed,           setSpeed]           = useState(1);
-  const [agentOn,         setAgentOn]         = useState(false);
-  const [controllerMode,  setControllerMode]  = useState<'mpc' | 'llm'>('mpc');
+  const {
+    state, startSim, stopSim, resetSim,
+    setControl, setController, setAgent, updateConfig, fetchConfig,
+  } = useApi();
 
-  // Sync initial states to backend on first connect
+  const [windowSize, setWindowSize]   = useState<number>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved).windowSize ?? 120 : 120;
+  });
+  const [activeTab, setActiveTab]     = useState<Tab>('thermals');
+  const [speed, setSpeed]             = useState<number>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved).speed ?? 1 : 1;
+  });
+  const [showConfig, setShowConfig]   = useState(false);
+  const [serverConfig, setServerConfig] = useState<SimConfig | null>(null);
+
+  // Persist UI settings
   useEffect(() => {
-    if (state.connected) {
-      publishAgentControl({ enabled: agentOn });
-      publishControllerSelect({ mode: controllerMode });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.connected]);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ windowSize, speed }));
+  }, [windowSize, speed]);
 
-  const handlePause = useCallback(() => {
-    const next = !paused;
-    setPaused(next);
-    publishControl({ paused: next, speed_multiplier: speed });
-  }, [paused, speed, publishControl]);
+  // Load server config once connected
+  useEffect(() => {
+    if (state.serverConnected && !serverConfig) {
+      fetchConfig().then(cfg => { if (cfg) setServerConfig(cfg); });
+    }
+  }, [state.serverConnected, serverConfig, fetchConfig]);
 
   const handleSpeed = useCallback((s: number) => {
     setSpeed(s);
-    setPaused(false);
-    publishControl({ paused: false, speed_multiplier: s });
-  }, [publishControl]);
+    setControl(false, s);
+  }, [setControl]);
 
-  const handleAgentToggle = useCallback(() => {
-    const next = !agentOn;
-    setAgentOn(next);
-    publishAgentControl({ enabled: next });
-  }, [agentOn, publishAgentControl]);
+  const handlePause = useCallback(() => {
+    setControl(!state.simPaused, speed);
+  }, [state.simPaused, speed, setControl]);
 
   const handleControllerSwitch = useCallback((mode: 'mpc' | 'llm') => {
-    setControllerMode(mode);
-    publishControllerSelect({ mode });
-  }, [publishControllerSelect]);
+    setController(mode);
+  }, [setController]);
 
-  const handleReset = useCallback(() => {
-    publishReset({ requested: true });
-  }, [publishReset]);
+  const handleAgentToggle = useCallback(() => {
+    setAgent(!state.agentEnabled);
+  }, [state.agentEnabled, setAgent]);
+
+  const handleReset = useCallback(() => { resetSim(); }, [resetSim]);
+
+  const handleSaveConfig = useCallback((cfg: SimConfig) => {
+    setServerConfig(cfg);
+    updateConfig(cfg);
+  }, [updateConfig]);
 
   const n      = windowSize;
   const labels = state.timestamps.slice(-n);
@@ -214,18 +257,22 @@ export default function App() {
     <div className="layout">
 
       <header className="header">
-        <StatusDot on={state.connected} />
+        <StatusDot on={state.serverConnected} />
         <h1 className="header__title">Greenhouse Control</h1>
-        <span className="header__subtitle">Live Dashboard</span>
-        <span className="header__step">Step: <b>{tel?.step ?? '\u2014'}</b></span>
+        <span className="header__subtitle">
+          {state.serverConnected
+            ? (state.simRunning ? 'Running' : 'Stopped')
+            : 'Offline'}
+        </span>
+        <span className="header__step">Step: <b>{state.simStep > 0 ? state.simStep : '\u2014'}</b></span>
       </header>
 
       <div className="metrics-bar">
-        <MetricCard label="Indoor Temp"  value={tel?.t_in  ?? null} unit="\u00b0C"   lo={SP.temp.lo} hi={SP.temp.hi} />
-        <MetricCard label="CO\u2082"          value={tel?.co2   ?? null} unit="ppm"  lo={SP.co2.lo}  hi={SP.co2.hi} />
+        <MetricCard label="Indoor Temp"  value={tel?.t_in  ?? null} unit="°C"   lo={SP.temp.lo} hi={SP.temp.hi} />
+        <MetricCard label="CO₂"          value={tel?.co2   ?? null} unit="ppm"  lo={SP.co2.lo}  hi={SP.co2.hi} />
         <MetricCard label="Humidity"     value={tel?.rh    ?? null} unit="%"    lo={SP.rh.lo}   hi={SP.rh.hi} />
-        <MetricCard label="Outdoor Temp" value={tel?.T_out ?? null} unit="\u00b0C" />
-        <MetricCard label="Solar Rad"    value={tel?.rad   ?? null} unit="W/m\u00b2" />
+        <MetricCard label="Outdoor Temp" value={tel?.T_out ?? null} unit="°C" />
+        <MetricCard label="Solar Rad"    value={tel?.rad   ?? null} unit="W/m²" />
         <div className="window-select">
           <span>Window:</span>
           {WINDOW_OPTIONS.map(w => (
@@ -252,167 +299,180 @@ export default function App() {
               ))}
             </div>
 
-            {activeTab === 'thermals' && (<>
-              <ChartCard title="Temperature" height={280}>
-                <Line options={chartOpts('\u00b0C')} data={{ labels, datasets: [
-                  lds('t_in (\u00b0C)', state.t_in.slice(-n), '#58a6ff', true),
-                  flatLds(`Min ${SP.temp.lo}`, labels.length, SP.temp.lo, '#8b949e'),
-                  flatLds(`Max ${SP.temp.hi}`, labels.length, SP.temp.hi, '#8b949e'),
-                  flatLds(`SP ${SP.temp.set}`,  labels.length, SP.temp.set, '#3fb950'),
-                ]}} />
-              </ChartCard>
-              <ChartCard title="CO\u2082 Concentration" height={240}>
-                <Line options={chartOpts('ppm')} data={{ labels, datasets: [
-                  lds('CO\u2082 (ppm)', state.co2.slice(-n), '#3fb950', true),
-                  flatLds(`Min ${SP.co2.lo}`, labels.length, SP.co2.lo, '#8b949e'),
-                  flatLds(`Max ${SP.co2.hi}`, labels.length, SP.co2.hi, '#8b949e'),
-                  flatLds(`SP ${SP.co2.set}`,  labels.length, SP.co2.set, '#58a6ff'),
-                ]}} />
-              </ChartCard>
-              <ChartCard title="Relative Humidity" height={200}>
-                <Line options={chartOpts('%')} data={{ labels, datasets: [
-                  lds('RH (%)', state.rh.slice(-n), '#bc8cff', true),
-                  flatLds(`Min ${SP.rh.lo}`, labels.length, SP.rh.lo, '#8b949e'),
-                  flatLds(`Max ${SP.rh.hi}`, labels.length, SP.rh.hi, '#8b949e'),
-                  flatLds(`SP ${SP.rh.set}`,  labels.length, SP.rh.set, '#d29922'),
-                ]}} />
-              </ChartCard>
-            </>)}
+            {activeTab === 'thermals' && (
+              <div className="chart-col">
+                <ChartCard title="Temperature (°C)" height={160}>
+                  <Line data={{ labels, datasets: [
+                    lds('Indoor', state.t_in.slice(-n), '#58a6ff', true),
+                    lds('Outdoor', state.T_out.slice(-n), '#8b949e'),
+                    flatLds('Setpoint 20°C', labels.length, 20, '#3fb950'),
+                  ]}} options={chartOpts('°C')} />
+                </ChartCard>
+                <ChartCard title="CO₂ (ppm)" height={140}>
+                  <Line data={{ labels, datasets: [
+                    lds('CO₂', state.co2.slice(-n), '#d2a8ff', true),
+                    flatLds('Setpoint 800', labels.length, 800, '#3fb950'),
+                    flatLds('Max 1000', labels.length, 1000, '#f85149'),
+                  ]}} options={chartOpts('ppm', 300, 1200)} />
+                </ChartCard>
+                <ChartCard title="Relative Humidity (%)" height={140}>
+                  <Line data={{ labels, datasets: [
+                    lds('RH', state.rh.slice(-n), '#79c0ff', true),
+                    flatLds('Max 85%', labels.length, 85, '#f85149'),
+                  ]}} options={chartOpts('%', 0, 100)} />
+                </ChartCard>
+              </div>
+            )}
 
-            {activeTab === 'actuators' && (<>
-              <ChartCard title="Heating &amp; CO\u2082" height={260}>
-                <Line options={chartOpts('signal [0\u20131]', 0, 1)} data={{ labels, datasets: [
-                  lds('Boiler',     state.uBoil.slice(-n), '#f85149'),
-                  lds('CO\u2082 inject', state.uCO2.slice(-n),  '#3fb950'),
-                ]}} />
-              </ChartCard>
-              <ChartCard title="Screens &amp; Ventilation" height={260}>
-                <Line options={chartOpts('signal [0\u20131]', 0, 1)} data={{ labels, datasets: [
-                  lds('Thermal screen',  state.uThScr.slice(-n), '#58a6ff'),
-                  lds('Ventilation',     state.uVent.slice(-n),  '#bc8cff'),
-                  lds('Blackout screen', state.uBlScr.slice(-n), '#8b949e'),
-                ]}} />
-              </ChartCard>
-              <ChartCard title="Lighting" height={200}>
-                <Line options={chartOpts('signal [0\u20131]', 0, 1)} data={{ labels, datasets: [
-                  lds('Lamps', state.uLamp.slice(-n), '#d29922', true),
-                ]}} />
-              </ChartCard>
-            </>)}
+            {activeTab === 'actuators' && (
+              <div className="chart-col">
+                {(['uBoil','uCO2','uThScr','uVent','uLamp','uBlScr'] as const).map((key, i) => {
+                  const labels2 = ['Boiler','CO₂ Inject','Thermal Screen','Ventilation','Lamps','Blackout Screen'];
+                  const colors  = ['#ff7b72','#79c0ff','#d2a8ff','#56d364','#ffa657','#8b949e'];
+                  return (
+                    <ChartCard key={key} title={labels2[i]} height={120}>
+                      <Line data={{ labels, datasets: [lds(labels2[i], state[key].slice(-n), colors[i], true)] }}
+                        options={chartOpts('', 0, 1)} />
+                    </ChartCard>
+                  );
+                })}
+              </div>
+            )}
 
-            {activeTab === 'weather' && (<>
-              <ChartCard title="Outdoor Temperature" height={300}>
-                <Line options={chartOpts('\u00b0C')} data={{ labels, datasets: [
-                  lds('T_out (\u00b0C)', state.T_out.slice(-n), '#bc8cff', true),
-                ]}} />
-              </ChartCard>
-              <ChartCard title="Solar Radiation" height={300}>
-                <Line options={chartOpts('W/m\u00b2', 0)} data={{ labels, datasets: [
-                  lds('Radiation (W/m\u00b2)', state.rad.slice(-n), '#d29922', true),
-                ]}} />
-              </ChartCard>
-            </>)}
+            {activeTab === 'weather' && (
+              <div className="chart-col">
+                <ChartCard title="Solar Radiation (W/m²)" height={180}>
+                  <Line data={{ labels, datasets: [lds('Radiation', state.rad.slice(-n), '#ffa657', true)] }}
+                    options={chartOpts('W/m²', 0)} />
+                </ChartCard>
+                <ChartCard title="Outdoor Temperature (°C)" height={180}>
+                  <Line data={{ labels, datasets: [lds('T_out', state.T_out.slice(-n), '#8b949e', true)] }}
+                    options={chartOpts('°C')} />
+                </ChartCard>
+              </div>
+            )}
 
             {activeTab === 'ood' && (
-              <ChartCard title={`Mahalanobis Distance (threshold = ${state.oodThreshold})`} height={400}>
-                <Line options={chartOpts('distance', 0)} data={{ labels, datasets: [
-                  lds('Mahalanobis', state.mahal.slice(-n), '#d29922', true),
-                  flatLds(`Threshold ${state.oodThreshold}`, labels.length, state.oodThreshold, '#f85149'),
-                ]}} />
-              </ChartCard>
+              <div className="chart-col">
+                <ChartCard title="Mahalanobis Distance (OOD)" height={220}>
+                  <Line data={{ labels, datasets: [
+                    lds('Mahal. dist', state.mahal.slice(-n), '#ff7b72', true),
+                    flatLds(`Threshold ${state.oodThreshold.toFixed(1)}`, labels.length, state.oodThreshold, '#f85149'),
+                  ]}} options={chartOpts('distance', 0)} />
+                </ChartCard>
+              </div>
             )}
           </div>
         </div>
 
-        <div className="sidebar">
+        <div className="controls-col">
 
+          {/* Simulation start/stop */}
           <div className="card">
-            <div className="card__title">Simulation Controls</div>
-            <div className="pause-row">
-              <button
-                className={`btn btn--warning${paused ? ' btn--active' : ''}`}
-                onClick={handlePause}
-                style={{ minWidth: 96 }}
-              >
-                {paused ? '\u25b6 Resume' : '\u23f8 Pause'}
-              </button>
-              <span style={{ color: 'var(--muted)', fontSize: 12 }}>
-                {paused ? 'Paused' : `${speed}× speed`}
-              </span>
-            </div>
-            <div className="speed-section-label">Speed multiplier:</div>
-            <div className="speed-btns">
-              {SPEED_OPTIONS.map(s => (
-                <button key={s}
-                  className={`btn${speed === s && !paused ? ' btn--active' : ''}`}
-                  disabled={paused}
-                  onClick={() => handleSpeed(s)}
-                >
-                  {s}×
+            <div className="card__title">Simulation</div>
+            <div className="pause-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+              {!state.simRunning ? (
+                <button className="btn btn--primary" style={{ flex: 1 }}
+                  onClick={startSim} disabled={!state.serverConnected}>
+                  &#9654; Start
                 </button>
-              ))}
-            </div>
-            <div style={{ marginTop: 10 }}>
-              <button
-                className="btn btn--warning"
-                onClick={handleReset}
-                style={{ width: '100%' }}
-                title="Restart the simulation episode from the beginning"
-              >
-                &#x21BA; Restart Simulation
+              ) : (
+                <>
+                  <button className="btn btn--warning" style={{ flex: 1 }}
+                    onClick={handlePause}>
+                    {state.simPaused ? '\u25BA Resume' : '\u23F8 Pause'}
+                  </button>
+                  <button className="btn" style={{ flex: 1 }}
+                    onClick={stopSim}>
+                    &#9632; Stop
+                  </button>
+                </>
+              )}
+              <button className="btn" style={{ flex: 1 }}
+                onClick={handleReset} disabled={!state.serverConnected}
+                title="Reset simulation episode">
+                &#x21BA; Reset
               </button>
             </div>
+            {state.simRunning && (
+              <>
+                <div className="speed-section-label" style={{ marginTop: 10 }}>Speed:</div>
+                <div className="speed-btns">
+                  {SPEED_OPTIONS.map(s => (
+                    <button key={s}
+                      className={`btn${speed === s && !state.simPaused ? ' btn--active' : ''}`}
+                      disabled={state.simPaused}
+                      onClick={() => handleSpeed(s)}>
+                      {s}&times;
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
+          {/* Simulation config */}
+          <div className="card">
+            <div className="card__title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Config</span>
+              <button className="btn" style={{ padding: '2px 8px', fontSize: 11 }}
+                onClick={() => setShowConfig(v => !v)}>
+                {showConfig ? 'Hide' : 'Edit'}
+              </button>
+            </div>
+            {showConfig && (
+              <ConfigPanel config={serverConfig} onSave={handleSaveConfig} />
+            )}
+            {!showConfig && serverConfig && (
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                {serverConfig.start_date} &bull; {serverConfig.n_days} days &bull; {serverConfig.controller_mode.toUpperCase()}
+              </div>
+            )}
+          </div>
+
+          {/* Controller select */}
           <div className="card">
             <div className="card__title">Controller</div>
             <div className="speed-btns">
               <button
-                className={`btn${controllerMode === 'mpc' ? ' btn--active' : ''}`}
-                onClick={() => handleControllerSwitch('mpc')}
-                style={{ flex: 1 }}
-                title="Physics-Informed SINDy MPC controller"
-              >
+                className={`btn${state.controllerMode === 'mpc' ? ' btn--active' : ''}`}
+                onClick={() => handleControllerSwitch('mpc')} style={{ flex: 1 }}
+                title="Physics-Informed SINDy MPC controller">
                 MPC
               </button>
               <button
-                className={`btn${controllerMode === 'llm' ? ' btn--active' : ''}`}
-                onClick={() => handleControllerSwitch('llm')}
-                style={{ flex: 1 }}
-                title="Large Language Model autonomous controller"
-              >
+                className={`btn${state.controllerMode === 'llm' ? ' btn--active' : ''}`}
+                onClick={() => handleControllerSwitch('llm')} style={{ flex: 1 }}
+                title="Large Language Model autonomous controller">
                 LLM
               </button>
             </div>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
-              {controllerMode === 'mpc'
+              {state.controllerMode === 'mpc'
                 ? 'Physics-Informed SINDy MPC with OOD detection.'
                 : 'LLM autonomously decides all actuators from sensor data.'}
             </div>
           </div>
 
-          {controllerMode === 'mpc' && (
+          {/* AI Supervisor (MPC only) */}
+          {state.controllerMode === 'mpc' && (
             <div className="card">
               <div className="card__title">AI Supervisor</div>
               <div className="pause-row">
                 <button
-                  className={`btn${agentOn ? ' btn--active' : ' btn--warning'}`}
-                  onClick={handleAgentToggle}
-                  style={{ minWidth: 110 }}
-                >
-                  {agentOn ? '\u2705 Enabled' : '\u274c Disabled'}
+                  className={`btn${state.agentEnabled ? ' btn--active' : ' btn--warning'}`}
+                  onClick={handleAgentToggle} style={{ minWidth: 110 }}>
+                  {state.agentEnabled ? '\u2705 Enabled' : '\u274c Disabled'}
                 </button>
                 <span style={{ color: 'var(--muted)', fontSize: 12 }}>
-                  {agentOn ? 'LLM active' : 'Auto-approve'}
+                  {state.agentEnabled ? 'LLM active' : 'Auto-approve'}
                 </span>
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
-                When disabled, all MPC actions are approved automatically.
               </div>
             </div>
           )}
 
-          {controllerMode === 'mpc' && (
+          {/* OOD Monitor (MPC only) */}
+          {state.controllerMode === 'mpc' && (
             <div className="card">
               <div className="card__title">OOD Monitor</div>
               <div className="ood-center">
@@ -428,15 +488,15 @@ export default function App() {
             </div>
           )}
 
+          {/* Decision log */}
           <div className="card" style={{ flex: 1 }}>
-            {controllerMode === 'mpc' ? (
+            {state.controllerMode === 'mpc' ? (
               <>
                 <div className="card__title">Supervisor Decisions</div>
                 <div className="log-scroll">
                   {state.supervisorLog.length === 0
-                    ? <div className="no-data">Waiting for decisions\u2026</div>
-                    : state.supervisorLog.map((e, i) => <LogEntry key={i} entry={e} />)
-                  }
+                    ? <div className="no-data">Waiting for decisions&hellip;</div>
+                    : state.supervisorLog.map((e, i) => <LogEntry key={i} entry={e} />)}
                 </div>
               </>
             ) : (
@@ -444,9 +504,8 @@ export default function App() {
                 <div className="card__title">LLM Actions</div>
                 <div className="log-scroll">
                   {state.llmLog.length === 0
-                    ? <div className="no-data">Waiting for LLM decisions\u2026</div>
-                    : state.llmLog.map((e, i) => <LLMLogEntry key={i} entry={e} />)
-                  }
+                    ? <div className="no-data">Waiting for LLM decisions&hellip;</div>
+                    : state.llmLog.map((e, i) => <LLMLogEntry key={i} entry={e} />)}
                 </div>
               </>
             )}

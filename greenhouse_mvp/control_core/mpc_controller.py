@@ -1,14 +1,12 @@
-"""
+﻿"""
 mpc_controller.py — do_mpc MPC controller backed by a SINDy surrogate model.
 
 Architecture
 ------------
 * The SINDy discrete-time equations are embedded symbolically in a
-  ``do_mpc.model.Model('discrete')`` via CasADi matrix multiplication.
-* The MPC controller solves at each step and publishes the proposed action
-  to ``greenhouse/action/proposed`` via MQTT.
+  do_mpc.model.Model via CasADi matrix multiplication.
 * OOD detection uses Mahalanobis distance on the scaled feature space.
-* ``update_model()`` supports hot-swapping the SINDy model for DAgger-style
+* update_model() supports hot-swapping the SINDy model for DAgger-style
   online retraining.
 """
 
@@ -24,17 +22,12 @@ import pysindy as ps
 from sklearn.preprocessing import StandardScaler
 
 from greenhouse_mvp.environment.tvp_forecast import WeatherForecastTVP
-from greenhouse_mvp.orchestration.mqtt_bus import MQTTBus
 from greenhouse_mvp.orchestration.schemas import ActionPayload, OODMetrics, TelemetryPayload
 from greenhouse_mvp.sindy_pipeline.physics_features import compute_physics_features
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 
 OOD_THRESHOLD: float = 6.0  # Mahalanobis distance threshold for 21-d feature space.
-# For chi(21), the 99th percentile ≈ 6.1 — values above this indicate genuine anomalies.
 
 
 class MPCController:
@@ -43,24 +36,14 @@ class MPCController:
 
     Parameters
     ----------
-    sindy_model:
-        Fitted ``ps.SINDy`` model.
-    scaler_x:
-        StandardScaler fitted on state data [t_in, co2, rh].
-    scaler_u:
-        StandardScaler fitted on 18-d physics feature vector.
-    weather_provider:
-        Pre-built weather forecast TVP for the episode.
-    bus:
-        MQTT bus for publishing proposed actions and OOD metrics.
-    horizon:
-        MPC prediction horizon (number of steps).
-    period:
-        Sampling period in seconds.
-    mu_train:
-        Mean of the training feature matrix used for OOD (optional).
-    cov_inv:
-        Inverse covariance of training features used for OOD (optional).
+    sindy_model : ps.SINDy
+    scaler_x    : StandardScaler fitted on state data [t_in, co2, rh]
+    scaler_u    : StandardScaler fitted on 18-d physics feature vector
+    weather_provider : WeatherForecastTVP
+    horizon     : MPC prediction horizon
+    period      : Sampling period in seconds
+    mu_train    : Mean of training feature matrix (OOD)
+    cov_inv     : Inverse covariance of training features (OOD)
     """
 
     def __init__(
@@ -69,14 +52,11 @@ class MPCController:
         scaler_x: StandardScaler,
         scaler_u: StandardScaler,
         weather_provider: WeatherForecastTVP,
-        bus: MQTTBus,
         horizon: int = 20,
         period: float = 900.0,
         mu_train: np.ndarray | None = None,
         cov_inv: np.ndarray | None = None,
-        auto_subscribe: bool = True,
     ) -> None:
-        self._bus = bus
         self._horizon = horizon
         self._period = period
         self._mu_train = mu_train
@@ -88,52 +68,25 @@ class MPCController:
         )
         self._t0: float = 0.0  # current simulation time, advances each step
 
-        # Subscribe to telemetry (disabled when managed externally, e.g. from orchestration)
-        if auto_subscribe:
-            bus.subscribe(
-                topic="greenhouse/telemetry",
-                schema=TelemetryPayload,
-                handler=self._on_telemetry,
-                qos=1,
-            )
-
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
     def initialise(self, x0: np.ndarray) -> None:
-        """
-        Set the initial state and call ``mpc.set_initial_guess()``.
-
-        Parameters
-        ----------
-        x0:
-            Initial state vector [t_in, co2, rh], shape (3,).
-        """
+        """Set initial state and call mpc.set_initial_guess()."""
         x0 = np.asarray(x0, dtype=np.float64).reshape(-1, 1)
         self._mpc.x0 = x0
         self._mpc.set_initial_guess()
         logger.info("MPCController initialised with x0=%s", x0.ravel().tolist())
 
     def step(self, telemetry: TelemetryPayload) -> tuple[ActionPayload, OODMetrics]:
-        """
-        Run one MPC solve step and return the proposed action + OOD metrics.
-
-        Parameters
-        ----------
-        telemetry:
-            Current telemetry from the simulation.
-
-        Returns
-        -------
-        (ActionPayload, OODMetrics)
-        """
+        """Run one MPC solve step and return the proposed action + OOD metrics."""
         x0 = np.array(
             [telemetry.t_in, telemetry.co2, telemetry.rh], dtype=np.float64
         ).reshape(-1, 1)
 
-        u_opt = self._mpc.make_step(x0)   # shape (6, 1)
-        self._t0 += self._period           # advance internal time tracker
+        u_opt = self._mpc.make_step(x0)
+        self._t0 += self._period
         u_vec = u_opt.ravel()
 
         action = ActionPayload(
@@ -148,10 +101,6 @@ class MPCController:
         )
 
         ood = self._compute_ood(telemetry, u_vec)
-
-        self._bus.publish("greenhouse/action/proposed", action)
-        self._bus.publish("greenhouse/ood/metrics", ood)
-
         return action, ood
 
     def update_model(
@@ -163,13 +112,7 @@ class MPCController:
         mu_train: np.ndarray | None = None,
         cov_inv: np.ndarray | None = None,
     ) -> None:
-        """
-        Hot-swap the SINDy model (DAgger online retraining).
-
-        Rebuilds the do_mpc controller with new equations. The current x0
-        is preserved and re-applied after the rebuild.
-        """
-        # Preserve current state and time
+        """Hot-swap the SINDy model (DAgger online retraining)."""
         try:
             x0_prev = np.array(self._mpc.x0.cat).ravel()
         except Exception:
@@ -186,7 +129,6 @@ class MPCController:
         if cov_inv is not None:
             self._cov_inv = cov_inv
 
-        # Restore simulation time so TVP forecast stays aligned
         self._mpc.t0 = t0_prev
 
         if x0_prev is not None:
@@ -198,20 +140,167 @@ class MPCController:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _on_telemetry(self, payload: TelemetryPayload) -> None:
-        """MQTT callback: run one MPC step when telemetry arrives."""
-        try:
-            self.step(payload)
-        except Exception:
-            logger.exception("MPCController.step() raised an exception")
-
-    def _compute_ood(
+    def _build(
         self,
-        telemetry: TelemetryPayload,
-        u_vec: np.ndarray,
-    ) -> OODMetrics:
-        """Compute Mahalanobis distance OOD metrics."""
-        if self._mu_train is None or self._cov_inv is None:
+        sindy_model: ps.SINDy,
+        scaler_x: StandardScaler,
+        scaler_u: StandardScaler,
+        weather_provider: WeatherForecastTVP,
+        horizon: int,
+        period: float,
+    ):
+        """Build and configure a do_mpc controller from a SINDy model.
+
+        Mirrors the notebook (physics_informed_mpc.ipynb) exactly:
+        - individual named scalar variables
+        - symbolic physics feature vector
+        - coefs @ library_vector (full next-state prediction, no increment)
+        - inverse scaling of RHS
+        - named bounds and rterm
+        """
+        coefs = sindy_model.coefficients()  # (3, 22): 3 states × 22 library terms
+
+        # Scaler parameters
+        mu_x  = scaler_x.mean_    # (3,)
+        st_x  = scaler_x.scale_   # (3,)
+        mu_u  = scaler_u.mean_    # (18,)
+        st_u  = scaler_u.scale_   # (18,)
+
+        # ── 1. Build do_mpc Model with individual named scalar variables ──
+        model = do_mpc.model.Model("discrete")
+
+        # States
+        t_in = model.set_variable("_x", "t_in")
+        co2  = model.set_variable("_x", "co2")
+        rh   = model.set_variable("_x", "rh")
+
+        # Controls
+        uBoil  = model.set_variable("_u", "uBoil")
+        uCO2   = model.set_variable("_u", "uCO2")
+        uThScr = model.set_variable("_u", "uThScr")
+        uVent  = model.set_variable("_u", "uVent")
+        uLamp  = model.set_variable("_u", "uLamp")
+        uBlScr = model.set_variable("_u", "uBlScr")
+
+        # TVP (weather forecast)
+        T_out_v   = model.set_variable("_tvp", "T_out")
+        rad_v     = model.set_variable("_tvp", "rad")
+        co2_out_v = model.set_variable("_tvp", "co2_out")
+        sin_h_v   = model.set_variable("_tvp", "sin_h")
+        cos_h_v   = model.set_variable("_tvp", "cos_h")
+
+        # ── 2. Symbolic physics feature vector (18 u-features) ──
+        psat    = 0.6108 * ca.exp(17.27 * t_in / (t_in + 237.3))
+        vpd     = (1.0 - rh / 100.0) * psat
+        S_eff   = rad_v * (1.0 - uThScr)
+        t_S_eff = t_in * S_eff
+        h_uVent = rh * uVent
+        dc_uVent = (co2 - co2_out_v) * uVent
+        t_uBoil = t_in * uBoil
+
+        u_raw = ca.vertcat(
+            T_out_v, rad_v, co2_out_v, sin_h_v, cos_h_v,
+            uBoil, uCO2, uThScr, uVent, uLamp, uBlScr,
+            psat, vpd, S_eff, t_S_eff, h_uVent, dc_uVent, t_uBoil,
+        )
+
+        # ── 3. Normalise features ──
+        x_raw = ca.vertcat(t_in, co2, rh)
+        x_sc  = (x_raw - ca.DM(mu_x)) / ca.DM(st_x)
+        u_sc  = (u_raw - ca.DM(mu_u)) / ca.DM(st_u)
+
+        # Library vector: [1, x_sc(3), u_sc(18)] = 22 terms
+        library_vector = ca.vertcat(1, x_sc, u_sc)
+
+        # ── 4. SINDy dynamics: x_{k+1}_scaled = coefs @ library_vector ──
+        x_next_sc = ca.DM(coefs) @ library_vector  # (3,1)
+
+        # ── 5. Inverse normalise ──
+        st_x_ca = ca.DM(st_x.reshape(-1, 1))   # (3,1)
+        mu_x_ca = ca.DM(mu_x.reshape(-1, 1))   # (3,1)
+        x_next_raw = x_next_sc * st_x_ca + mu_x_ca
+
+        model.set_rhs("t_in", x_next_raw[0])
+        model.set_rhs("co2",  x_next_raw[1])
+        model.set_rhs("rh",   x_next_raw[2])
+        model.setup()
+
+        # ── 6. MPC controller ──
+        mpc = do_mpc.controller.MPC(model)
+        mpc.set_param(
+            n_horizon=horizon,
+            t_step=period,
+            n_robust=0,
+            store_full_solution=False,
+        )
+
+        # ── 7. Objective: track temperature setpoint + penalise energy ──
+        T_setpoint = 20.0
+        lterm = 10.0 * (t_in - T_setpoint) ** 2 + 100.0 * uBoil ** 2 + 50.0 * uLamp ** 2
+        mterm = 10.0 * (t_in - T_setpoint) ** 2
+        mpc.set_objective(mterm=mterm, lterm=lterm)
+
+        mpc.set_rterm(
+            uBoil=50.0,
+            uCO2=10.0,
+            uThScr=10.0,
+            uVent=100.0,
+            uLamp=5.0,
+            uBlScr=5.0,
+        )
+
+        # ── 8. Bounds ──
+        for u_name in ["uBoil", "uCO2", "uThScr", "uVent", "uLamp", "uBlScr"]:
+            mpc.bounds["lower", "_u", u_name] = 0.0
+            mpc.bounds["upper", "_u", u_name] = 1.0
+
+        mpc.bounds["lower", "_x", "t_in"] = 5.0
+        mpc.bounds["upper", "_x", "t_in"] = 45.0
+
+        # ── 9. TVP function from weather provider ──
+        tvp_fun = weather_provider.get_mpc_tvp_fun(mpc)
+        mpc.set_tvp_fun(tvp_fun)
+        mpc.setup()
+
+        return mpc, model, scaler_x, scaler_u
+
+    def _compute_ood(self, telemetry: TelemetryPayload, u_vec: np.ndarray) -> OODMetrics:
+        """Compute Mahalanobis-distance OOD detection."""
+        try:
+            feat = compute_physics_features(
+                t_in=telemetry.t_in,
+                co2=telemetry.co2,
+                rh=telemetry.rh,
+                T_out=telemetry.T_out,
+                rad=telemetry.rad,
+                co2_out=telemetry.co2_out,
+                u_vec=u_vec,
+            )
+            feat_sc = self._scaler_u.transform(feat.reshape(1, -1))[0]
+
+            if self._mu_train is not None and self._cov_inv is not None:
+                diff = feat_sc - self._mu_train
+                mahal = float(np.sqrt(diff @ self._cov_inv @ diff))
+            else:
+                mahal = 0.0
+
+            # Max residual: one-step SINDy prediction error
+            x0 = np.array([telemetry.t_in, telemetry.co2, telemetry.rh])
+            x0_sc = self._scaler_x.transform(x0.reshape(1, -1))[0]
+            pred = self._sindy_model.predict(
+                x0_sc.reshape(1, -1), u=feat_sc.reshape(1, -1)
+            )
+            max_res = float(np.max(np.abs(pred)))
+
+            return OODMetrics(
+                step=telemetry.step,
+                mahalanobis_distance=mahal,
+                max_residual=max_res,
+                in_distribution=mahal < OOD_THRESHOLD,
+                threshold_used=OOD_THRESHOLD,
+            )
+        except Exception:
+            logger.debug("OOD computation failed — returning safe default", exc_info=True)
             return OODMetrics(
                 step=telemetry.step,
                 mahalanobis_distance=0.0,
@@ -219,241 +308,3 @@ class MPCController:
                 in_distribution=True,
                 threshold_used=OOD_THRESHOLD,
             )
-
-        # Build the physics feature vector for current state+action
-        states_1 = np.array([[telemetry.t_in, telemetry.co2, telemetry.rh]])
-        weather_1 = np.array([[telemetry.T_out, telemetry.rad, telemetry.co2_out]])
-        time_1 = np.array([[telemetry.sin_h, telemetry.cos_h]])
-        actions_1 = u_vec.reshape(1, -1)  # (1, 6)
-
-        phys = compute_physics_features(states_1, weather_1, time_1, actions_1)
-
-        x_cur = self._scaler_x.transform(states_1)[0]   # (3,)
-        u_cur = self._scaler_u.transform(phys)[0]        # (18,)
-        feat = np.concatenate([x_cur, u_cur])             # (21,)
-
-        delta = feat - self._mu_train
-        dist = float(np.sqrt(delta @ self._cov_inv @ delta))
-        in_dist = dist < OOD_THRESHOLD
-
-        # One-step SINDy residual on scaled inputs (simple proxy)
-        max_residual = float(np.max(np.abs(delta)))
-
-        return OODMetrics(
-            step=telemetry.step,
-            mahalanobis_distance=dist,
-            max_residual=max_residual,
-            in_distribution=in_dist,
-            threshold_used=OOD_THRESHOLD,
-        )
-
-    # ------------------------------------------------------------------
-    # Static builder
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _build(
-        sindy_model: ps.SINDy,
-        scaler_x: StandardScaler,
-        scaler_u: StandardScaler,
-        weather_provider: WeatherForecastTVP,
-        horizon: int,
-        period: float,
-    ) -> tuple[do_mpc.controller.MPC, do_mpc.model.Model, StandardScaler, StandardScaler]:
-        """Build a fresh do_mpc model + controller from a SINDy model."""
-
-        # ------ Extract scaler constants ------
-        mu_x = ca.DM(scaler_x.mean_.tolist())         # (3,)
-        sigma_x = ca.DM(scaler_x.scale_.tolist())     # (3,)
-        mu_u = ca.DM(scaler_u.mean_.tolist())         # (18,)
-        sigma_u = ca.DM(scaler_u.scale_.tolist())     # (18,)
-
-        # SINDy coefficient matrix Ξ, shape (3, 22)
-        coefs = ca.DM(sindy_model.coefficients())
-
-        # ------ Build do_mpc discrete model ------
-        model = do_mpc.model.Model("discrete")
-
-        # State variables
-        t_in = model.set_variable("_x", "t_in")
-        co2 = model.set_variable("_x", "co2")
-        rh = model.set_variable("_x", "rh")
-
-        # Control variables
-        uBoil = model.set_variable("_u", "uBoil")
-        uCO2 = model.set_variable("_u", "uCO2")
-        uThScr = model.set_variable("_u", "uThScr")
-        uVent = model.set_variable("_u", "uVent")
-        uLamp = model.set_variable("_u", "uLamp")
-        uBlScr = model.set_variable("_u", "uBlScr")
-
-        # Time-varying parameters (weather forecast)
-        T_out = model.set_variable("_tvp", "T_out")
-        rad = model.set_variable("_tvp", "rad")
-        co2_out = model.set_variable("_tvp", "co2_out")
-        sin_h = model.set_variable("_tvp", "sin_h")
-        cos_h = model.set_variable("_tvp", "cos_h")
-
-        # ------ Symbolic physics features (CasADi) ------
-        psat = 0.6108 * ca.exp(17.27 * t_in / (t_in + 237.3))
-        vpd = (1.0 - rh / 100.0) * psat
-        S_eff = rad * (1.0 - uThScr)
-
-        u_raw = ca.vertcat(
-            T_out, rad, co2_out, sin_h, cos_h,
-            uBoil, uCO2, uThScr, uVent, uLamp, uBlScr,
-            psat, vpd, S_eff,
-            t_in * S_eff,
-            rh * uVent,
-            (co2 - co2_out) * uVent,
-            t_in * uBoil,
-        )  # (18,)
-
-        # ------ Normalisation (embedded in model) ------
-        x_sym = ca.vertcat(t_in, co2, rh)
-        x_scaled = (x_sym - mu_x) / sigma_x          # (3,)
-        u_scaled = (u_raw - mu_u) / sigma_u           # (18,)
-
-        # ------ SINDy prediction ------
-        # bias term first: theta = [1; x_scaled; u_scaled]  (22,)
-        theta = ca.vertcat(1.0, x_scaled, u_scaled)   # (22,)
-        x_next_scaled = coefs @ theta                  # (3,)
-        x_next_raw = x_next_scaled * sigma_x + mu_x   # (3,)
-
-        model.set_rhs("t_in", x_next_raw[0])
-        model.set_rhs("co2", x_next_raw[1])
-        model.set_rhs("rh", x_next_raw[2])
-        model.setup()
-
-        # ------ MPC controller ------
-        mpc = do_mpc.controller.MPC(model)
-        setup_params = {
-            "n_horizon": horizon,
-            "t_step": period,
-            "state_discretization": "discrete",
-            "store_full_solution": False,
-            "nlpsol_opts": {
-                "ipopt.print_level": 0,
-                "ipopt.sb": "yes",
-                "print_time": 0,
-            },
-        }
-        mpc.set_param(**setup_params)
-
-        # ------ TVP function ------
-        tvp_fun = weather_provider.get_mpc_tvp_fun(mpc)
-        mpc.set_tvp_fun(tvp_fun)
-
-        # ------ Cost function ------
-        # Re-reference model variables for cost (needed after model.setup())
-        t_in_c = model.x["t_in"]
-        co2_c = model.x["co2"]
-        rh_c = model.x["rh"]
-        uBoil_c = model.u["uBoil"]
-        uCO2_c = model.u["uCO2"]
-        uLamp_c = model.u["uLamp"]
-
-        err_T = (t_in_c - 20.0) / 5.0
-        err_co2 = (co2_c - 800.0) / 200.0
-        err_rh = ca.fmax(0, rh_c - 85.0) / 5.0
-
-        lterm = (
-            100.0 * err_T ** 2
-            + 30.0 * err_co2 ** 2
-            + 50.0 * err_rh ** 2
-            + 20.0 * uBoil_c
-            + 10.0 * uLamp_c
-            + 2.0 * uCO2_c
-        )
-        mterm = 100.0 * err_T ** 2 + 30.0 * err_co2 ** 2 + 50.0 * err_rh ** 2
-
-        mpc.set_objective(mterm=mterm, lterm=lterm)
-
-        # Anti-chattering R terms
-        mpc.set_rterm(
-            uBoil=10.0,
-            uCO2=5.0,
-            uThScr=100.0,
-            uVent=50.0,
-            uLamp=1.0,
-            uBlScr=1.0,
-        )
-
-        # ------ Constraints ------
-        # Actuator bounds
-        for u_name in ["uBoil", "uCO2", "uThScr", "uLamp", "uBlScr"]:
-            mpc.bounds["lower", "_u", u_name] = 0.0
-            mpc.bounds["upper", "_u", u_name] = 1.0
-
-        # Ventilation: winter frost protection
-        mpc.bounds["lower", "_u", "uVent"] = 0.0
-        mpc.bounds["upper", "_u", "uVent"] = 0.4
-
-        # State bounds (hard frost / heat damage)
-        mpc.bounds["lower", "_x", "t_in"] = 12.0
-        mpc.bounds["upper", "_x", "t_in"] = 35.0
-
-        mpc.setup()
-
-        return mpc, model, scaler_x, scaler_u
-
-
-if __name__ == "__main__":
-    import os
-    import pickle
-    import signal
-    import threading
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(name)s %(levelname)s %(message)s",
-    )
-
-    from greenhouse_mvp.environment.tvp_forecast import WeatherForecastTVP
-    from greenhouse_mvp.orchestration.mqtt_bus import MQTTBus
-
-    _host = os.environ.get("MQTT_HOST", "localhost")
-    _port = int(os.environ.get("MQTT_PORT", "1883"))
-    _model_path = os.environ.get("SINDY_MODEL_PATH", "/app/models/sindy_model.pkl")
-    _horizon = int(os.environ.get("MPC_HORIZON", "20"))
-    _start_date = os.environ.get("START_DATE", "2010-02-28")
-    _n_days = int(os.environ.get("N_DAYS", "60"))
-    _period = int(os.environ.get("PERIOD", "900"))
-
-    with open(_model_path, "rb") as _fh:
-        _bundle = pickle.load(_fh)
-
-    _weather = WeatherForecastTVP(
-        start_date=_start_date,
-        n_days=_n_days,
-        horizon=_horizon,
-        period=_period,
-    )
-
-    _bus = MQTTBus(host=_host, port=_port)
-    _bus.loop_start()
-
-    _ctrl = MPCController(
-        sindy_model=_bundle["model"],
-        scaler_x=_bundle["scaler_x"],
-        scaler_u=_bundle["scaler_u"],
-        weather_provider=_weather,
-        bus=_bus,
-        horizon=_horizon,
-        mu_train=_bundle.get("mu_train"),
-        cov_inv=_bundle.get("cov_inv"),
-        auto_subscribe=True,
-    )
-
-    logger.info("control_core: MPCController running, waiting for telemetry...")
-
-    _stop = threading.Event()
-
-    def _shutdown(*_: object) -> None:
-        logger.info("control_core: shutdown signal received.")
-        _stop.set()
-
-    signal.signal(signal.SIGTERM, _shutdown)
-    signal.signal(signal.SIGINT, _shutdown)
-    _stop.wait()
-    _bus.loop_stop()

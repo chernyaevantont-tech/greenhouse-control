@@ -1,6 +1,5 @@
-"""greenhouse_mvp.orchestration – MQTT bus and shared Pydantic schemas."""
+"""greenhouse_mvp.orchestration – shared Pydantic schemas."""
 
-from greenhouse_mvp.orchestration.mqtt_bus import MQTTBus
 from greenhouse_mvp.orchestration.schemas import (
     ActionPayload,
     GraphState,
@@ -10,7 +9,6 @@ from greenhouse_mvp.orchestration.schemas import (
 )
 
 __all__ = [
-    "MQTTBus",
     "TelemetryPayload",
     "ActionPayload",
     "OODMetrics",
