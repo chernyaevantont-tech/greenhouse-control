@@ -34,6 +34,7 @@ const INIT: DashboardState = {
   latestAction: null,
   supervisorLog: [],
   llmLog: [],
+  faultReports: [],
   simRunning: false,
   simPaused: false,
   simStep: 0,
@@ -117,7 +118,14 @@ export function useApi() {
           }
           case 'llm_action': {
             const p = data as LLMActionPayload;
-            return { ...prev, llmLog: [p, ...prev.llmLog].slice(0, 50) };
+            const newFaultReports = (p.fault_report && p.fault_report !== 'OK')
+              ? [{ step: p.step, report: p.fault_report }, ...prev.faultReports].slice(0, 100)
+              : prev.faultReports;
+            return {
+              ...prev,
+              llmLog: [p, ...prev.llmLog].slice(0, 50),
+              faultReports: newFaultReports,
+            };
           }
           case 'reset': {
             return {
@@ -125,7 +133,7 @@ export function useApi() {
               timestamps: [], steps: [], t_in: [], T_out: [], co2: [], rh: [], rad: [], mahal: [],
               uBoil: [], uCO2: [], uThScr: [], uVent: [], uLamp: [], uBlScr: [],
               latestTelemetry: null, latestOOD: null, latestAction: null,
-              supervisorLog: [], llmLog: [],
+              supervisorLog: [], llmLog: [], faultReports: [],
               simStep: 0,
             };
           }

@@ -43,11 +43,21 @@ def set_actuators(
     uLamp: Annotated[float, "Supplemental lamps [0=off, 1=full]"],
     uBlScr: Annotated[float, "Blackout screen [0=open, 1=closed]"],
     reasoning: Annotated[str, "One-sentence explanation of the control decision"],
+    fault_report: Annotated[
+        str,
+        (
+            "Anomaly/fault diagnosis. Write 'OK' if all sensors and actuators appear normal. "
+            "Otherwise describe the suspected fault: which signal is anomalous, what pattern "
+            "(stuck/random/no-effect), and your confidence. "
+            "E.g. 'FAULT: t_in=41°C impossible at T_out=1°C — sensor likely stuck high (high confidence)'"
+        ),
+    ] = "OK",
 ) -> str:
     """
     Set greenhouse actuator signals for the current control step.
     Call this exactly once after reasoning about the sensor readings.
     All actuator values must be in range [0.0, 1.0].
+    Always fill fault_report — 'OK' if nominal, otherwise describe the anomaly.
     """
     return "Actuators set successfully."
 
@@ -85,7 +95,30 @@ Analyse the sensor history and call set_actuators with optimal values.
   Trend matters: if a parameter is STILL moving in the wrong direction despite previous action, INCREASE intensity.
 
 Time hint: sin_h > 0 means daytime; sin_h < 0 means nighttime.
-Always call set_actuators — do not just respond with text."""
+Always call set_actuators — do not just respond with text.
+
+=== FAULT DETECTION ===
+  Cross-check sensor readings at every step for physical plausibility.
+
+  Sensor fault indicators (write to fault_report if detected):
+    - t_in > 38°C or t_in < 3°C while T_out is near-normal and rad=0  → likely stuck/random sensor
+    - t_in reads the SAME value for 3+ consecutive steps despite uBoil changes → sensor stuck
+    - co2 < 250 ppm or co2 > 2500 ppm                                 → likely sensor fault
+    - rh > 100% or rh < 3%                                            → impossible, sensor fault
+    - Any sensor jumps erratically ±50%+ between steps with no cause  → random noise fault
+
+  Actuator fault indicators (write to fault_report if detected):
+    - uBoil held at >0.5 for 5+ steps but t_in not rising (Δ < 0.1°C/step) → boiler actuator fault
+    - uCO2 applied but co2 not rising after 3 steps                        → CO2 actuator fault
+    - uVent opened but rh not dropping after 3 steps                       → vent actuator fault
+
+  Control strategy under faults:
+    - If a sensor is suspect, weight it less and infer from other sensors + physics.
+      (E.g. if t_in seems stuck, use T_out + rad + recent trend to estimate real temperature)
+    - If an actuator is dead, compensate with alternatives where possible.
+      (E.g. if boiler dead, close uThScr=1 and reduce uVent to retain heat)
+    - Always prioritise crop safety: keep t_in > 15°C even under degraded sensing.
+    - Log your fault hypothesis in fault_report even if confidence is moderate."""
 
 # Per-step block: state + the action that was applied at that step
 _STEP_TEMPLATE = """\
@@ -167,6 +200,7 @@ class LLMController:
         self._history: deque[_HistoryEntry] = deque(maxlen=self._history_window)
         self._last_action: ActionPayload | None = None
         self._last_reasoning: str = ""
+        self._last_fault_report: str = "OK"
         self._last_call_step: int = -999
         self._model = model
 
@@ -212,14 +246,19 @@ class LLMController:
             return cached, f"[cached from step {self._last_call_step}] {self._last_reasoning}"
 
         try:
-            action, reasoning = self._call_agent(telemetry)
+            action, reasoning, fault_report = self._call_agent(telemetry)
             self._last_action = action
             self._last_reasoning = reasoning
+            self._last_fault_report = fault_report
             self._last_call_step = current_step
             return action, reasoning
         except Exception as exc:
             logger.exception("LLMController: error at step %d: %s", current_step, exc)
             return self._fallback(current_step), f"Fallback: {exc}"
+
+    @property
+    def last_fault_report(self) -> str:
+        return self._last_fault_report
 
     def close(self) -> None:
         pass
@@ -228,11 +267,13 @@ class LLMController:
     # Private
     # ------------------------------------------------------------------
 
-    def _call_agent(self, telemetry: TelemetryPayload) -> tuple[ActionPayload, str]:
+    def _call_agent(self, telemetry: TelemetryPayload) -> tuple[ActionPayload, str, str]:
         """Invoke the LangGraph ReAct agent and extract the set_actuators tool call.
 
         If the model responds with text instead of a tool call, retries once with
         an explicit nudge message. If the second attempt also fails, raises.
+
+        Returns (action, reasoning, fault_report).
         """
         # Append current reading with the action that was active before this step
         self._history.append(_HistoryEntry(telemetry=telemetry, action=self._last_action))
@@ -325,14 +366,18 @@ class LLMController:
         lines.append("Review the above and call set_actuators for the NEXT step.")
         return "\n".join(lines)
 
-    def _extract_action(self, messages, step: int) -> tuple[ActionPayload, str]:
-        """Extract set_actuators tool call args from agent messages."""
+    def _extract_action(self, messages, step: int) -> tuple[ActionPayload, str, str]:
+        """Extract set_actuators tool call args from agent messages.
+
+        Returns (action, reasoning, fault_report).
+        """
         for msg in messages:
             if hasattr(msg, "tool_calls") and msg.tool_calls:
                 for tc in msg.tool_calls:
                     if tc["name"] == "set_actuators":
                         args = tc["args"]
                         reasoning = args.get("reasoning", "")
+                        fault_report = args.get("fault_report", "OK")
                         action = ActionPayload(
                             step=step,
                             approved=False,
@@ -343,10 +388,15 @@ class LLMController:
                             uLamp=float(max(0.0, min(1.0, args.get("uLamp", 0.0)))),
                             uBlScr=float(max(0.0, min(1.0, args.get("uBlScr", 0.0)))),
                         )
-                        logger.info(
-                            "LLMController step=%d reasoning=%s", step, reasoning[:80]
-                        )
-                        return action, reasoning
+                        if fault_report and fault_report != "OK":
+                            logger.warning(
+                                "LLMController step=%d FAULT_REPORT: %s", step, fault_report
+                            )
+                        else:
+                            logger.info(
+                                "LLMController step=%d reasoning=%s", step, reasoning[:80]
+                            )
+                        return action, reasoning, fault_report
         raise ValueError("No set_actuators tool call found in agent response")
 
     def _fallback(self, step: int) -> ActionPayload:

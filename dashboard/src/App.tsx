@@ -2,7 +2,7 @@
 import { Line } from 'react-chartjs-2';
 import type { ChartOptions, ChartDataset } from 'chart.js';
 import { useApi } from './useApi';
-import type { SimConfig, SupervisorVerdict, LLMActionPayload } from './types';
+import type { SimConfig, SupervisorVerdict, LLMActionPayload, FaultSpec } from './types';
 
 // -- Constants ---------------------------------------------------------------
 const WINDOW_OPTIONS = [60, 120, 300, 600] as const;
@@ -140,13 +140,32 @@ function LogEntry({ entry }: { entry: SupervisorVerdict }) {
 }
 
 function LLMLogEntry({ entry }: { entry: LLMActionPayload }) {
+  const hasFault = entry.fault_report && entry.fault_report !== 'OK';
   return (
-    <div className="log-entry">
+    <div className="log-entry" style={hasFault ? { borderLeft: '3px solid var(--red)' } : {}}>
       <div className="log-header">
         <span className="log-step">Step {entry.step}</span>
         <span className="badge badge--APPROVE">LLM</span>
+        {hasFault && <span className="badge badge--REJECT">FAULT</span>}
       </div>
       {entry.reasoning && <div className="log-reason">{entry.reasoning}</div>}
+      {hasFault && (
+        <div className="log-reason" style={{ color: 'var(--red)', marginTop: 4 }}>
+          ⚠️ {entry.fault_report}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FaultReportEntry({ step, report }: { step: number; report: string }) {
+  return (
+    <div className="log-entry" style={{ borderLeft: '3px solid var(--red)' }}>
+      <div className="log-header">
+        <span className="log-step">Step {step}</span>
+        <span className="badge badge--REJECT">⚠ FAULT</span>
+      </div>
+      <div className="log-reason" style={{ color: 'var(--red)' }}>{report}</div>
     </div>
   );
 }
@@ -163,6 +182,34 @@ function ChartCard({ title, height, children }: {
 }
 
 // -- Config panel ------------------------------------------------------------
+
+const FAULT_PRESETS: { label: string; faults: FaultSpec[] }[] = [
+  { label: 'None', faults: [] },
+  {
+    label: 't_in stuck 40°C', faults: [{
+      target: 't_in', fault_type: 'stuck_high', start_step: 10,
+      value: 40, value_lo: 0, value_hi: 1,
+    }],
+  },
+  {
+    label: 't_in random', faults: [{
+      target: 't_in', fault_type: 'random', start_step: 10,
+      value: 0, value_lo: -5, value_hi: 50,
+    }],
+  },
+  {
+    label: 'Boiler dead', faults: [{
+      target: 'uBoil', fault_type: 'dead', start_step: 5,
+      value: 0, value_lo: 0, value_hi: 1,
+    }],
+  },
+  {
+    label: 'CO₂ sensor low', faults: [{
+      target: 'co2', fault_type: 'stuck_low', start_step: 10,
+      value: 50, value_lo: 0, value_hi: 1,
+    }],
+  },
+];
 function ConfigPanel({
   config, onSave,
 }: {
@@ -206,6 +253,27 @@ function ConfigPanel({
           value={local.llm_history_window}
           onChange={e => setLocal({ ...local, llm_history_window: parseInt(e.target.value, 10) || 1 })} />
       </div>
+      <div className="cfg-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+        <label style={{ marginBottom: 4 }}>Fault injection</label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {FAULT_PRESETS.map(p => (
+            <button
+              key={p.label}
+              className={`btn${JSON.stringify(local.faults) === JSON.stringify(p.faults) ? ' btn--active' : ''}`}
+              style={{ fontSize: 11, padding: '2px 8px' }}
+              onClick={() => setLocal({ ...local, faults: p.faults })}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+        {local.faults.length > 0 && (
+          <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 2 }}>
+            {local.faults.map((f, i) => (
+              <div key={i}>\u26a0 {f.target} → {f.fault_type}{f.fault_type === 'stuck_high' || f.fault_type === 'stuck_low' ? ` (${f.value})` : ''} from step {f.start_step}</div>
+            ))}
+          </div>
+        )}
+      </div>
       <button className="btn btn--primary" style={{ marginTop: 4 }}
         onClick={() => onSave(local)}>
         Save & Apply
@@ -220,7 +288,6 @@ export default function App() {
     state, startSim, stopSim, resetSim,
     setControl, setController, setAgent, updateConfig, fetchConfig,
   } = useApi();
-
   const [windowSize, setWindowSize]   = useState<number>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved).windowSize ?? 120 : 120;
@@ -533,6 +600,18 @@ export default function App() {
               </>
             )}
           </div>
+
+          {/* Fault Reports (LLM mode only) */}
+          {state.controllerMode === 'llm' && state.faultReports.length > 0 && (
+            <div className="card" style={{ flex: 'none' }}>
+              <div className="card__title" style={{ color: 'var(--red)' }}>⚠ Fault Reports</div>
+              <div className="log-scroll" style={{ maxHeight: 160 }}>
+                {state.faultReports.map((r, i) => (
+                  <FaultReportEntry key={i} step={r.step} report={r.report} />
+                ))}
+              </div>
+            </div>
+          )}
 
         </div>
       </div>

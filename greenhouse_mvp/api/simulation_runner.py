@@ -276,6 +276,8 @@ class SimulationRunner:
                 action_to_array,
                 obs_to_telemetry,
             )
+            from greenhouse_mvp.environment.fault_injector import FaultInjector
+            fault_injector = FaultInjector(cfg.faults)
 
             while not self._stop_event.is_set():
                 # Honor pause
@@ -299,8 +301,9 @@ class SimulationRunner:
                     logger.info("SimulationRunner: episode reset at step %d", step)
                     continue
 
-                # Build telemetry from observation
+                # Build telemetry from observation (apply sensor faults before LLM sees it)
                 telemetry = obs_to_telemetry(obs, step, cfg.period)
+                telemetry = fault_injector.inject_sensor(telemetry, step)
 
                 with self._lock:
                     self._step = step
@@ -348,9 +351,11 @@ class SimulationRunner:
                     self._emit({"type": "verdict", "data": verdict.model_dump()})
 
                 if llm_reasoning and ctrl_mode == "llm" and final_action:
+                    fault_report = getattr(llm_ctrl, "last_fault_report", "OK")
                     self._emit({"type": "llm_action", "data": {
                         "step": step,
                         "reasoning": llm_reasoning,
+                        "fault_report": fault_report,
                         "uBoil": final_action.uBoil,
                         "uCO2": final_action.uCO2,
                         "uThScr": final_action.uThScr,
@@ -359,11 +364,12 @@ class SimulationRunner:
                         "uBlScr": final_action.uBlScr,
                     }})
 
-                # Step the environment
+                # Step the environment (apply actuator faults after LLM decision, before gym)
                 action_vec = (
                     action_to_array(final_action) if final_action
                     else SAFE_FALLBACK_ACTION.copy()
                 )
+                action_vec = fault_injector.inject_actuator(action_vec, step)
                 obs, _reward, terminated, truncated, _info = env.step(action_vec)
                 step += 1
 

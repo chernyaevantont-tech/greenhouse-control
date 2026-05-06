@@ -5,10 +5,27 @@ Every message travelling over the MQTT bus must be validated using one of these 
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import List, Literal
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 from typing_extensions import TypedDict
+
+
+class FaultSpec(BaseModel):
+    """Describes a single injected fault for stress-testing LLM anomaly detection."""
+
+    target: Literal[
+        "t_in", "co2", "rh",
+        "uBoil", "uCO2", "uThScr", "uVent", "uLamp", "uBlScr"
+    ]
+    fault_type: Literal["stuck_high", "stuck_low", "random", "offset", "dead"]
+    start_step: int = 0
+    # For stuck_high / stuck_low: the fixed value to emit
+    # For offset: delta added to the real value
+    value: float = 0.0
+    # For random: uniform(value_lo, value_hi)
+    value_lo: float = 0.0
+    value_hi: float = 1.0
 
 
 class TelemetryPayload(BaseModel):
@@ -140,6 +157,7 @@ class LLMActionPayload(BaseModel):
 
     step: int
     reasoning: str
+    fault_report: str = "OK"  # LLM self-reported anomaly / fault diagnosis
     # Actuator signals [0.0, 1.0] — mirror of ActionPayload fields
     uBoil: float
     uCO2: float
@@ -167,6 +185,7 @@ class SimConfig(BaseModel):
     mpc_horizon: int = 20
     llm_call_interval: int = 1
     llm_history_window: int = 1  # Number of past telemetry steps to include in LLM prompt (1 = current only)
+    faults: List[FaultSpec] = Field(default_factory=list)  # Active fault injections
 
 
 class SimStatus(BaseModel):

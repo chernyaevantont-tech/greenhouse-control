@@ -1,4 +1,16 @@
-﻿export interface TelemetryPayload {
+﻿export type FaultType = 'stuck_high' | 'stuck_low' | 'random' | 'offset' | 'dead';
+export type FaultTarget = 't_in' | 'co2' | 'rh' | 'uBoil' | 'uCO2' | 'uThScr' | 'uVent' | 'uLamp' | 'uBlScr';
+
+export interface FaultSpec {
+  target: FaultTarget;
+  fault_type: FaultType;
+  start_step: number;
+  value: number;
+  value_lo: number;
+  value_hi: number;
+}
+
+export interface TelemetryPayload {
   step: number;
   timestamp_sim: number;
   t_in: number;
@@ -41,6 +53,7 @@ export interface SupervisorVerdict {
 export interface LLMActionPayload {
   step: number;
   reasoning: string;
+  fault_report: string;
   uBoil: number;
   uCO2: number;
   uThScr: number;
@@ -60,6 +73,7 @@ export interface SimConfig {
   mpc_horizon: number;
   llm_call_interval: number;
   llm_history_window: number;
+  faults: FaultSpec[];
 }
 
 export interface SimStatus {
@@ -97,6 +111,7 @@ export interface DashboardState {
   latestAction: ActionPayload | null;
   supervisorLog: SupervisorVerdict[];
   llmLog: LLMActionPayload[];
+  faultReports: { step: number; report: string }[];
   // Simulation control
   simRunning: boolean;
   simPaused: boolean;
