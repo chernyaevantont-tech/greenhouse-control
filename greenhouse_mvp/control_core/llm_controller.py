@@ -21,6 +21,14 @@ from greenhouse_mvp.orchestration.schemas import ActionPayload, TelemetryPayload
 
 logger = logging.getLogger(__name__)
 
+# Named tuple for history entries (state + action that was applied at that step)
+from typing import NamedTuple
+
+
+class _HistoryEntry(NamedTuple):
+    telemetry: TelemetryPayload
+    action: ActionPayload | None  # None for very first step before any action
+
 
 # ---------------------------------------------------------------------------
 # Tool definition — the agent calls this to emit actuator values
@@ -50,29 +58,78 @@ def set_actuators(
 
 _SYSTEM_PROMPT = """\
 You are an autonomous greenhouse climate controller.
-Analyse the sensor readings and call set_actuators with optimal values.
+Analyse the sensor history and call set_actuators with optimal values.
 
-Target ranges:
-  Indoor temperature : 18-22 C    (setpoint 20 C)
-  CO2 concentration  : 600-1000 ppm (setpoint 800 ppm)
-  Relative humidity  : 40-85 %    (max 85 %)
+=== SETPOINTS & HARD LIMITS ===
+  t_in  : target 18-22 C   (setpoint 20 C)   — NEVER let it fall below 15 C
+  co2   : target 600-1000 ppm (setpoint 800)
+  rh    : target 40-85 %   — NEVER exceed 87 %
 
-Actuator guide (all values in range [0.0, 1.0]):
-  uBoil  - boiler heating     (0=off, 1=full heat; use to raise temperature)
-  uCO2   - CO2 injection      (0=off, 1=full; use to raise CO2)
-  uThScr - thermal screen     (0=open, 1=closed; reduces heat loss at night/cold)
-  uVent  - roof ventilation   (0=closed, 1=open; removes excess heat & humidity)
-  uLamp  - supplemental lamps (0=off, 1=full; adds heat and light in dark periods)
-  uBlScr - blackout screen    (0=open, 1=closed; blocks natural light at night)
+=== ACTUATOR GUIDE (all values [0.0, 1.0]) ===
+  uBoil  - boiler heating.     Raise t_in.   Scale with error: +1 C error → 0.2, +3 C → 0.6, +5 C → 1.0
+  uCO2   - CO2 injection.      Raise co2.    Use 0.5-1.0 when co2 < 600 ppm; 0 when co2 > 900 ppm
+  uThScr - thermal screen.     1=closed reduces heat loss. Always close at night or when T_out < 10 C.
+  uVent  - roof ventilation.   Opens to reduce rh and heat. WARNING: also cools greenhouse by ~2 C per 0.3 open.
+  uLamp  - supplemental lamps. Adds heat (+~1 C) and light. Use at night when t_in < 19 C.
+  uBlScr - blackout screen.    1=closed. Close at night to block light pollution.
+
+=== CONFLICT RESOLUTION ===
+  High rh + Low t_in: open vents slightly (0.1-0.2) AND increase boiler — do NOT choose one over the other.
+  Low t_in + Cold outside: increase uBoil AND close uThScr, avoid opening vents.
+  CO2 too high: open vents briefly, it removes CO2 AND humidity AND cools — compensate with uBoil.
+
+=== RESPONSE MAGNITUDE RULE ===
+  Small error (within 1 unit of limit): gentle correction (0.1-0.3 change)
+  Medium error (1-3 units past limit): moderate response (0.3-0.6)
+  Large error (>3 units past limit): aggressive response (0.6-1.0)
+  Trend matters: if a parameter is STILL moving in the wrong direction despite previous action, INCREASE intensity.
 
 Time hint: sin_h > 0 means daytime; sin_h < 0 means nighttime.
 Always call set_actuators — do not just respond with text."""
 
-# Single-step block used for each history entry and the current reading
+# Per-step block: state + the action that was applied at that step
 _STEP_TEMPLATE = """\
-  Step {step} | sin(h)={sin_h:.3f}  cos(h)={cos_h:.3f}
-    t_in={t_in:.2f} C   co2={co2:.1f} ppm   rh={rh:.1f} %
-    T_out={T_out:.2f} C   rad={rad:.1f} W/m2   co2_out={co2_out:.1f} ppm"""
+  Step {step} [{tag}] | {time_str} | sin(h)={sin_h:.3f}
+    STATE:  t_in={t_in:.2f}C {t_status}  co2={co2:.0f}ppm {c_status}  rh={rh:.1f}% {h_status}
+    WEATHER: T_out={T_out:.1f}C  rad={rad:.0f}W/m2  co2_out={co2_out:.0f}ppm
+    ACTION:  uBoil={uBoil}  uCO2={uCO2}  uThScr={uThScr}  uVent={uVent}  uLamp={uLamp}  uBlScr={uBlScr}"""
+
+
+def _status(value: float, lo: float, hi: float, unit: str = "") -> str:
+    """Return a short status tag: OK / WARN / CRIT with deviation."""
+    if value < lo:
+        diff = lo - value
+        level = "CRIT" if diff > 3 else "WARN"
+        return f"[{level} -{diff:.1f}{unit}]"
+    if value > hi:
+        diff = value - hi
+        level = "CRIT" if diff > 3 else "WARN"
+        return f"[{level} +{diff:.1f}{unit}]"
+    return "[OK]"
+
+
+def _fmt_action(a: ActionPayload | None) -> dict:
+    if a is None:
+        return {k: "?" for k in ("uBoil", "uCO2", "uThScr", "uVent", "uLamp", "uBlScr")}
+    return {
+        "uBoil":  f"{a.uBoil:.2f}",
+        "uCO2":   f"{a.uCO2:.2f}",
+        "uThScr": f"{a.uThScr:.2f}",
+        "uVent":  f"{a.uVent:.2f}",
+        "uLamp":  f"{a.uLamp:.2f}",
+        "uBlScr": f"{a.uBlScr:.2f}",
+    }
+
+
+def _time_str(sin_h: float, cos_h: float) -> str:
+    """Convert sin/cos hour encoding back to approximate HH:MM."""
+    import math
+    hour = math.atan2(sin_h, cos_h) * 12.0 / math.pi
+    if hour < 0:
+        hour += 24.0
+    h = int(hour)
+    m = int((hour - h) * 60)
+    return f"{h:02d}:{m:02d}"
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +164,7 @@ class LLMController:
     ) -> None:
         self._call_interval: int = max(1, call_interval)
         self._history_window: int = max(1, history_window)
-        self._history: deque[TelemetryPayload] = deque(maxlen=self._history_window)
+        self._history: deque[_HistoryEntry] = deque(maxlen=self._history_window)
         self._last_action: ActionPayload | None = None
         self._last_reasoning: str = ""
         self._last_call_step: int = -999
@@ -172,52 +229,100 @@ class LLMController:
     # ------------------------------------------------------------------
 
     def _call_agent(self, telemetry: TelemetryPayload) -> tuple[ActionPayload, str]:
-        """Invoke the LangGraph ReAct agent and extract the set_actuators tool call."""
-        # Append current reading to history before building the prompt
-        self._history.append(telemetry)
+        """Invoke the LangGraph ReAct agent and extract the set_actuators tool call.
+
+        If the model responds with text instead of a tool call, retries once with
+        an explicit nudge message. If the second attempt also fails, raises.
+        """
+        # Append current reading with the action that was active before this step
+        self._history.append(_HistoryEntry(telemetry=telemetry, action=self._last_action))
 
         prompt = _SYSTEM_PROMPT + "\n\n" + self._build_user_prompt()
 
-        result = self._agent.invoke(
-            {"messages": [HumanMessage(content=prompt)]},
-            config={"recursion_limit": 10},
-        )
-        return self._extract_action(result["messages"], telemetry.step)
+        messages: list = [HumanMessage(content=prompt)]
+
+        for attempt in range(2):
+            result = self._agent.invoke(
+                {"messages": messages},
+                config={"recursion_limit": 10},
+            )
+            try:
+                return self._extract_action(result["messages"], telemetry.step)
+            except ValueError:
+                if attempt == 0:
+                    # Append agent reply + forceful nudge and retry once
+                    messages = result["messages"] + [
+                        HumanMessage(
+                            content=(
+                                "You have not called set_actuators yet. "
+                                "You MUST call set_actuators now with all six actuator values. "
+                                "Do not write text — invoke the tool immediately."
+                            )
+                        )
+                    ]
+                    logger.warning(
+                        "LLMController step=%d: no tool call on attempt 1, retrying with nudge",
+                        telemetry.step,
+                    )
+                else:
+                    raise
 
     def _build_user_prompt(self) -> str:
-        """Build the user-facing part of the prompt from the rolling history."""
-        history = list(self._history)  # oldest first
+        """Build user prompt with history, per-step actions, and trend summary."""
+        history = list(self._history)  # oldest → newest
         n = len(history)
+        cur = history[-1].telemetry
 
+        # ---- Per-step history table ----
+        lines: list[str] = []
         if n == 1:
-            # Single step — concise single-block format
-            t = history[0]
-            lines = [
-                f"=== Sensor Readings (Step {t.step}) ===",
-                _STEP_TEMPLATE.format(
-                    step=t.step, t_in=t.t_in, co2=t.co2, rh=t.rh,
-                    T_out=t.T_out, rad=t.rad, co2_out=t.co2_out,
-                    sin_h=t.sin_h, cos_h=t.cos_h,
-                ),
-                "",
-                "  Targets: t_in 18-22 C (set 20) | co2 600-1000 ppm (set 800) | rh ≤ 85%",
-            ]
+            lines.append(f"=== Sensor Readings (Step {cur.step}) ===")
         else:
-            lines = [
-                f"=== Sensor History (last {n} steps, newest last) ===",
-                "  Targets: t_in 18-22 C (set 20) | co2 600-1000 ppm (set 800) | rh ≤ 85%",
-                "",
-            ]
-            for i, t in enumerate(history):
-                tag = "[CURRENT]" if i == n - 1 else f"[t-{n - 1 - i}]"
-                lines.append(f"{tag}" + _STEP_TEMPLATE.format(
-                    step=t.step, t_in=t.t_in, co2=t.co2, rh=t.rh,
-                    T_out=t.T_out, rad=t.rad, co2_out=t.co2_out,
-                    sin_h=t.sin_h, cos_h=t.cos_h,
-                ))
+            lines.append(f"=== Sensor History — last {n} steps (oldest → newest) ===")
+
+        for i, entry in enumerate(history):
+            t = entry.telemetry
+            tag = "NOW" if i == n - 1 else f"t-{n - 1 - i}"
+            af = _fmt_action(entry.action)
+            lines.append(_STEP_TEMPLATE.format(
+                step=t.step, tag=tag,
+                time_str=_time_str(t.sin_h, t.cos_h),
+                sin_h=t.sin_h,
+                t_in=t.t_in,  t_status=_status(t.t_in, 18, 22, "C"),
+                co2=t.co2,    c_status=_status(t.co2, 600, 1000, "ppm"),
+                rh=t.rh,      h_status=_status(t.rh, 40, 85, "%"),
+                T_out=t.T_out, rad=t.rad, co2_out=t.co2_out,
+                **af,
+            ))
+
+        # ---- Trend summary (only when we have >1 entry) ----
+        if n > 1:
+            old = history[0].telemetry
+            dt_in  = cur.t_in  - old.t_in
+            dco2   = cur.co2   - old.co2
+            drh    = cur.rh    - old.rh
+            steps  = n - 1
+
+            def _trend(delta: float, unit: str) -> str:
+                rate = delta / steps
+                arrow = "↑" if delta > 0 else ("↓" if delta < 0 else "→")
+                return f"{arrow}{abs(delta):.1f}{unit} total ({rate:+.2f}{unit}/step)"
+
+            lines.append("")
+            lines.append("=== TRENDS (over last {} steps) ===".format(steps))
+            lines.append(f"  t_in  : {_trend(dt_in, 'C')}   current error vs setpoint 20C: {cur.t_in - 20:+.1f}C")
+            lines.append(f"  co2   : {_trend(dco2, 'ppm')} current error vs setpoint 800: {cur.co2 - 800:+.0f}ppm")
+            lines.append(f"  rh    : {_trend(drh, '%')}  current vs limit 85%: {cur.rh - 85:+.1f}%")
+
+            # Warn if previous actions had no effect
+            last_a = history[-1].action
+            if last_a is not None and dt_in < -0.5 and last_a.uBoil < 0.5:
+                lines.append("  ⚠ t_in is falling despite heating — consider INCREASING uBoil significantly.")
+            if last_a is not None and drh > 1.0 and last_a.uVent < 0.3:
+                lines.append("  ⚠ rh is rising — consider INCREASING uVent (and compensate with uBoil).")
 
         lines.append("")
-        lines.append("Review the above and call set_actuators with your control decision.")
+        lines.append("Review the above and call set_actuators for the NEXT step.")
         return "\n".join(lines)
 
     def _extract_action(self, messages, step: int) -> tuple[ActionPayload, str]:
