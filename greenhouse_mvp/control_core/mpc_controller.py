@@ -29,6 +29,16 @@ logger = logging.getLogger(__name__)
 
 OOD_THRESHOLD: float = 6.0  # Mahalanobis distance threshold for 21-d feature space.
 
+# Target ranges mirrored from dashboard/src/App.tsx
+SP_TEMP_LO = 18.0
+SP_TEMP_HI = 22.0
+SP_TEMP_SET = (SP_TEMP_LO + SP_TEMP_HI) / 2.0
+SP_CO2_LO = 600.0
+SP_CO2_HI = 1000.0
+SP_CO2_SET = (SP_CO2_LO + SP_CO2_HI) / 2.0
+SP_RH_LO = 40.0
+SP_RH_HI = 85.0
+
 
 class MPCController:
     """
@@ -77,6 +87,8 @@ class MPCController:
         x0 = np.asarray(x0, dtype=np.float64).reshape(-1, 1)
         self._mpc.x0 = x0
         self._mpc.set_initial_guess()
+        self._t0 = 0.0
+        self._mpc.t0 = 0.0
         logger.info("MPCController initialised with x0=%s", x0.ravel().tolist())
 
     def step(self, telemetry: TelemetryPayload) -> tuple[ActionPayload, OODMetrics]:
@@ -85,8 +97,17 @@ class MPCController:
             [telemetry.t_in, telemetry.co2, telemetry.rh], dtype=np.float64
         ).reshape(-1, 1)
 
+        t_now = float(telemetry.timestamp_sim)
+        if t_now < 0.0:
+            logger.warning("MPCController: negative timestamp_sim %.3f; clamping to 0", t_now)
+            t_now = 0.0
+        self._mpc.t0 = t_now
+
         u_opt = self._mpc.make_step(x0)
-        self._t0 += self._period
+        try:
+            self._t0 = float(self._mpc.t0)
+        except Exception:
+            self._t0 = t_now + self._period
         u_vec = u_opt.ravel()
 
         action = ActionPayload(
@@ -234,10 +255,24 @@ class MPCController:
             store_full_solution=False,
         )
 
-        # ── 7. Objective: track temperature setpoint + penalise energy ──
-        T_setpoint = 20.0
-        lterm = 10.0 * (t_in - T_setpoint) ** 2 + 100.0 * uBoil ** 2 + 50.0 * uLamp ** 2
-        mterm = 10.0 * (t_in - T_setpoint) ** 2
+        # ── 7. Objective: track temp/CO2/RH targets + penalise energy ──
+        t_scale = max(1.0, (SP_TEMP_HI - SP_TEMP_LO) / 2.0)
+        co2_scale = max(1.0, (SP_CO2_HI - SP_CO2_LO) / 2.0)
+        rh_scale = max(1.0, (SP_RH_HI - SP_RH_LO) / 2.0)
+
+        err_t = (t_in - SP_TEMP_SET) / t_scale
+        err_co2 = (co2 - SP_CO2_SET) / co2_scale
+        err_rh = ca.fmax(0, rh - SP_RH_HI) / rh_scale
+
+        lterm = (
+            100.0 * err_t ** 2
+            + 30.0 * err_co2 ** 2
+            + 50.0 * err_rh ** 2
+            + 20.0 * uBoil
+            + 10.0 * uLamp
+            + 2.0 * uCO2
+        )
+        mterm = 100.0 * err_t ** 2 + 30.0 * err_co2 ** 2 + 50.0 * err_rh ** 2
         mpc.set_objective(mterm=mterm, lterm=lterm)
 
         mpc.set_rterm(

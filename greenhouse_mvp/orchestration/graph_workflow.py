@@ -331,8 +331,8 @@ def _run_dagger_worker(
     from greenhouse_mvp.environment.sim_adapter import obs_to_telemetry, action_to_array
 
     xs, us = [], []
-    for _ in range(steps_per_episode):
-        telemetry = obs_to_telemetry(obs, 0, period)
+    for step_idx in range(steps_per_episode):
+        telemetry = obs_to_telemetry(obs, step_idx, period)
         action, _ = dagger_mpc.step(telemetry)
         u_arr = action_to_array(action)
 
