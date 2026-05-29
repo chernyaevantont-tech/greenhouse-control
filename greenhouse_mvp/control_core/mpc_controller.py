@@ -23,7 +23,7 @@ from sklearn.preprocessing import StandardScaler
 
 from greenhouse_mvp.environment.tvp_forecast import WeatherForecastTVP
 from greenhouse_mvp.orchestration.schemas import ActionPayload, OODMetrics, TelemetryPayload
-from greenhouse_mvp.sindy_pipeline.physics_features import compute_physics_features
+from greenhouse_mvp.sindy_pipeline.physics_features import compute_physics_features_single
 
 logger = logging.getLogger(__name__)
 
@@ -302,13 +302,15 @@ class MPCController:
     def _compute_ood(self, telemetry: TelemetryPayload, u_vec: np.ndarray) -> OODMetrics:
         """Compute Mahalanobis-distance OOD detection."""
         try:
-            feat = compute_physics_features(
+            feat = compute_physics_features_single(
                 t_in=telemetry.t_in,
                 co2=telemetry.co2,
                 rh=telemetry.rh,
                 T_out=telemetry.T_out,
                 rad=telemetry.rad,
                 co2_out=telemetry.co2_out,
+                sin_h=telemetry.sin_h,
+                cos_h=telemetry.cos_h,
                 u_vec=u_vec,
             )
             feat_sc = self._scaler_u.transform(feat.reshape(1, -1))[0]

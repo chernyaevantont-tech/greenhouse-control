@@ -20,8 +20,11 @@ from typing import Optional
 
 import numpy as np
 
+from greenhouse_mvp.environment.incident_manager import INCIDENT_CATALOG, IncidentManager
 from greenhouse_mvp.orchestration.schemas import (
     ActionPayload,
+    IncidentAlert,
+    IncidentSpec,
     OODMetrics,
     SimConfig,
     SimStatus,
@@ -67,6 +70,7 @@ class SimulationRunner:
         self._agent_enabled: bool = self._config.agent_enabled
         self._speed_multiplier: float = 1.0
         self._paused: bool = False
+        self._incident_detector_enabled: bool = True
 
         # Shared state (read by /api/status)
         self._running: bool = False
@@ -74,6 +78,9 @@ class SimulationRunner:
         self._latest_telemetry: Optional[dict] = None
         self._latest_action: Optional[dict] = None
         self._latest_ood: Optional[dict] = None
+
+        # Incident management
+        self._incident_manager = IncidentManager()
 
         # SSE subscribers (asyncio.Queue, one per connected client)
         self._subscribers: list[asyncio.Queue] = []
@@ -142,6 +149,61 @@ class SimulationRunner:
             self._config = self._config.model_copy(update={"agent_enabled": enabled})
         logger.info("SimulationRunner: agent_enabled -> %s", enabled)
 
+    def set_incident_detector_enabled(self, enabled: bool) -> None:
+        with self._lock:
+            self._incident_detector_enabled = enabled
+        logger.info("SimulationRunner: incident_detector_enabled -> %s", enabled)
+
+    # ------------------------------------------------------------------
+    # Incident management
+    # ------------------------------------------------------------------
+
+    def add_incident(self, spec: IncidentSpec) -> IncidentAlert:
+        """Add an incident and return an IncidentAlert for SSE emission."""
+        with self._lock:
+            current_step = self._step
+        # Set start_step to current if not specified
+        if spec.start_step == 0 and current_step > 0:
+            spec = spec.model_copy(update={"start_step": current_step})
+        self._incident_manager.add(spec, current_step)
+        meta = INCIDENT_CATALOG.get(spec.incident_type, {})
+        alert = IncidentAlert(
+            incident_id=spec.incident_id,
+            incident_type=spec.incident_type,
+            action="triggered",
+            step=current_step,
+            severity=spec.severity,
+            description=spec.description or meta.get("description", ""),
+        )
+        self._emit({"type": "incident", "data": alert.model_dump()})
+        return alert
+
+    def remove_incident(self, incident_id: str) -> bool:
+        """Remove an incident by ID; returns True if it existed."""
+        with self._lock:
+            current_step = self._step
+        removed = self._incident_manager.remove(incident_id)
+        if removed:
+            self._emit({"type": "incident", "data": {
+                "incident_id": incident_id,
+                "incident_type": "unknown",
+                "action": "resolved",
+                "step": current_step,
+                "severity": 0.0,
+                "description": "Resolved by operator",
+            }})
+        return removed
+
+    def list_incidents(self) -> list[dict]:
+        """Return serialised list of all active incidents."""
+        return self._incident_manager.summary()
+
+    def get_active_incidents(self) -> list[IncidentSpec]:
+        """Return active IncidentSpec objects at the current step."""
+        with self._lock:
+            step = self._step
+        return self._incident_manager.get_active(step)
+
     def update_config(self, new_config: SimConfig) -> None:
         """Update simulation config (applies on next start/reset)."""
         with self._lock:
@@ -161,6 +223,9 @@ class SimulationRunner:
 
     def get_status(self) -> SimStatus:
         with self._lock:
+            step = self._step
+        active_incidents = self._incident_manager.get_active(step)
+        with self._lock:
             return SimStatus(
                 running=self._running,
                 paused=self._paused,
@@ -178,6 +243,7 @@ class SimulationRunner:
                     OODMetrics(**self._latest_ood)
                     if self._latest_ood else None
                 ),
+                active_incidents=active_incidents,
             )
 
     # ------------------------------------------------------------------
@@ -230,8 +296,20 @@ class SimulationRunner:
                 "n_days": cfg.n_days,
                 "period": cfg.period,
             }
+
+            # Build incident detector (shares LLM credentials with the supervisor)
+            from greenhouse_mvp.agents.incident_detector import IncidentDetector
+            incident_detector = IncidentDetector(
+                backend=os.environ.get("LLM_BACKEND", "openai"),
+                api_key=os.environ.get("OPENAI_API_KEY", ""),
+                base_url=os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+                model=os.environ.get("LLM_MODEL", "gpt-4o-mini"),
+                timeout=float(os.environ.get("LLM_TIMEOUT", "30")),
+            )
+
             graph = build_graph(
                 mpc_ctrl, llm_ctrl, supervisor,
+                incident_detector=incident_detector,
                 dagger_dataset={}, weather_cfg=weather_cfg,
             )
 
@@ -269,6 +347,11 @@ class SimulationRunner:
                 "_terminated": False,
                 "controller_mode": self._controller_mode,
                 "agent_enabled": self._agent_enabled,
+                # Incident detection
+                "active_incidents": [],
+                "incident_report": None,
+                "last_incident_detect_step": -999,
+                "incident_detector_enabled": self._incident_detector_enabled,
             }
 
             from greenhouse_mvp.environment.sim_adapter import (
@@ -278,6 +361,9 @@ class SimulationRunner:
             )
             from greenhouse_mvp.environment.fault_injector import FaultInjector
             fault_injector = FaultInjector(cfg.faults)
+
+            # Incident manager is long-lived across episodes within one start() call
+            incident_manager = self._incident_manager
 
             while not self._stop_event.is_set():
                 # Honor pause
@@ -295,15 +381,23 @@ class SimulationRunner:
                     mpc_ctrl.initialise(x0)
                     graph_state["episode_log"] = []
                     graph_state["last_supervisor_step"] = -999
+                    graph_state["last_incident_detect_step"] = -999
+                    incident_manager.reset()
                     with self._lock:
                         self._step = 0
                     self._emit({"type": "reset", "data": {}})
                     logger.info("SimulationRunner: episode reset at step %d", step)
                     continue
 
-                # Build telemetry from observation (apply sensor faults before LLM sees it)
+                # Check for expired incidents and emit alerts
+                expired_alerts = incident_manager.expire_check(step)
+                for alert in expired_alerts:
+                    self._emit({"type": "incident", "data": alert.model_dump()})
+
+                # Build telemetry from observation (apply sensor faults, then incident disturbances)
                 telemetry = obs_to_telemetry(obs, step, cfg.period)
                 telemetry = fault_injector.inject_sensor(telemetry, step)
+                telemetry = incident_manager.apply_to_telemetry(telemetry, step)
 
                 with self._lock:
                     self._step = step
@@ -315,6 +409,12 @@ class SimulationRunner:
                 with self._lock:
                     ctrl_mode = self._controller_mode
                     agent_on = self._agent_enabled
+                    detector_on = self._incident_detector_enabled
+
+                # Collect active incidents for the graph context
+                active_incident_dicts = [
+                    inc.model_dump() for inc in incident_manager.get_active(step)
+                ]
 
                 # Run LangGraph step
                 graph_state = graph.invoke({
@@ -327,9 +427,12 @@ class SimulationRunner:
                     "ood_metrics": None,
                     "ood_detected": False,
                     "llm_reasoning": None,
+                    "incident_report": None,
                     "_terminated": False,
                     "controller_mode": ctrl_mode,
                     "agent_enabled": agent_on,
+                    "active_incidents": active_incident_dicts,
+                    "incident_detector_enabled": detector_on,
                 })
 
                 final_action: Optional[ActionPayload] = graph_state.get("final_action")
@@ -364,12 +467,32 @@ class SimulationRunner:
                         "uBlScr": final_action.uBlScr,
                     }})
 
-                # Step the environment (apply actuator faults after LLM decision, before gym)
+                # Emit incident detection report (if detector ran this step)
+                incident_report = graph_state.get("incident_report")
+                if incident_report is not None:
+                    self._emit({"type": "incident_report", "data": {
+                        "step": incident_report.step,
+                        "detected_type": incident_report.detected_type,
+                        "confidence": incident_report.confidence,
+                        "affected_systems": incident_report.affected_systems,
+                        "repair_steps": incident_report.repair_steps,
+                        "reasoning": incident_report.reasoning,
+                        "urgency": incident_report.urgency,
+                        "mitigation_action": (
+                            incident_report.mitigation_action.model_dump()
+                            if incident_report.mitigation_action else None
+                        ),
+                    }})
+
+                # Step the environment:
+                #   1. fault injector (sensor faults already applied above; actuator faults here)
+                #   2. incident constraints (physical actuator limitations)
                 action_vec = (
                     action_to_array(final_action) if final_action
                     else SAFE_FALLBACK_ACTION.copy()
                 )
                 action_vec = fault_injector.inject_actuator(action_vec, step)
+                action_vec = incident_manager.apply_to_action(action_vec, step)
                 obs, _reward, terminated, truncated, _info = env.step(action_vec)
                 step += 1
 
@@ -452,6 +575,7 @@ class SimulationRunner:
             env_id=cfg.env_id,
             start_date=cfg.start_date,
             n_days=cfg.n_days,
+            horizon=cfg.mpc_horizon,
             period=cfg.period,
         )
 
