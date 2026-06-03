@@ -1,0 +1,3 @@
+dataset,source,env_id,start_date,n_days,period,seed,noise_scale,noise_period,created_at,rows
+train,rule_based,gl_gym/GreenLightTomato-v0,2010-02-28,60,900,42,0.1,5,2026-05-31 11:19:17,5760
+test,rule_based,gl_gym/GreenLightTomato-v0,2010-04-15,30,900,42,0.1,5,2026-05-31 11:19:18,2880
