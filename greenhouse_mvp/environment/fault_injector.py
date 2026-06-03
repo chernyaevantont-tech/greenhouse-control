@@ -39,6 +39,10 @@ def _apply(original: float, fault: "FaultSpec") -> float:
         return original + fault.value
     if ft == "dead":          # actuators only
         return 0.0
+    if ft == "min_floor":     # actuator can't go below value
+        return max(original, fault.value)
+    if ft == "max_cap":       # actuator can't exceed value
+        return min(original, fault.value)
     return original
 
 

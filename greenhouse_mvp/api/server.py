@@ -27,9 +27,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
+from fastapi import HTTPException
+
+from greenhouse_mvp.environment.incident_manager import INCIDENT_CATALOG
 from greenhouse_mvp.orchestration.schemas import (
     AgentControlPayload,
     ControllerSelectPayload,
+    IncidentSpec,
     SimConfig,
     SimControlPayload,
     SimResetPayload,
@@ -126,6 +130,55 @@ def set_controller(req: ControllerSelectPayload) -> dict:
 def set_agent(req: AgentControlPayload) -> dict:
     runner.set_agent_enabled(req.enabled)
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Incident management
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/incidents")
+def list_incidents() -> dict:
+    """Return all currently active incidents."""
+    return {"incidents": runner.list_incidents()}
+
+
+@app.get("/api/incidents/catalog")
+def get_incident_catalog() -> dict:
+    """Return the catalog of available incident types with metadata."""
+    catalog = {}
+    for key, meta in INCIDENT_CATALOG.items():
+        catalog[key] = {
+            "label": meta.get("label", key),
+            "description": meta.get("description", ""),
+            "affected_systems": meta.get("affected_systems", []),
+            "repair_steps": meta.get("repair_steps", []),
+            "mitigation_hints": meta.get("mitigation_hints", ""),
+        }
+    return {"catalog": catalog}
+
+
+@app.post("/api/incidents")
+def trigger_incident(spec: IncidentSpec) -> dict:
+    """
+    Trigger a named incident in the running simulation.
+
+    The incident is applied immediately (from the next simulation step).
+    Returns the generated incident_id.
+    """
+    if not runner.get_status().running:
+        raise HTTPException(status_code=400, detail="Simulation is not running")
+    alert = runner.add_incident(spec)
+    return {"ok": True, "incident_id": alert.incident_id, "alert": alert.model_dump()}
+
+
+@app.delete("/api/incidents/{incident_id}")
+def resolve_incident(incident_id: str) -> dict:
+    """Resolve (remove) an active incident by its ID."""
+    removed = runner.remove_incident(incident_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail=f"Incident '{incident_id}' not found")
+    return {"ok": True, "incident_id": incident_id}
 
 
 # ---------------------------------------------------------------------------

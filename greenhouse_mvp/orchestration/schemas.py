@@ -5,7 +5,8 @@ Every message travelling over the MQTT bus must be validated using one of these 
 
 from __future__ import annotations
 
-from typing import List, Literal
+from typing import List, Literal, Optional
+from uuid import uuid4
 
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import TypedDict
@@ -18,14 +19,71 @@ class FaultSpec(BaseModel):
         "t_in", "co2", "rh",
         "uBoil", "uCO2", "uThScr", "uVent", "uLamp", "uBlScr"
     ]
-    fault_type: Literal["stuck_high", "stuck_low", "random", "offset", "dead"]
+    fault_type: Literal["stuck_high", "stuck_low", "random", "offset", "dead", "min_floor", "max_cap"]
     start_step: int = 0
     # For stuck_high / stuck_low: the fixed value to emit
     # For offset: delta added to the real value
+    # For min_floor: max(original, value)  — actuator can't go below this
+    # For max_cap:   min(original, value)  — actuator can't go above this
     value: float = 0.0
     # For random: uniform(value_lo, value_hi)
     value_lo: float = 0.0
     value_hi: float = 1.0
+
+
+# ---------------------------------------------------------------------------
+# Incident / event schemas
+# ---------------------------------------------------------------------------
+
+INCIDENT_TYPES = Literal[
+    "door_open",
+    "heater_failure",
+    "co2_supply_failure",
+    "ventilation_stuck_open",
+    "ventilation_stuck_closed",
+    "lamp_failure",
+    "thermal_screen_broken",
+    "sensor_temp_stuck",
+    "sensor_co2_drift",
+    "sensor_rh_failure",
+    "power_surge",
+    "high_humidity_event",
+]
+
+
+class IncidentSpec(BaseModel):
+    """A triggered incident / abnormal event in the greenhouse simulation."""
+
+    incident_id: str = Field(default_factory=lambda: str(uuid4())[:8])
+    incident_type: INCIDENT_TYPES
+    start_step: int = 0
+    duration_steps: Optional[int] = None   # None = permanent until manually resolved
+    severity: float = Field(default=1.0, ge=0.0, le=1.0)
+    description: str = ""                  # optional operator annotation
+
+
+class IncidentReport(BaseModel):
+    """Output of the incident detection agent after analysing telemetry anomalies."""
+
+    step: int
+    detected_type: str              # incident type key, "nominal", or "unknown_anomaly"
+    confidence: float               # [0.0, 1.0]
+    affected_systems: List[str]
+    repair_steps: List[str]         # ordered repair recommendations for the operator
+    mitigation_action: Optional["ActionPayload"] = None  # suggested immediate control action
+    reasoning: str                  # LLM reasoning text
+    urgency: Literal["low", "medium", "high", "critical"] = "medium"
+
+
+class IncidentAlert(BaseModel):
+    """Emitted via SSE when an incident is triggered, resolved, or expires."""
+
+    incident_id: str
+    incident_type: str
+    action: Literal["triggered", "resolved", "expired"]
+    step: int
+    severity: float
+    description: str
 
 
 class TelemetryPayload(BaseModel):
@@ -122,6 +180,15 @@ class GraphState(TypedDict):
     episode_log: list[dict]
     # Set to True when the simulation episode terminates
     _terminated: bool
+    # ---- Incident / event tracking ----
+    # Active incidents passed in from IncidentManager (serialised dicts)
+    active_incidents: list[dict]
+    # Result from the incident detection agent (None if not triggered this step)
+    incident_report: IncidentReport | None
+    # Step of the last incident detector LLM call (for cooldown)
+    last_incident_detect_step: int
+    # Whether incident detector is enabled
+    incident_detector_enabled: bool
 
 
 class SimControlPayload(BaseModel):
@@ -198,3 +265,4 @@ class SimStatus(BaseModel):
     latest_telemetry: TelemetryPayload | None = None
     latest_action: ActionPayload | None = None
     latest_ood: OODMetrics | None = None
+    active_incidents: List[IncidentSpec] = Field(default_factory=list)

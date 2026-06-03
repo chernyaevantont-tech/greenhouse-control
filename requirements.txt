@@ -11,7 +11,7 @@ do-mpc>=4.6
 casadi>=3.6
 pysindy>=1.7
 
-# Web API (replaces MQTT + streamlit)
+# Web API
 fastapi>=0.111
 uvicorn[standard]>=0.29
 
@@ -25,3 +25,6 @@ httpx>=0.27
 
 # Schema validation
 pydantic>=2.6
+
+# Tests
+pytest>=8.0

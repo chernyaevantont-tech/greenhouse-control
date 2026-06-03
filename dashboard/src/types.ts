@@ -1,5 +1,63 @@
-﻿export type FaultType = 'stuck_high' | 'stuck_low' | 'random' | 'offset' | 'dead';
+﻿export type FaultType = 'stuck_high' | 'stuck_low' | 'random' | 'offset' | 'dead' | 'min_floor' | 'max_cap';
 export type FaultTarget = 't_in' | 'co2' | 'rh' | 'uBoil' | 'uCO2' | 'uThScr' | 'uVent' | 'uLamp' | 'uBlScr';
+
+// ---------------------------------------------------------------------------
+// Incident types
+// ---------------------------------------------------------------------------
+
+export type IncidentType =
+  | 'door_open'
+  | 'heater_failure'
+  | 'co2_supply_failure'
+  | 'ventilation_stuck_open'
+  | 'ventilation_stuck_closed'
+  | 'lamp_failure'
+  | 'thermal_screen_broken'
+  | 'sensor_temp_stuck'
+  | 'sensor_co2_drift'
+  | 'sensor_rh_failure'
+  | 'power_surge'
+  | 'high_humidity_event';
+
+export type IncidentAction = 'triggered' | 'resolved' | 'expired';
+export type IncidentUrgency = 'low' | 'medium' | 'high' | 'critical';
+
+export interface IncidentSpec {
+  incident_id?: string;
+  incident_type: IncidentType;
+  start_step?: number;
+  duration_steps?: number | null;   // null = permanent
+  severity?: number;                // 0.0 – 1.0
+  description?: string;
+}
+
+export interface IncidentAlert {
+  incident_id: string;
+  incident_type: string;
+  action: IncidentAction;
+  step: number;
+  severity: number;
+  description: string;
+}
+
+export interface IncidentReport {
+  step: number;
+  detected_type: string;
+  confidence: number;
+  affected_systems: string[];
+  repair_steps: string[];
+  mitigation_action: ActionPayload | null;
+  reasoning: string;
+  urgency: IncidentUrgency;
+}
+
+export interface IncidentCatalogEntry {
+  label: string;
+  description: string;
+  affected_systems: string[];
+  repair_steps: string[];
+  mitigation_hints: string;
+}
 
 export interface FaultSpec {
   target: FaultTarget;
@@ -84,10 +142,10 @@ export interface SimStatus {
   latest_telemetry: TelemetryPayload | null;
   latest_action: ActionPayload | null;
   latest_ood: OODMetrics | null;
+  active_incidents: IncidentSpec[];
 }
 
 export interface DashboardState {
-  connected: boolean;
   timestamps: string[];
   steps: number[];
   t_in: number[];
@@ -117,4 +175,8 @@ export interface DashboardState {
   simPaused: boolean;
   simStep: number;
   serverConnected: boolean;
+  // Incidents
+  activeIncidents: IncidentSpec[];
+  incidentAlerts: IncidentAlert[];    // recent triggered/resolved/expired alerts
+  incidentReports: IncidentReport[];  // recent LLM detection reports
 }

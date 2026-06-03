@@ -121,6 +121,26 @@ def compute_physics_features(
     return features
 
 
+def compute_physics_features_single(
+    *,
+    t_in: float,
+    co2: float,
+    rh: float,
+    T_out: float,
+    rad: float,
+    co2_out: float,
+    sin_h: float,
+    cos_h: float,
+    u_vec: np.ndarray,
+) -> np.ndarray:
+    """Compute one 18-d physics feature row for online control paths."""
+    states = np.array([[t_in, co2, rh]], dtype=np.float64)
+    weather = np.array([[T_out, rad, co2_out]], dtype=np.float64)
+    time_enc = np.array([[sin_h, cos_h]], dtype=np.float64)
+    actions = np.asarray(u_vec, dtype=np.float64).reshape(1, 6)
+    return compute_physics_features(states, weather, time_enc, actions)[0]
+
+
 def check_condition_number(matrix: np.ndarray, context: str = "") -> float:
     """
     Compute the condition number of *matrix* via SVD and log warnings.

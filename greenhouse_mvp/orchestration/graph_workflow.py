@@ -3,7 +3,7 @@ graph_workflow.py — LangGraph StateGraph orchestration for greenhouse control.
 
 Refactored to run in-process without MQTT.
 One invocation corresponds to one simulation timestep:
-  [mpc|llm] -> check_ood -> [supervisor_review] -> approve -> log_step -> END
+  [mpc|llm] -> check_ood -> [supervisor_review|detect_incident] -> approve -> log_step -> END
 
 Telemetry is passed directly in state — no blocking queue needed.
 """
@@ -19,13 +19,14 @@ from langgraph.graph import END, StateGraph
 from greenhouse_mvp.orchestration.schemas import (
     ActionPayload,
     GraphState,
-    LLMActionPayload,
+    IncidentReport,
     OODMetrics,
     SupervisorVerdict,
     TelemetryPayload,
 )
 
 if TYPE_CHECKING:
+    from greenhouse_mvp.agents.incident_detector import IncidentDetector
     from greenhouse_mvp.agents.notebooklm_agent import NotebookLMAgent
     from greenhouse_mvp.control_core.llm_controller import LLMController
     from greenhouse_mvp.control_core.mpc_controller import MPCController
@@ -105,6 +106,67 @@ def reject_replan_node(state: GraphState) -> GraphState:
     new_count = state["retry_count"] + 1
     logger.info("reject_replan: retry %d/%d", new_count, state["max_retries"])
     return {**state, "retry_count": new_count, "proposed_action": None}
+
+
+def make_incident_detect_node(detector: "IncidentDetector"):
+    """
+    Run the LLM incident detector when heuristic conditions are met and cooldown has elapsed.
+
+    The detector only calls the LLM when:
+      - incident_detector_enabled is True
+      - heuristic rules triggered (OOD or abnormal actuator response)
+      - cooldown since last LLM call has elapsed
+
+    The result is placed in state["incident_report"] for emission via SSE.
+    """
+    from greenhouse_mvp.agents.incident_detector import (
+        DETECTOR_COOLDOWN,
+        DETECTOR_WARMUP,
+        should_trigger,
+    )
+
+    def detect_incident(state: GraphState) -> GraphState:
+        if not state.get("incident_detector_enabled", False):
+            return {**state, "incident_report": None}
+
+        telemetry: TelemetryPayload | None = state.get("telemetry")
+        if telemetry is None:
+            return {**state, "incident_report": None}
+
+        step = telemetry.step
+        last_detect = state.get("last_incident_detect_step", -DETECTOR_COOLDOWN)
+
+        # Check cooldown
+        if step - last_detect < DETECTOR_COOLDOWN:
+            return {**state, "incident_report": None}
+
+        # Heuristic check (cheap, no LLM)
+        episode_log: list[dict] = state.get("episode_log", [])
+        ood_detected: bool = state.get("ood_detected", False)
+        triggered, reason = should_trigger(
+            episode_log, ood_detected, step, warmup=DETECTOR_WARMUP
+        )
+
+        if not triggered:
+            return {**state, "incident_report": None}
+
+        # Call LLM detector
+        ood: OODMetrics | None = state.get("ood_metrics")
+        active_incidents: list[dict] = state.get("active_incidents", [])
+        logger.info(
+            "IncidentDetect step=%d: heuristic triggered (%s) — calling LLM detector",
+            step, reason,
+        )
+        report: IncidentReport = detector.detect(
+            current_telemetry=telemetry,
+            episode_log=episode_log,
+            ood_metrics=ood,
+            active_incidents=active_incidents,
+            heuristic_reason=reason,
+        )
+        return {**state, "incident_report": report, "last_incident_detect_step": step}
+
+    return detect_incident
 
 
 def make_log_node(mpc_ctrl: "MPCController", dagger_dataset: dict, weather_cfg: dict):
@@ -187,6 +249,7 @@ def build_graph(
     mpc_ctrl: "MPCController",
     llm_ctrl: "LLMController",
     agent: "NotebookLMAgent",
+    incident_detector: "IncidentDetector | None" = None,
     dagger_dataset: "dict | None" = None,
     weather_cfg: "dict | None" = None,
 ):
@@ -201,6 +264,10 @@ def build_graph(
     sg.add_node("approve_action", approve_action_node)
     sg.add_node("reject_replan", reject_replan_node)
     sg.add_node("log_step", make_log_node(mpc_ctrl, dagger_dataset or {}, weather_cfg or {}))
+
+    # Incident detection node — runs after action is approved (non-blocking for control)
+    if incident_detector is not None:
+        sg.add_node("detect_incident", make_incident_detect_node(incident_detector))
 
     # Entry: branch by controller mode
     sg.set_conditional_entry_point(
@@ -230,8 +297,12 @@ def build_graph(
     # LLM path — direct approve
     sg.add_edge("run_llm", "approve_action")
 
-    # Shared tail
-    sg.add_edge("approve_action", "log_step")
+    # Shared tail: approve → [detect_incident →] log_step → END
+    if incident_detector is not None:
+        sg.add_edge("approve_action", "detect_incident")
+        sg.add_edge("detect_incident", "log_step")
+    else:
+        sg.add_edge("approve_action", "log_step")
     sg.add_edge("log_step", END)
 
     return sg.compile()
@@ -271,19 +342,14 @@ def _run_dagger_worker(
     weather_cfg: dict,
 ) -> None:
     """Full DAgger iteration — collects new data and retrains the SINDy model."""
-    import math
-
     import gymnasium as gym
     import numpy as np
-    import pysindy as ps
-    from sklearn.preprocessing import StandardScaler
 
     import gl_gym  # noqa: F401
     from greenhouse_mvp.control_core.mpc_controller import MPCController as _MPC
     from greenhouse_mvp.environment.tvp_forecast import WeatherForecastTVP
     from greenhouse_mvp.sindy_pipeline.physics_features import (
-        FEATURE_NAMES,
-        compute_physics_features,
+        compute_physics_features_single,
     )
     from greenhouse_mvp.sindy_pipeline.sindy_fitter import SINDyFitter
 
@@ -310,6 +376,7 @@ def _run_dagger_worker(
         env_id=env_id,
         start_date=base_start_date,
         n_days=episode_days,
+        horizon=horizon,
         period=period,
     )
     dagger_mpc = _MPC(
@@ -331,15 +398,16 @@ def _run_dagger_worker(
     from greenhouse_mvp.environment.sim_adapter import obs_to_telemetry, action_to_array
 
     xs, us = [], []
-    for _ in range(steps_per_episode):
-        telemetry = obs_to_telemetry(obs, 0, period)
+    for step_idx in range(steps_per_episode):
+        telemetry = obs_to_telemetry(obs, step_idx, period)
         action, _ = dagger_mpc.step(telemetry)
         u_arr = action_to_array(action)
 
         x_state = np.array([telemetry.t_in, telemetry.co2, telemetry.rh])
-        feat = compute_physics_features(
+        feat = compute_physics_features_single(
             t_in=telemetry.t_in, co2=telemetry.co2, rh=telemetry.rh,
             T_out=telemetry.T_out, rad=telemetry.rad, co2_out=telemetry.co2_out,
+            sin_h=telemetry.sin_h, cos_h=telemetry.cos_h,
             u_vec=u_arr,
         )
         xs.append(x_state)
@@ -364,21 +432,21 @@ def _run_dagger_worker(
     dagger_dataset["xs"] = xs_all
     dagger_dataset["us"] = us_all
 
-    # Refit scalers
-    new_scaler_x = StandardScaler().fit(xs_all)
-    new_scaler_u = StandardScaler().fit(us_all)
-
-    # Retrain SINDy
+    # Retrain SINDy. SINDyFitter owns scaling and OOD statistics.
     fitter = SINDyFitter(threshold=0.05, alpha=0.01)
-    xs_sc = new_scaler_x.transform(xs_all)
+    new_sindy, new_scaler_x, new_scaler_u = fitter.fit(
+        xs_all,
+        us_all,
+        period=float(period),
+    )
     us_sc = new_scaler_u.transform(us_all)
-    new_sindy = fitter.fit(xs_sc, us_sc, t=float(period))
 
     # New weather forecast for live episode
     new_weather = WeatherForecastTVP(
         env_id=env_id,
         start_date=base_start_date,
         n_days=n_days_full,
+        horizon=horizon,
         period=period,
     )
 

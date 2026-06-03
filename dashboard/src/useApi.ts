@@ -1,6 +1,10 @@
 ﻿import { useState, useEffect, useRef, useCallback } from 'react';
 import type {
   DashboardState,
+  IncidentAlert,
+  IncidentCatalogEntry,
+  IncidentReport,
+  IncidentSpec,
   SimConfig,
   SimStatus,
   TelemetryPayload,
@@ -25,7 +29,6 @@ function simToHHMM(tsSeconds: number): string {
 }
 
 const INIT: DashboardState = {
-  connected: false,
   timestamps: [], steps: [], t_in: [], T_out: [], co2: [], rh: [], rad: [], mahal: [],
   oodThreshold: 6.0, inDistribution: null, agentEnabled: false,
   controllerMode: 'mpc',
@@ -39,6 +42,10 @@ const INIT: DashboardState = {
   simPaused: false,
   simStep: 0,
   serverConnected: false,
+  // Incidents
+  activeIncidents: [],
+  incidentAlerts: [],
+  incidentReports: [],
 };
 
 export function useApi() {
@@ -127,6 +134,37 @@ export function useApi() {
               faultReports: newFaultReports,
             };
           }
+          case 'incident': {
+            const p = data as IncidentAlert;
+            // Update activeIncidents list based on the alert action
+            let updatedIncidents = [...prev.activeIncidents];
+            if (p.action === 'triggered') {
+              // Add if not already present (avoid duplicates on reconnect)
+              if (!updatedIncidents.find(i => i.incident_id === p.incident_id)) {
+                updatedIncidents = [...updatedIncidents, {
+                  incident_id: p.incident_id,
+                  incident_type: p.incident_type as IncidentSpec['incident_type'],
+                  severity: p.severity,
+                  description: p.description,
+                }];
+              }
+            } else {
+              // resolved or expired — remove from list
+              updatedIncidents = updatedIncidents.filter(i => i.incident_id !== p.incident_id);
+            }
+            return {
+              ...prev,
+              activeIncidents: updatedIncidents,
+              incidentAlerts: [p, ...prev.incidentAlerts].slice(0, 100),
+            };
+          }
+          case 'incident_report': {
+            const p = data as IncidentReport;
+            return {
+              ...prev,
+              incidentReports: [p, ...prev.incidentReports].slice(0, 50),
+            };
+          }
           case 'reset': {
             return {
               ...prev,
@@ -134,6 +172,7 @@ export function useApi() {
               uBoil: [], uCO2: [], uThScr: [], uVent: [], uLamp: [], uBlScr: [],
               latestTelemetry: null, latestOOD: null, latestAction: null,
               supervisorLog: [], llmLog: [], faultReports: [],
+              activeIncidents: [], incidentAlerts: [], incidentReports: [],
               simStep: 0,
             };
           }
@@ -164,6 +203,7 @@ export function useApi() {
         simStep: status.step,
         controllerMode: status.config.controller_mode,
         agentEnabled: status.config.agent_enabled,
+        activeIncidents: status.active_incidents ?? s.activeIncidents,
       }));
     } catch {
       setState(s => ({ ...s, serverConnected: false }));
@@ -232,6 +272,53 @@ export function useApi() {
     }
   }, []);
 
+  // ---------- Incident API ----------
+
+  const triggerIncident = useCallback(
+    async (spec: IncidentSpec): Promise<{ incident_id: string } | null> => {
+      try {
+        const res = await fetch(`${API_BASE}/incidents`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(spec),
+        });
+        if (!res.ok) return null;
+        return await res.json();
+      } catch {
+        return null;
+      }
+    },
+    [],
+  );
+
+  const resolveIncident = useCallback(
+    async (incidentId: string): Promise<boolean> => {
+      try {
+        const res = await fetch(`${API_BASE}/incidents/${incidentId}`, {
+          method: 'DELETE',
+        });
+        return res.ok;
+      } catch {
+        return false;
+      }
+    },
+    [],
+  );
+
+  const fetchIncidentCatalog = useCallback(
+    async (): Promise<Record<string, IncidentCatalogEntry> | null> => {
+      try {
+        const res = await fetch(`${API_BASE}/incidents/catalog`);
+        if (!res.ok) return null;
+        const body = await res.json();
+        return body.catalog ?? null;
+      } catch {
+        return null;
+      }
+    },
+    [],
+  );
+
   return {
     state,
     startSim,
@@ -242,5 +329,8 @@ export function useApi() {
     setAgent,
     updateConfig,
     fetchConfig,
+    triggerIncident,
+    resolveIncident,
+    fetchIncidentCatalog,
   };
 }

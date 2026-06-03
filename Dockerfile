@@ -12,5 +12,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Default entrypoint is overridden per-service in docker-compose.yml
-CMD ["python", "-m", "greenhouse_mvp.orchestration.graph_workflow"]
+# Default entrypoint is overridden per-service in docker-compose.yml.
+CMD ["python", "-m", "greenhouse_mvp.api.server"]
