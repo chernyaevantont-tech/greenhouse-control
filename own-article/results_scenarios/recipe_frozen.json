@@ -1,0 +1,10 @@
+{
+  "recipe": {
+    "feature_variant": "physics",
+    "library_degree": 1,
+    "optimizer": "stlsq",
+    "denoise": "savgol"
+  },
+  "selected_by": "pareto(diverged_frac, rollout_rmse, sparsity); gates=embeddable+transparent",
+  "frozen_at": "2026-06-26 12:52:02"
+}

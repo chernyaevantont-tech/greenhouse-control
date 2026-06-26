@@ -1,38 +1,61 @@
-# Article Experiment Notebooks
+# Article experiments — E0–E3 (protocol-aligned)
 
-This folder contains reproducible notebooks for testing the publishable claims
-around a data-efficient interpretable greenhouse MPC controller with
-physics-informed sparse dynamics.
+Reproducible notebooks for the **data-efficient interpretable greenhouse SINDy-MPC**
+study, implemented per [`EXPERIMENT_PROTOCOL.md`](EXPERIMENT_PROTOCOL.md). All claims
+are **in-silico** on `gl_gym/GreenLightTomato-v0` (GreenLight-Gym2).
 
-The notebooks deliberately ignore OOD/LLM components and focus on:
+This pass covers the **core hypothesis chain E0→E3** at article grade, on
+**Rostov-on-Don 2018–2023** with the economic indicator **EPI** read directly from
+the simulator. E4–E8 (online adaptation, OOD, sensitivity, faults, full multi-seed)
+are the next pass; the legacy `0x_*.ipynb` notebooks remain as their scaffolding.
 
-1. Physics-informed SINDy feature ablations.
-2. Closed-loop MPC performance.
-3. DAgger-style dataset aggregation.
-4. Interpretability of sparse equations.
-5. Cross-season / cross-start-date generalization.
+## Notebooks (run in order)
 
-## Recommended order
+| Notebook | Experiment | Output |
+|---|---|---|
+| `E0_canonical_setup_and_metrics.ipynb` | E0 — EPI metric + frozen protocol config | `protocol.json`, EPI decomposition |
+| `E1_data_and_scenarios.ipynb` | E1 — Rostov splits, excitation (noise + PRBS), budget/κ curve | `.npz` datasets, split + κ tables |
+| `E2_identification_ladder.ipynb` | E2 — denoise×optimizer×library×degree ablation + gates | ablation table, `recipe_frozen.json`, equations |
+| `E3_closed_loop_benchmark.ipynb` | E3 — closed-loop EPI benchmark + statistics | main mean±CI table, Pareto, Wilcoxon |
 
-1. `00_data_collection.ipynb`
-2. `01_sindy_feature_ablation.ipynb`
-3. `02_closed_loop_mpc_benchmark.ipynb`
-4. `03_dagger_dataset_aggregation.ipynb`
-5. `04_interpretability_and_equations.ipynb`
-6. `05_cross_season_generalization.ipynb`
+`protocol_config.py` is the single source of truth (split, budgets, seeds, horizons,
+HP budget) and reads the simulator's prices/corridors via `read_env_economics()`.
+Helper code lives in `article_experiment_utils.py`.
 
-All generated artifacts are written to `own-article/results_scenarios/`.
-The helper code resolves `start_date` into an explicit GreenLightGym2 weather
-scenario (`location`, `growth_year`, `start_day`), so train/test and seasonal
-generalization runs use genuinely different weather trajectories.
+## How to run
 
-Ignore `own-article/results/` if it exists locally; it is retained only as a
-stale pre-fix run.
+The project venv is `…/greenlight/sindylom/.venv` (uv-managed, Python 3.14;
+has gl_gym, pysindy 2.1, do-mpc, casadi, torch, gymnasium, stable-baselines3,
+nbformat/nbclient). Notebooks read **`FAST_MODE`** from the `ARTICLE_FAST` env var.
 
-- `datasets/`: `.npz` trajectory datasets.
-- `models/`: pickled SINDy bundles.
-- `tables/`: CSV tables for the paper.
-- `figures/`: PNG figures for the paper.
+```bash
+# FAST_MODE smoke (tiny data/horizons/seeds — minutes, validates the whole pipeline)
+python run_all_notebooks.py
 
-Each notebook has a `FAST_MODE` switch. Keep it enabled for smoke tests; disable
-it for article-grade runs.
+# article-grade (full Rostov, >=10 seeds, 60-day rollouts — hours; oracle/RL reduced)
+ARTICLE_FAST=0 python run_all_notebooks.py
+```
+
+Run a single notebook: `python run_all_notebooks.py E2_identification_ladder.ipynb`.
+
+## Key design points
+
+- **EPI is the simulator's economics, not a proxy.** `EPI = Σ profit` per season is
+  harvested from `env.step(...)` info (gl_gym `GreenhouseReward`); revenue and
+  heat/CO₂/electricity costs are decomposed from the same dict. Constraint corridors
+  (CO₂∈[300,1600], T∈[15,34], RH∈[50,85]) come from `env.constraints_*`.
+- **Rostov soil** (`rostov_soil.apply_rostov_soil`) is patched automatically inside
+  `_make_env` (gated on location) before the first weather load.
+- **Identification ladder** factors: optimizer {STLSQ, SR3, Ensemble, ConstrainedSR3},
+  denoise {none, Savitzky–Golay, Kalman}, library {raw, physics, physics_no_cross},
+  degree {1,2}. The recommended recipe is frozen (pre-registration) before E3.
+- **Gates:** MPC-embeddability (degree-1 → CasADi/do-mpc within a step-time budget)
+  and transparency (sign/dimension checks + bootstrap structural stability).
+- **E3 controllers:** rule-based · SINDy-MPC (frozen recipe) · grey-box-MPC
+  (reduced linear physics) · NN-MPC · PPO · SAC · **oracle-MPC** (CEM over the true
+  simulator model `env.F`). Variance comes from re-collecting train per seed
+  (retraining surrogates) — the valid source the legacy `07_multi_seed` lacked.
+  Oracle and RL run on a reduced seed set (CPU budget).
+
+All artifacts are written to `results_scenarios/{datasets,models,tables,figures}` plus
+`protocol.json` and `recipe_frozen.json`. The legacy `results/` directory is stale.

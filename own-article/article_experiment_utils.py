@@ -35,6 +35,30 @@ PHYSICS_NO_CROSS_NAMES = WEATHER_NAMES + TIME_NAMES + ACTION_NAMES + [
 ]
 PHYSICS_FEATURE_NAMES = WEATHER_NAMES + TIME_NAMES + ACTION_NAMES + PHYSICS_EXTRA_NAMES
 
+# Per-step economic fields harvested from gl_gym's GreenhouseReward via env.step info.
+# EPI = sum of "profit" over the season; the rest decompose revenue and costs.
+ECON_FIELDS = [
+    "profit", "revenue", "variable_costs", "heat_cost", "co2_cost", "elec_cost",
+    "fruit_growth_dm", "temp_penalty", "co2_penalty", "rh_penalty", "lamp_penalty",
+]
+
+# Simulator's enforced corridors (CO2/T/RH); read live via protocol_config when
+# available, this is the GreenLightTomato-v0 default fallback.
+DEFAULT_CORRIDORS = {"co2": (300.0, 1600.0), "t_in": (15.0, 34.0), "rh": (50.0, 85.0)}
+
+
+def _econ_row(info: dict | None) -> dict:
+    """Extract the raw (unscaled) economic fields from an env.step info dict."""
+    if not info:
+        return {f: 0.0 for f in ECON_FIELDS}
+    out = {}
+    for f in ECON_FIELDS:
+        v = info.get(f)
+        if v is None and f == "revenue":
+            v = info.get("gains", 0.0)
+        out[f] = float(v) if v is not None else 0.0
+    return out
+
 
 @dataclass
 class ExperimentConfig:
@@ -69,6 +93,8 @@ class TrajectoryData:
     time_enc: np.ndarray
     actions: np.ndarray
     meta: dict
+    econ: np.ndarray | None = None          # (n, len(ECON_FIELDS)) per-step economics
+    econ_names: list[str] | None = None
 
     def __post_init__(self) -> None:
         self.states = np.asarray(self.states, dtype=np.float64)
@@ -83,6 +109,10 @@ class TrajectoryData:
         ]:
             if len(arr) != n:
                 raise ValueError(f"{name} length {len(arr)} does not match states length {n}")
+        if self.econ is not None:
+            self.econ = np.asarray(self.econ, dtype=np.float64)
+            if self.econ_names is None:
+                self.econ_names = list(ECON_FIELDS)
 
     def subset_steps(self, n_steps: int) -> "TrajectoryData":
         n = min(int(n_steps), len(self.states))
@@ -94,6 +124,8 @@ class TrajectoryData:
             time_enc=self.time_enc[:n],
             actions=self.actions[:n],
             meta=meta,
+            econ=None if self.econ is None else self.econ[:n],
+            econ_names=self.econ_names,
         )
 
     def to_frame(self) -> pd.DataFrame:
@@ -106,6 +138,9 @@ class TrajectoryData:
             data[name] = self.time_enc[:, i]
         for i, name in enumerate(ACTION_NAMES):
             data[name] = self.actions[:, i]
+        if self.econ is not None and self.econ_names is not None:
+            for i, name in enumerate(self.econ_names):
+                data[name] = self.econ[:, i]
         data["step"] = np.arange(len(self.states))
         data["time_h"] = data["step"] * float(self.meta.get("period", 900)) / 3600.0
         return pd.DataFrame(data)
@@ -163,24 +198,31 @@ def save_json(path: Path, payload: dict) -> None:
 
 def save_dataset(data: TrajectoryData, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(
-        path,
+    meta = dict(data.meta)
+    arrays = dict(
         states=data.states,
         weather=data.weather,
         time_enc=data.time_enc,
         actions=data.actions,
-        meta=json.dumps(data.meta, ensure_ascii=False),
     )
+    if data.econ is not None:
+        arrays["econ"] = data.econ
+        meta["_econ_names"] = list(data.econ_names or ECON_FIELDS)
+    np.savez_compressed(path, meta=json.dumps(meta, ensure_ascii=False), **arrays)
 
 
 def load_dataset(path: Path) -> TrajectoryData:
     z = np.load(path, allow_pickle=False)
+    meta = json.loads(str(z["meta"]))
+    econ_names = meta.pop("_econ_names", None)
     return TrajectoryData(
         states=z["states"],
         weather=z["weather"],
         time_enc=z["time_enc"],
         actions=z["actions"],
-        meta=json.loads(str(z["meta"])),
+        meta=meta,
+        econ=z["econ"] if "econ" in z.files else None,
+        econ_names=econ_names,
     )
 
 
@@ -195,10 +237,33 @@ def load_bundle(path: Path) -> SINDyBundle:
         return pickle.load(f)
 
 
+def _maybe_apply_regional_soil(location: str) -> None:
+    """Patch gl_gym's deep-soil boundary to the regional model before env creation.
+
+    Rostov-on-Don needs the continental soil sinusoid (rostov_soil.apply_rostov_soil);
+    the patch must be active before the first weather load (it is cached). Gated on
+    location so legacy Amsterdam runs keep the Dutch (NL) default.
+    """
+    if not str(location).lower().startswith("rostov"):
+        return
+    try:
+        from rostov_soil import apply_rostov_soil
+    except ImportError:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "rostov_soil", str(article_dir() / "rostov_soil.py")
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        apply_rostov_soil = module.apply_rostov_soil
+    apply_rostov_soil()
+
+
 def _make_env(cfg: ExperimentConfig, n_days: int | None = None):
     import gl_gym  # noqa: F401
     import gymnasium as gym
 
+    _maybe_apply_regional_soil(cfg.location)
     return gym.make(
         cfg.env_id,
         normalize_actions=False,
@@ -288,7 +353,17 @@ def collect_rule_based_dataset(
     seed: int | None = None,
     noise_scale: float | None = None,
     noise_period: int | None = None,
+    prbs_scale: float = 0.0,
+    prbs_period: int = 16,
 ) -> TrajectoryData:
+    """Collect rule-based GreenLight trajectories with optional excitation.
+
+    Excitation overlaid on the agronomic rule-based action:
+      - gaussian noise (``noise_scale``), refreshed every ``noise_period`` steps;
+      - PRBS (``prbs_scale`` > 0): piecewise-constant +/- step on each actuator,
+        flipping every ``prbs_period`` steps -> richer identifiability (E1).
+    Per-step economics (EPI ``info``) are captured into ``TrajectoryData.econ``.
+    """
     cfg = ExperimentConfig(**{**asdict(cfg), "n_days": n_days or cfg.n_days})
     start_date = start_date or cfg.start_date
     seed = cfg.seed if seed is None else seed
@@ -302,9 +377,11 @@ def collect_rule_based_dataset(
     obs, reset_info = env.reset(options={"scenario": scenario}, seed=seed)
     scenario = reset_info.get("scenario", scenario)
 
-    states, weather, times, actions = [], [], [], []
+    states, weather, times, actions, econ_rows = [], [], [], [], []
     current_noise = np.zeros(6, dtype=np.float64)
     noise_countdown = 0
+    prbs_state = np.zeros(6, dtype=np.float64)
+    prbs_countdown = 0
 
     for step in range(cfg.total_steps):
         state, weather_vec = observation_to_arrays(obs)
@@ -319,7 +396,18 @@ def collect_rule_based_dataset(
         else:
             current_noise = np.zeros(6, dtype=np.float64)
 
-        action = np.clip(base_action + current_noise, env.action_space.low, env.action_space.high)
+        if prbs_scale > 0:
+            if prbs_countdown <= 0:
+                prbs_state = prbs_scale * rng.choice([-1.0, 1.0], size=6)
+                prbs_countdown = prbs_period
+            prbs_countdown -= 1
+        else:
+            prbs_state = np.zeros(6, dtype=np.float64)
+
+        action = np.clip(
+            base_action + current_noise + prbs_state,
+            env.action_space.low, env.action_space.high,
+        )
 
         states.append(state)
         weather.append(weather_vec)
@@ -327,17 +415,21 @@ def collect_rule_based_dataset(
         actions.append(action.astype(np.float64))
 
         obs, _reward, terminated, truncated, _info = env.step(action.astype(np.float32))
+        econ_rows.append([_econ_row(_info)[f] for f in ECON_FIELDS])
         if terminated or truncated:
             break
 
     env.close()
+    source = "rule_based" + ("+prbs" if prbs_scale > 0 else "")
     return TrajectoryData(
         states=np.asarray(states),
         weather=np.asarray(weather),
         time_enc=np.asarray(times),
         actions=np.asarray(actions),
+        econ=np.asarray(econ_rows, dtype=np.float64),
+        econ_names=list(ECON_FIELDS),
         meta={
-            "source": "rule_based",
+            "source": source,
             "env_id": cfg.env_id,
             "location": scenario["location"],
             "start_date": start_date,
@@ -349,6 +441,8 @@ def collect_rule_based_dataset(
             "seed": seed,
             "noise_scale": noise_scale,
             "noise_period": noise_period,
+            "prbs_scale": prbs_scale,
+            "prbs_period": prbs_period,
             "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         },
     )
@@ -425,6 +519,67 @@ def condition_number(matrix: np.ndarray) -> float:
     return float(np.inf if len(s) == 0 else s[0] / s[-1])
 
 
+def _denoise_states(states: np.ndarray, method: str) -> np.ndarray:
+    """Smooth the raw state signal before forming the one-step map (E2 denoise factor)."""
+    if method in ("none", None):
+        return states
+    x = np.asarray(states, dtype=np.float64)
+    n = len(x)
+    if method == "savgol":
+        from scipy.signal import savgol_filter
+        win = min(31, n if n % 2 == 1 else n - 1)
+        if win < 5:
+            return x
+        return np.column_stack([savgol_filter(x[:, i], win, 2) for i in range(x.shape[1])])
+    if method == "kalman":
+        # Constant-velocity RTS smoother per channel (lightweight Kalman smoothing).
+        return np.column_stack([_kalman_smooth_1d(x[:, i]) for i in range(x.shape[1])])
+    raise ValueError(f"Unknown denoise method: {method}")
+
+
+def _kalman_smooth_1d(z: np.ndarray, q: float = 1e-3, r: float | None = None) -> np.ndarray:
+    """Minimal constant-velocity Kalman filter + RTS smoother for a 1-D signal."""
+    z = np.asarray(z, dtype=np.float64)
+    n = len(z)
+    if n < 3:
+        return z
+    r = float(np.var(np.diff(z)) * 0.5 + 1e-9) if r is None else r
+    F = np.array([[1.0, 1.0], [0.0, 1.0]])
+    H = np.array([[1.0, 0.0]])
+    Q = q * np.array([[0.25, 0.5], [0.5, 1.0]])
+    xs = np.zeros((n, 2)); Ps = np.zeros((n, 2, 2))
+    xp = np.zeros((n, 2)); Pp = np.zeros((n, 2, 2))
+    x = np.array([z[0], 0.0]); P = np.eye(2)
+    for k in range(n):
+        x = F @ x; P = F @ P @ F.T + Q
+        xp[k] = x; Pp[k] = P
+        S = H @ P @ H.T + r
+        K = (P @ H.T) / S
+        x = x + (K * (z[k] - H @ x)).ravel()
+        P = (np.eye(2) - K @ H) @ P
+        xs[k] = x; Ps[k] = P
+    xsm = xs.copy()
+    for k in range(n - 2, -1, -1):
+        C = Ps[k] @ F.T @ np.linalg.inv(Pp[k + 1])
+        xsm[k] = xs[k] + C @ (xsm[k + 1] - xp[k + 1])
+    return xsm[:, 0]
+
+
+def _make_optimizer(name: str, threshold: float, alpha: float, ensemble_models: int = 20):
+    import pysindy as ps
+    name = (name or "stlsq").lower()
+    base = ps.STLSQ(threshold=threshold, alpha=alpha, max_iter=200, normalize_columns=False)
+    if name == "stlsq":
+        return base
+    if name == "sr3":
+        return ps.SR3(reg_weight_lam=threshold, relax_coeff_nu=1.0, max_iter=200)
+    if name == "constrained":
+        return ps.ConstrainedSR3(reg_weight_lam=threshold, relax_coeff_nu=1.0, max_iter=200)
+    if name == "ensemble":
+        return ps.EnsembleOptimizer(base, bagging=True, n_models=ensemble_models)
+    raise ValueError(f"Unknown optimizer: {name}")
+
+
 def fit_sindy(
     data: TrajectoryData,
     feature_variant: str = "physics",
@@ -433,14 +588,25 @@ def fit_sindy(
     alpha: float = 0.01,
     period: float = 900.0,
     metadata: dict | None = None,
+    optimizer: str = "stlsq",
+    denoise: str = "none",
+    ensemble_models: int = 20,
 ) -> SINDyBundle:
+    """Fit a discrete one-step SINDy map x_{k+1}=f(x_k,u_k) (pysindy 2.x).
+
+    E2 identification-ladder factors are exposed as: ``optimizer`` in
+    {stlsq, sr3, constrained, ensemble}, ``denoise`` in {none, savgol, kalman},
+    ``feature_variant`` (library) and ``library_degree``. Defaults reproduce the
+    original STLSQ + physics + degree-1 recipe.
+    """
     import pysindy as ps
     from sklearn.preprocessing import StandardScaler
 
+    states = _denoise_states(data.states, denoise)
     features, feature_names = compute_feature_matrix(data, feature_variant)
     scaler_x = StandardScaler()
     scaler_u = StandardScaler()
-    x_sc = scaler_x.fit_transform(data.states)
+    x_sc = scaler_x.fit_transform(states)
     u_sc = scaler_u.fit_transform(features)
 
     x_in = x_sc[:-1]
@@ -449,17 +615,14 @@ def fit_sindy(
     kappa = condition_number(np.hstack([x_in, u_in]))
 
     model = ps.SINDy(
-        optimizer=ps.STLSQ(
-            threshold=threshold,
-            alpha=alpha,
-            max_iter=200,
-            normalize_columns=False,
-        ),
+        optimizer=_make_optimizer(optimizer, threshold, alpha, ensemble_models),
         feature_library=ps.PolynomialLibrary(degree=library_degree, include_bias=True),
-        feature_names=STATE_NAMES + feature_names,
     )
-    model.fit(x_in, u=u_in, x_dot=x_out, t=period)
+    model.fit(x_in, u=u_in, x_dot=x_out, t=period, feature_names=STATE_NAMES + feature_names)
 
+    meta = dict(metadata or {})
+    meta.setdefault("optimizer", optimizer)
+    meta.setdefault("denoise", denoise)
     return SINDyBundle(
         model=model,
         scaler_x=scaler_x,
@@ -472,7 +635,7 @@ def fit_sindy(
         period=float(period),
         train_rows=len(x_in),
         condition_number=kappa,
-        metadata=metadata or {},
+        metadata=meta,
     )
 
 
@@ -518,7 +681,7 @@ def evaluate_sindy(
                 "metric_scope": "one_step",
                 "horizon": 1,
                 "state": state,
-                "rmse": mean_squared_error(truth[:, i], pred[:, i], squared=False),
+                "rmse": float(np.sqrt(mean_squared_error(truth[:, i], pred[:, i]))),
                 "mae": mean_absolute_error(truth[:, i], pred[:, i]),
                 "r2": r2_score(truth[:, i], pred[:, i]),
             }
@@ -736,6 +899,11 @@ def build_mpc_controller(
         t_step=cfg.period,
         n_robust=0,
         store_full_solution=False,
+        nlpsol_opts={
+            "ipopt.print_level": 0,
+            "ipopt.sb": "yes",
+            "print_time": 0,
+        },
     )
 
     t_in = x_vars["t_in"]
@@ -809,7 +977,7 @@ def rollout_mpc(
     n_days: int,
     start_date: str | None = None,
     objective: str = "full",
-    max_solver_failures: int = 3,
+    max_solver_failures: int = 100,
 ) -> pd.DataFrame:
     cfg_run = ExperimentConfig(**{**asdict(cfg), "n_days": n_days})
     weather_provider = WeatherForecastTVP(cfg_run, n_days=n_days, start_date=start_date)
@@ -850,9 +1018,10 @@ def rollout_mpc(
             row[name] = time_encoding(step, cfg_run.period)[i]
         for i, name in enumerate(ACTION_NAMES):
             row[name] = action[i]
-        rows.append(row)
 
         obs, _reward, terminated, truncated, _info = env.step(action.astype(np.float32))
+        row.update(_econ_row(_info))
+        rows.append(row)
         if terminated or truncated:
             break
 
@@ -913,6 +1082,72 @@ def rollout_metrics(df: pd.DataFrame) -> dict:
         "vent_sum": float(np.sum(df["uVent"])),
         "solver_failures": int(df.get("solver_failures", pd.Series([0])).max()),
     }
+
+
+def epi_metrics(
+    df: pd.DataFrame,
+    corridors: dict | None = None,
+    prices: dict | None = None,
+) -> dict:
+    """Primary protocol metrics (E0): EPI from the simulator economics + corridors.
+
+    EPI [EUR/m2.season] = sum of per-step ``profit`` harvested from gl_gym's
+    GreenhouseReward (captured into rollout/dataset frames as the ECON_FIELDS
+    columns). Constraint metrics use the simulator's CO2/T/RH corridors. When
+    ``prices`` are given (from protocol_config.read_env_economics), costs are also
+    converted to physical resource use (kWh/m2, kg/m2).
+    """
+    if df.empty:
+        return {}
+    corridors = corridors or DEFAULT_CORRIDORS
+    n = int(len(df))
+    out: dict = {"steps": n}
+
+    if "profit" in df.columns:
+        out["epi"] = float(df["profit"].sum())
+        out["revenue"] = float(df["revenue"].sum())
+        out["cost_total"] = float(df["variable_costs"].sum())
+        out["cost_heat"] = float(df["heat_cost"].sum())
+        out["cost_co2"] = float(df["co2_cost"].sum())
+        out["cost_elec"] = float(df["elec_cost"].sum())
+        out["fruit_dm_growth"] = float(df["fruit_growth_dm"].sum())
+        if prices:
+            ph = prices.get("heating_price_eur_per_kwh") or np.nan
+            pe = prices.get("elec_price_eur_per_kwh") or np.nan
+            pc = prices.get("co2_price_eur_per_kg") or np.nan
+            out["energy_heat_kwh_m2"] = float(out["cost_heat"] / ph) if ph else np.nan
+            out["energy_elec_kwh_m2"] = float(out["cost_elec"] / pe) if pe else np.nan
+            out["co2_kg_m2"] = float(out["cost_co2"] / pc) if pc else np.nan
+
+    # Constraint corridors (% time inside, count and area of violations).
+    for key in ("t_in", "co2", "rh"):
+        if key in df.columns and key in corridors:
+            lo, hi = corridors[key]
+            x = df[key].to_numpy(dtype=float)
+            viol = np.maximum(0.0, lo - x) + np.maximum(0.0, x - hi)
+            out[f"{key}_in_corridor_pct"] = float(np.mean((x >= lo) & (x <= hi)) * 100.0)
+            out[f"{key}_violation_steps"] = int(np.sum(viol > 0))
+            out[f"{key}_violation_area"] = float(np.sum(viol))
+    out["violation_steps_total"] = int(
+        sum(out.get(f"{k}_violation_steps", 0) for k in ("t_in", "co2", "rh"))
+    )
+
+    if "uBoil" in df.columns:
+        out["boiler_sum"] = float(df["uBoil"].sum())
+        out["lamp_sum"] = float(df["uLamp"].sum())
+        out["co2_injection_sum"] = float(df["uCO2"].sum())
+        out["vent_sum"] = float(df["uVent"].sum())
+    out["solver_failures"] = int(df.get("solver_failures", pd.Series([0])).max())
+    return out
+
+
+def benchmark_epi(rollouts: dict[str, pd.DataFrame], corridors=None, prices=None) -> pd.DataFrame:
+    rows = []
+    for name, df in rollouts.items():
+        row = {"method": name}
+        row.update(epi_metrics(df, corridors=corridors, prices=prices))
+        rows.append(row)
+    return pd.DataFrame(rows)
 
 
 def benchmark_rollouts(rollouts: dict[str, pd.DataFrame]) -> pd.DataFrame:
@@ -1374,9 +1609,10 @@ def rollout_mpc_nn(
             row[name] = time_encoding(step, cfg_run.period)[i]
         for i, name in enumerate(ACTION_NAMES):
             row[name] = action[i]
-        rows.append(row)
 
         obs, _reward, terminated, truncated, _info = env.step(action.astype(np.float32))
+        row.update(_econ_row(_info))
+        rows.append(row)
         if terminated or truncated:
             break
 
@@ -1653,3 +1889,322 @@ def plot_coefficient_heatmap(bundle: SINDyBundle, figures_dir: Path, top_n: int 
     ax.set_title("Top SINDy coefficients")
     fig.colorbar(im, ax=ax, label="coefficient")
     save_figure(fig, figures_dir / "sindy_coefficient_heatmap.png")
+
+
+# ── E2 gates: MPC-embeddability + transparency (sign checks + structural stability) ──
+
+def mpc_embeddability_gate(
+    bundle: SINDyBundle,
+    cfg: ExperimentConfig,
+    start_date: str | None = None,
+    budget_ms: float = 250.0,
+) -> dict:
+    """Gate: a model is admitted to E3 only if it embeds in the MPC solver cheaply.
+
+    Degree-1 SINDy maps embed analytically into do-mpc/CasADi; degree>1 does not
+    (build_mpc_controller raises). Returns embeddability and the measured MPC-step time.
+    """
+    if bundle.library_degree != 1:
+        return {"embeddable": False, "mpc_step_ms": float("nan"),
+                "reason": "library_degree>1 not analytically MPC-embeddable"}
+    try:
+        wp = WeatherForecastTVP(cfg, n_days=2, start_date=start_date)
+        mpc = build_mpc_controller(bundle, wp, cfg)
+        x0 = np.array([20.0, 800.0, 80.0]).reshape(-1, 1)
+        mpc.x0 = x0
+        mpc.set_initial_guess()
+        t0 = time.perf_counter()
+        mpc.make_step(x0)
+        ms = (time.perf_counter() - t0) * 1000.0
+        return {"embeddable": bool(ms <= budget_ms), "mpc_step_ms": float(ms), "reason": "ok"}
+    except Exception as exc:  # noqa: BLE001
+        return {"embeddable": False, "mpc_step_ms": float("nan"), "reason": str(exc)[:90]}
+
+
+def _block_bootstrap(data: TrajectoryData, rng, block: int = 96) -> TrajectoryData:
+    n = len(data.states)
+    if n <= block:
+        return data
+    n_blocks = max(1, n // block)
+    starts = rng.integers(0, n - block, size=n_blocks)
+    idx = np.concatenate([np.arange(s, s + block) for s in starts])
+    return TrajectoryData(
+        states=data.states[idx], weather=data.weather[idx],
+        time_enc=data.time_enc[idx], actions=data.actions[idx],
+        meta={**data.meta, "bootstrap": True},
+    )
+
+
+def structural_stability(
+    data: TrajectoryData,
+    feature_variant: str = "physics",
+    library_degree: int = 1,
+    optimizer: str = "stlsq",
+    denoise: str = "none",
+    period: float = 900.0,
+    threshold: float = 0.05,
+    n_boot: int = 20,
+    block: int = 96,
+    seed: int = 0,
+) -> tuple[float, np.ndarray]:
+    """Fraction of the base model's active terms that stay active under block-bootstrap refits."""
+    rng = np.random.default_rng(seed)
+    base = fit_sindy(data, feature_variant=feature_variant, library_degree=library_degree,
+                     optimizer=optimizer, denoise=denoise, period=period, threshold=threshold)
+    base_active = np.abs(np.asarray(base.model.coefficients())) > 1e-9
+    if not base_active.any():
+        return 0.0, base_active
+    counts = np.zeros_like(base_active, dtype=float)
+    for _ in range(n_boot):
+        sub = _block_bootstrap(data, rng, block=block)
+        try:
+            b = fit_sindy(sub, feature_variant=feature_variant, library_degree=library_degree,
+                          optimizer=optimizer, denoise=denoise, period=period, threshold=threshold)
+            counts += np.abs(np.asarray(b.model.coefficients())) > 1e-9
+        except Exception:  # noqa: BLE001
+            continue
+    freq = counts / max(1, n_boot)
+    return float(freq[base_active].mean()), freq
+
+
+def transparency_gate(
+    bundle: SINDyBundle,
+    data: TrajectoryData,
+    sign_pass_threshold: float = 0.5,
+    stability_threshold: float = 0.6,
+    n_boot: int = 15,
+) -> dict:
+    """Transparency gate (§1.3): glass-box AND sign/dimension checks AND structural stability."""
+    signs = sign_check_table(bundle)
+    checked = signs[signs["verdict"] != "missing_or_zero"]
+    sign_pass = float((checked["verdict"] == "consistent").mean()) if len(checked) else 0.0
+    stab, _ = structural_stability(
+        data, feature_variant=bundle.feature_variant, library_degree=bundle.library_degree,
+        optimizer=bundle.metadata.get("optimizer", "stlsq"),
+        denoise=bundle.metadata.get("denoise", "none"),
+        period=bundle.period, threshold=bundle.threshold, n_boot=n_boot,
+    )
+    glass_box = True  # SINDy yields explicit symbolic equations
+    passed = glass_box and (sign_pass >= sign_pass_threshold) and (stab >= stability_threshold)
+    return {"glass_box": glass_box, "sign_pass_rate": sign_pass,
+            "structural_stability": stab, "passed": bool(passed)}
+
+
+# ── E3 oracle-MPC: receding-horizon CEM over the TRUE simulator model env.F ──
+
+def rollout_oracle_mpc(
+    cfg: ExperimentConfig,
+    n_days: int,
+    start_date: str | None = None,
+    horizon: int | None = None,
+    n_samples: int = 48,
+    n_iters: int = 3,
+    elite_frac: float = 0.2,
+    sample_std: float = 0.3,
+    max_solver_failures: int = 10,
+) -> pd.DataFrame:
+    """Oracle controller: cross-entropy-method shooting over the simulator's own CasADi
+    integrator ``env.unwrapped.F`` (the true 28-state GreenLight model). Uses the SAME
+    climate-tracking objective as SINDy-MPC, so the gap isolates model fidelity -- the
+    EPI upper reference relative to the simulator (cf. protocol oracle, §1.2).
+    Compute-heavy (~1 s/step); article runs use a reduced seed set.
+    """
+    import casadi as ca
+
+    cfg_run = ExperimentConfig(**{**asdict(cfg), "n_days": n_days})
+    H = horizon or cfg.horizon
+    env = _make_env(cfg_run, n_days=n_days)
+    scen = weather_scenario_from_date(start_date or cfg_run.start_date, cfg_run.location, cfg_run.growth_year)
+    obs, _ = env.reset(options={"scenario": scen}, seed=cfg.seed)
+    raw = env.unwrapped
+    Fmap = raw.F.map(n_samples)
+    params = np.asarray(raw.p, dtype=float)
+    weather = np.asarray(raw.weather_data, dtype=float)
+    nx = raw.nx
+    rng = np.random.default_rng(cfg.seed)
+    u_low = np.zeros(6)
+    u_high = np.array([1.0, 1.0, 1.0, 0.4, 1.0, 1.0])
+    R, Pr, M = 8.3144598, 101325.0, 44.01e-3
+    mean = np.tile([0.3, 0.0, 0.5, 0.1, 0.0, 0.2], (H, 1))
+
+    def plan(x_now, step, mean):
+        std = np.full((H, 6), sample_std)
+        m = mean.copy()
+        for _ in range(n_iters):
+            seqs = np.clip(m[None] + std[None] * rng.standard_normal((n_samples, H, 6)), u_low, u_high)
+            X = np.tile(x_now.reshape(nx, 1), (1, n_samples))
+            cost = np.zeros(n_samples)
+            for k in range(H):
+                Uk = seqs[:, k, :].T
+                pdyn = np.concatenate([weather[min(step + k, len(weather) - 1)], params])
+                Pm = np.tile(pdyn.reshape(-1, 1), (1, n_samples))
+                X = np.asarray(Fmap(x0=X, u=Uk, p=Pm)["xf"])
+                t2 = X[2]
+                co2 = 1e6 * R * (t2 + 273.15) * (X[0] * 1e-6) / (Pr * M)
+                rh = 100.0 * X[15] / (610.78 * np.exp(17.2694 * t2 / (t2 + 238.3)))
+                cost += (100 * ((t2 - 20) / 5) ** 2 + 30 * ((co2 - 800) / 200) ** 2
+                         + 50 * (np.maximum(0, rh - 85) / 5) ** 2
+                         + 20 * Uk[0] + 10 * Uk[4] + 2 * Uk[1]
+                         + 1e3 * (np.maximum(0, 12 - t2) + np.maximum(0, t2 - 35)))
+            ne = max(2, int(elite_frac * n_samples))
+            idx = np.argsort(cost)[:ne]
+            m = seqs[idx].mean(0)
+            std = seqs[idx].std(0) + 1e-3
+        return np.clip(m[0], u_low, u_high), np.vstack([m[1:], m[-1:]])
+
+    rows = []
+    failures = 0
+    fallback = np.array([0.3, 0.0, 1.0, 0.0, 0.0, 0.0])
+    for step in range(cfg_run.total_steps):
+        state, weather_vec = observation_to_arrays(obs)
+        try:
+            action, mean = plan(np.asarray(raw.x, dtype=float), step, mean)
+        except Exception as exc:  # noqa: BLE001
+            failures += 1
+            action = fallback.copy()
+            if failures > max_solver_failures:
+                print(f"[oracle] stop after {failures} failures at step {step}: {exc}")
+                break
+        row = {"step": step, "time_h": step * cfg_run.period / 3600.0,
+               "controller": "oracle_mpc", "solver_failures": failures}
+        for i, name in enumerate(STATE_NAMES):
+            row[name] = state[i]
+        for i, name in enumerate(WEATHER_NAMES):
+            row[name] = weather_vec[i]
+        for i, name in enumerate(TIME_NAMES):
+            row[name] = time_encoding(step, cfg_run.period)[i]
+        for i, name in enumerate(ACTION_NAMES):
+            row[name] = action[i]
+        obs, _r, terminated, truncated, info = env.step(action.astype(np.float32))
+        row.update(_econ_row(info))
+        rows.append(row)
+        if terminated or truncated:
+            break
+    env.close()
+    return pd.DataFrame(rows)
+
+
+# ── E3 RL baselines: PPO / SAC via stable-baselines3 ─────────────────────────
+
+def _scenario_reset_env(cfg: ExperimentConfig, n_days: int, scenario: dict):
+    import gymnasium as gym
+
+    base = _make_env(cfg, n_days=n_days)
+
+    class _FixedScenario(gym.Wrapper):
+        def reset(self, *, seed=None, options=None):
+            return self.env.reset(seed=seed, options={"scenario": scenario})
+
+    return _FixedScenario(base)
+
+
+def train_rl(
+    algo: str,
+    cfg: ExperimentConfig,
+    train_steps: int,
+    train_start_date: str | None = None,
+    seed: int = 0,
+):
+    """Train a PPO or SAC policy on the GreenLight env (reward = scaled EPI)."""
+    from stable_baselines3 import PPO, SAC
+
+    scen = weather_scenario_from_date(train_start_date or cfg.start_date, cfg.location, cfg.growth_year)
+    env = _scenario_reset_env(cfg, n_days=cfg.n_days, scenario=scen)
+    Algo = {"ppo": PPO, "sac": SAC}[algo.lower()]
+    # GreenLight env exposes a Dict observation space -> MultiInputPolicy.
+    model = Algo("MultiInputPolicy", env, seed=seed, verbose=0)
+    model.learn(total_timesteps=int(train_steps), progress_bar=False)
+    env.close()
+    return model
+
+
+def rollout_rl(
+    model,
+    cfg: ExperimentConfig,
+    n_days: int,
+    start_date: str | None = None,
+    label: str = "rl",
+) -> pd.DataFrame:
+    """Roll out a trained SB3 policy (deterministic) capturing per-step economics."""
+    cfg_run = ExperimentConfig(**{**asdict(cfg), "n_days": n_days})
+    env = _make_env(cfg_run, n_days=n_days)
+    scen = weather_scenario_from_date(start_date or cfg_run.start_date, cfg_run.location, cfg_run.growth_year)
+    obs, _ = env.reset(options={"scenario": scen}, seed=cfg.seed)
+    rows = []
+    for step in range(cfg_run.total_steps):
+        state, weather_vec = observation_to_arrays(obs)
+        action, _ = model.predict(obs, deterministic=True)
+        action = np.clip(np.asarray(action, dtype=np.float64).ravel(), 0.0, 1.0)
+        row = {"step": step, "time_h": step * cfg_run.period / 3600.0,
+               "controller": label, "solver_failures": 0}
+        for i, name in enumerate(STATE_NAMES):
+            row[name] = state[i]
+        for i, name in enumerate(WEATHER_NAMES):
+            row[name] = weather_vec[i]
+        for i, name in enumerate(TIME_NAMES):
+            row[name] = time_encoding(step, cfg_run.period)[i]
+        for i, name in enumerate(ACTION_NAMES):
+            row[name] = action[i]
+        obs, _r, terminated, truncated, info = env.step(action.astype(np.float32))
+        row.update(_econ_row(info))
+        rows.append(row)
+        if terminated or truncated:
+            break
+    env.close()
+    return pd.DataFrame(rows)
+
+
+# ── E3 / E8 statistics: paired Wilcoxon + Holm + bootstrap CI + effect size ──
+
+def paired_stats(
+    df: pd.DataFrame,
+    metric: str,
+    baseline: str,
+    methods: list[str] | None = None,
+    n_boot: int = 2000,
+    seed: int = 0,
+    alpha: float = 0.05,
+) -> pd.DataFrame:
+    """Paired comparison of each method vs a baseline across seeds.
+
+    df is long-form with columns [method, seed, <metric>]; pairing is by seed. Reports
+    mean difference, bootstrap CI, Cohen's d, Wilcoxon signed-rank p, and Holm-adjusted p.
+    """
+    from scipy.stats import wilcoxon
+
+    rng = np.random.default_rng(seed)
+    piv = df.pivot_table(index="seed", columns="method", values=metric)
+    methods = methods or [m for m in piv.columns if m != baseline]
+    rows, pvals = [], []
+    for m in methods:
+        a = piv[m].to_numpy(float)
+        b = piv[baseline].to_numpy(float)
+        mask = ~(np.isnan(a) | np.isnan(b))
+        a, b = a[mask], b[mask]
+        diff = a - b
+        try:
+            _stat, p = wilcoxon(a, b)
+        except Exception:  # noqa: BLE001 (e.g. all-zero differences)
+            p = float("nan")
+        if len(diff) > 0:
+            boot = np.array([rng.choice(diff, len(diff), replace=True).mean() for _ in range(n_boot)])
+            lo, hi = np.percentile(boot, [100 * alpha / 2, 100 * (1 - alpha / 2)])
+        else:
+            lo = hi = float("nan")
+        d = float(diff.mean() / (diff.std(ddof=1) + 1e-12)) if len(diff) > 1 else float("nan")
+        rows.append({"method": m, "baseline": baseline, "metric": metric, "n_pairs": int(len(diff)),
+                     "mean_diff": float(np.mean(diff)) if len(diff) else float("nan"),
+                     "ci_low": float(lo), "ci_high": float(hi), "cohen_d": d, "p_value": float(p)})
+        pvals.append(p)
+    res = pd.DataFrame(rows)
+    # Holm-Bonferroni step-down correction
+    valid = [(i, p) for i, p in enumerate(pvals) if not np.isnan(p)]
+    holm = [float("nan")] * len(pvals)
+    prev = 0.0
+    for rank, (i, p) in enumerate(sorted(valid, key=lambda t: t[1])):
+        adj = min(1.0, (len(valid) - rank) * p)
+        prev = max(prev, adj)
+        holm[i] = prev
+    res["p_holm"] = holm
+    res["significant"] = res["p_holm"] < alpha
+    return res

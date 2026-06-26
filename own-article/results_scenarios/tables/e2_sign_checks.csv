@@ -1,0 +1,5 @@
+equation,term,expected_sign,coefficient,verdict,interpretation
+co2,dc_uVent,negative,0.0,missing_or_zero,ventilation should reduce indoor CO2 gradient
+rh,h_uVent,negative,-0.06342836900849376,consistent,ventilation should reduce humidity
+t_in,t_uBoil,positive,0.0,missing_or_zero,heating should increase or maintain temperature
+t_in,S_eff,positive,0.0,missing_or_zero,solar gain should increase or maintain temperature
