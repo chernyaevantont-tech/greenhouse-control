@@ -1019,6 +1019,512 @@ def sign_check_table(bundle: SINDyBundle) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+# ── Neural-network (MLP) surrogate ──────────────────────────────────────────
+
+@dataclass
+class NNBundle:
+    """MLP surrogate trained with PyTorch, weights stored as numpy for portability."""
+    weights: list          # list of np.ndarray W matrices (layer order)
+    biases: list           # list of np.ndarray b vectors
+    scaler_x: object
+    scaler_u: object
+    feature_variant: str
+    feature_names: list[str]
+    hidden_sizes: list
+    period: float
+    train_rows: int
+    train_loss: float
+    metadata: dict
+
+
+def _build_torch_mlp(input_size: int, hidden_sizes: list, output_size: int):
+    import torch.nn as nn
+    layers: list = []
+    in_dim = input_size
+    for h in hidden_sizes:
+        layers += [nn.Linear(in_dim, h), nn.Tanh()]
+        in_dim = h
+    layers.append(nn.Linear(in_dim, output_size))
+    return nn.Sequential(*layers)
+
+
+def fit_nn_surrogate(
+    data: TrajectoryData,
+    feature_variant: str = "physics",
+    hidden_sizes: list | None = None,
+    epochs: int = 500,
+    lr: float = 1e-3,
+    batch_size: int = 512,
+    period: float = 900.0,
+    metadata: dict | None = None,
+) -> NNBundle:
+    import torch
+    import torch.nn as nn
+    from sklearn.preprocessing import StandardScaler
+    from torch.utils.data import DataLoader, TensorDataset
+
+    hidden_sizes = hidden_sizes or [64, 64]
+    features, feature_names = compute_feature_matrix(data, feature_variant)
+    scaler_x = StandardScaler()
+    scaler_u = StandardScaler()
+    x_sc = scaler_x.fit_transform(data.states).astype(np.float32)
+    u_sc = scaler_u.fit_transform(features).astype(np.float32)
+
+    X = torch.tensor(np.hstack([x_sc[:-1], u_sc[:-1]]))
+    Y = torch.tensor(x_sc[1:])
+
+    loader = DataLoader(TensorDataset(X, Y), batch_size=batch_size, shuffle=True)
+    model = _build_torch_mlp(X.shape[1], hidden_sizes, output_size=3)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    criterion = nn.MSELoss()
+
+    for _ in range(epochs):
+        for xb, yb in loader:
+            optimizer.zero_grad()
+            criterion(model(xb), yb).backward()
+            optimizer.step()
+
+    with torch.no_grad():
+        final_loss = float(criterion(model(X), Y).item())
+
+    ws, bs = [], []
+    for layer in model:
+        if hasattr(layer, "weight"):
+            ws.append(layer.weight.detach().numpy().copy())
+            bs.append(layer.bias.detach().numpy().copy())
+
+    return NNBundle(
+        weights=ws,
+        biases=bs,
+        scaler_x=scaler_x,
+        scaler_u=scaler_u,
+        feature_variant=feature_variant,
+        feature_names=feature_names,
+        hidden_sizes=list(hidden_sizes),
+        period=float(period),
+        train_rows=len(x_sc) - 1,
+        train_loss=final_loss,
+        metadata=metadata or {},
+    )
+
+
+def _nn_forward_numpy(bundle: NNBundle, inp: np.ndarray) -> np.ndarray:
+    """Fast numpy forward pass (no gradient tracking)."""
+    h = inp.astype(np.float32)
+    for i, (W, b) in enumerate(zip(bundle.weights, bundle.biases)):
+        h = h @ W.T + b
+        if i < len(bundle.weights) - 1:
+            h = np.tanh(h)
+    return h
+
+
+def predict_next_raw_nn(
+    bundle: NNBundle,
+    x_raw: np.ndarray,
+    weather: np.ndarray,
+    time_enc: np.ndarray,
+    action: np.ndarray,
+) -> np.ndarray:
+    tmp = TrajectoryData(
+        states=np.asarray(x_raw, dtype=np.float64).reshape(1, 3),
+        weather=np.asarray(weather, dtype=np.float64).reshape(1, 3),
+        time_enc=np.asarray(time_enc, dtype=np.float64).reshape(1, 2),
+        actions=np.asarray(action, dtype=np.float64).reshape(1, 6),
+        meta={"period": bundle.period},
+    )
+    u_raw, _ = compute_feature_matrix(tmp, bundle.feature_variant)
+    x_sc = bundle.scaler_x.transform(tmp.states).astype(np.float32)
+    u_sc = bundle.scaler_u.transform(u_raw).astype(np.float32)
+    y_sc = _nn_forward_numpy(bundle, np.hstack([x_sc, u_sc]))
+    return bundle.scaler_x.inverse_transform(y_sc.reshape(1, -1))[0]
+
+
+def evaluate_nn_surrogate(
+    bundle: NNBundle,
+    data: TrajectoryData,
+    rollout_horizons: Iterable[int] = (4, 20, 96),
+) -> pd.DataFrame:
+    from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+    rows = []
+    features, _ = compute_feature_matrix(data, bundle.feature_variant)
+    x_sc = bundle.scaler_x.transform(data.states).astype(np.float32)
+    u_sc = bundle.scaler_u.transform(features).astype(np.float32)
+    inp = np.hstack([x_sc[:-1], u_sc[:-1]])
+    pred_sc = _nn_forward_numpy(bundle, inp)
+    pred = bundle.scaler_x.inverse_transform(pred_sc)
+    truth = data.states[1:]
+
+    for i, state in enumerate(STATE_NAMES):
+        rows.append({
+            "metric_scope": "one_step", "horizon": 1, "state": state,
+            "rmse": mean_squared_error(truth[:, i], pred[:, i], squared=False),
+            "mae": mean_absolute_error(truth[:, i], pred[:, i]),
+            "r2": r2_score(truth[:, i], pred[:, i]),
+        })
+
+    for horizon in rollout_horizons:
+        errs, failed = [], 0
+        n0 = max(0, len(data.states) - horizon - 1)
+        starts = np.linspace(0, n0, num=min(20, n0 + 1), dtype=int) if n0 > 0 else []
+        for start in starts:
+            x = data.states[start].copy()
+            pred_path, true_path = [], []
+            for k in range(horizon):
+                idx = start + k
+                try:
+                    x = predict_next_raw_nn(bundle, x, data.weather[idx], data.time_enc[idx], data.actions[idx])
+                except Exception:
+                    failed += 1
+                    break
+                if not np.all(np.isfinite(x)) or np.max(np.abs(x)) > 1e6:
+                    failed += 1
+                    break
+                pred_path.append(x)
+                true_path.append(data.states[idx + 1])
+            if pred_path:
+                errs.append(np.asarray(pred_path) - np.asarray(true_path))
+        if errs:
+            err = np.concatenate(errs, axis=0)
+            for i, state in enumerate(STATE_NAMES):
+                rows.append({
+                    "metric_scope": "rollout", "horizon": int(horizon), "state": state,
+                    "rmse": float(np.sqrt(np.mean(err[:, i] ** 2))),
+                    "mae": float(np.mean(np.abs(err[:, i]))),
+                    "r2": np.nan,
+                    "failed_rollouts": int(failed),
+                    "attempted_rollouts": int(len(starts)),
+                })
+        else:
+            for state in STATE_NAMES:
+                rows.append({
+                    "metric_scope": "rollout", "horizon": int(horizon), "state": state,
+                    "rmse": np.inf, "mae": np.inf, "r2": np.nan,
+                    "failed_rollouts": int(failed), "attempted_rollouts": int(len(starts)),
+                })
+    return pd.DataFrame(rows)
+
+
+def _build_physics_features_torch(
+    x: "torch.Tensor",
+    uk_raw: "torch.Tensor",
+    weather_k: np.ndarray,
+    time_k: np.ndarray,
+    feature_variant: str,
+    su_mean: "torch.Tensor",
+    su_scale: "torch.Tensor",
+) -> "torch.Tensor":
+    import torch
+    T_out = torch.tensor(float(weather_k[0]))
+    rad   = torch.tensor(float(weather_k[1]))
+    co2_out = torch.tensor(float(weather_k[2]))
+    sin_h = torch.tensor(float(time_k[0]))
+    cos_h = torch.tensor(float(time_k[1]))
+    uBoil, uCO2, uThScr, uVent, uLamp, uBlScr = [uk_raw[i] for i in range(6)]
+    raw = torch.stack([T_out, rad, co2_out, sin_h, cos_h, uBoil, uCO2, uThScr, uVent, uLamp, uBlScr])
+    if feature_variant == "raw":
+        feat = raw
+    elif feature_variant == "physics":
+        sx_mean_t = torch.zeros(3)  # placeholder, x is already scaled
+        # x here is SCALED; to compute physics we need raw values
+        # we pass scaled x so need scale params externally — handled by caller
+        raise RuntimeError("Use _build_physics_features_torch_with_scales")
+    else:
+        feat = raw
+    return (feat - su_mean) / su_scale
+
+
+def rollout_mpc_nn(
+    bundle: NNBundle,
+    cfg: ExperimentConfig,
+    n_days: int,
+    start_date: str | None = None,
+    horizon: int = 20,
+    max_solver_failures: int = 10,
+) -> pd.DataFrame:
+    """Shooting MPC using the MLP surrogate with PyTorch autograd gradients."""
+    import torch
+    import torch.nn as nn
+    import scipy.optimize as sopt
+    from dataclasses import asdict
+
+    # Reconstruct torch model from stored numpy weights
+    input_size = 3 + len(bundle.feature_names)
+    torch_model = _build_torch_mlp(input_size, bundle.hidden_sizes, 3)
+    wi = 0
+    for layer in torch_model:
+        if hasattr(layer, "weight"):
+            layer.weight.data = torch.tensor(bundle.weights[wi], dtype=torch.float32)
+            layer.bias.data = torch.tensor(bundle.biases[wi], dtype=torch.float32)
+            wi += 1
+    torch_model.eval()
+    for p in torch_model.parameters():
+        p.requires_grad_(False)
+
+    sx_mean  = torch.tensor(bundle.scaler_x.mean_, dtype=torch.float32)
+    sx_scale = torch.tensor(bundle.scaler_x.scale_, dtype=torch.float32)
+    su_mean  = torch.tensor(bundle.scaler_u.mean_, dtype=torch.float32)
+    su_scale = torch.tensor(bundle.scaler_u.scale_, dtype=torch.float32)
+
+    cfg_run = ExperimentConfig(**{**asdict(cfg), "n_days": n_days})
+    weather_provider = WeatherForecastTVP(cfg_run, n_days=n_days, start_date=start_date)
+    env = _make_env(cfg_run, n_days=n_days)
+    obs, _ = env.reset(options={"scenario": weather_provider.scenario}, seed=cfg.seed)
+
+    u_low  = np.zeros(6)
+    u_high = np.array([1.0, 1.0, 1.0, 0.4, 1.0, 1.0])
+    bounds = list(zip(np.tile(u_low, horizon), np.tile(u_high, horizon)))
+
+    def mpc_step(state_raw: np.ndarray, step_idx: int) -> np.ndarray:
+        x0_sc = torch.tensor(
+            bundle.scaler_x.transform(state_raw.reshape(1, -1))[0], dtype=torch.float32
+        )
+
+        def objective(u_flat: np.ndarray):
+            u_t = torch.tensor(
+                u_flat.reshape(horizon, 6), dtype=torch.float32, requires_grad=True
+            )
+            x = x0_sc.clone()
+            total_cost = torch.zeros(1)
+            for k in range(horizon):
+                uk_raw = u_t[k]
+                n_w = len(weather_provider.weather)
+                wk = weather_provider.weather[min(step_idx + k, n_w - 1)]
+                tk = weather_provider.time_enc[min(step_idx + k, n_w - 1)]
+
+                # Reconstruct raw state for physics features
+                x_raw_k = x * sx_scale + sx_mean
+                t_in_k, co2_k, rh_k = x_raw_k[0], x_raw_k[1], x_raw_k[2]
+                uBoil_k, uCO2_k, uThScr_k = uk_raw[0], uk_raw[1], uk_raw[2]
+                uVent_k, uLamp_k, uBlScr_k = uk_raw[3], uk_raw[4], uk_raw[5]
+
+                T_out_k   = torch.tensor(float(wk[0]))
+                rad_k     = torch.tensor(float(wk[1]))
+                co2_out_k = torch.tensor(float(wk[2]))
+                sin_h_k   = torch.tensor(float(tk[0]))
+                cos_h_k   = torch.tensor(float(tk[1]))
+
+                raw_feat = torch.stack([
+                    T_out_k, rad_k, co2_out_k, sin_h_k, cos_h_k,
+                    uBoil_k, uCO2_k, uThScr_k, uVent_k, uLamp_k, uBlScr_k,
+                ])
+                if bundle.feature_variant == "physics":
+                    psat_k  = 0.6108 * torch.exp(17.27 * t_in_k / (t_in_k + 237.3))
+                    vpd_k   = (1.0 - rh_k / 100.0) * psat_k
+                    S_eff_k = rad_k * (1.0 - uThScr_k)
+                    feat_k  = torch.cat([raw_feat, torch.stack([
+                        psat_k, vpd_k, S_eff_k,
+                        t_in_k * S_eff_k, rh_k * uVent_k,
+                        (co2_k - co2_out_k) * uVent_k, t_in_k * uBoil_k,
+                    ])])
+                else:
+                    feat_k = raw_feat
+
+                u_sc_k = (feat_k - su_mean) / su_scale
+                inp_k  = torch.cat([x, u_sc_k])
+                x      = torch_model(inp_k.unsqueeze(0)).squeeze(0)
+
+                x_raw_next = x * sx_scale + sx_mean
+                t_next, co2_next, rh_next = x_raw_next[0], x_raw_next[1], x_raw_next[2]
+                err_T   = (t_next - 20.0) / 5.0
+                err_co2 = (co2_next - 800.0) / 200.0
+                err_rh  = torch.clamp(rh_next - 85.0, min=0.0) / 5.0
+                cost_e  = 20.0 * uBoil_k + 10.0 * uLamp_k + 2.0 * uCO2_k
+                total_cost = total_cost + (
+                    100.0 * err_T**2 + 30.0 * err_co2**2 + 50.0 * err_rh**2 + cost_e
+                )
+
+            total_cost.backward()
+            grad = u_t.grad.detach().numpy().ravel() if u_t.grad is not None else np.zeros_like(u_flat)
+            return float(total_cost.item()), grad
+
+        u_init = np.tile([0.3, 0.0, 0.5, 0.1, 0.0, 0.0], horizon).astype(np.float64)
+        res = sopt.minimize(
+            objective, u_init, method="L-BFGS-B", jac=True,
+            bounds=bounds, options={"maxiter": 25, "ftol": 1e-4},
+        )
+        return res.x[:6]
+
+    rows, failures = [], 0
+    fallback = np.array([0.3, 0.0, 1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+    label = bundle.metadata.get("label", "nn_mpc")
+
+    for step in range(cfg_run.total_steps):
+        state, weather_vec = observation_to_arrays(obs)
+        try:
+            action = np.clip(mpc_step(state, step), u_low, u_high)
+        except Exception as exc:
+            failures += 1
+            action = fallback.copy()
+            if failures > max_solver_failures:
+                print(f"[NN-MPC] stopping after {failures} failures at step {step}: {exc}")
+                break
+
+        row: dict = {
+            "step": step,
+            "time_h": step * cfg_run.period / 3600.0,
+            "controller": label,
+            "solver_failures": failures,
+        }
+        for i, name in enumerate(STATE_NAMES):
+            row[name] = state[i]
+        for i, name in enumerate(WEATHER_NAMES):
+            row[name] = weather_vec[i]
+        for i, name in enumerate(TIME_NAMES):
+            row[name] = time_encoding(step, cfg_run.period)[i]
+        for i, name in enumerate(ACTION_NAMES):
+            row[name] = action[i]
+        rows.append(row)
+
+        obs, _reward, terminated, truncated, _info = env.step(action.astype(np.float32))
+        if terminated or truncated:
+            break
+
+    env.close()
+    return pd.DataFrame(rows)
+
+
+# ── Inference timing ─────────────────────────────────────────────────────────
+
+def measure_inference_time(
+    bundles_sindy: dict[str, SINDyBundle],
+    bundles_nn: dict[str, NNBundle],
+    sample_data: TrajectoryData,
+    n_samples: int = 500,
+) -> pd.DataFrame:
+    """
+    Benchmark one-step prediction latency for SINDy and MLP surrogates.
+    Returns a DataFrame with columns [method, mean_ms, std_ms, median_ms].
+    """
+    rows = []
+    idx = np.random.default_rng(0).integers(0, max(1, len(sample_data.states) - 1), size=n_samples)
+
+    for label, bundle in bundles_sindy.items():
+        times = []
+        for i in idx:
+            t0 = time.perf_counter()
+            predict_next_raw(
+                bundle,
+                sample_data.states[i],
+                sample_data.weather[i],
+                sample_data.time_enc[i],
+                sample_data.actions[i],
+            )
+            times.append((time.perf_counter() - t0) * 1e3)
+        times_arr = np.array(times)
+        rows.append({
+            "method": label,
+            "surrogate_type": "SINDy",
+            "mean_ms": float(np.mean(times_arr)),
+            "std_ms": float(np.std(times_arr)),
+            "median_ms": float(np.median(times_arr)),
+            "p95_ms": float(np.percentile(times_arr, 95)),
+        })
+
+    for label, bundle in bundles_nn.items():
+        times = []
+        for i in idx:
+            t0 = time.perf_counter()
+            predict_next_raw_nn(
+                bundle,
+                sample_data.states[i],
+                sample_data.weather[i],
+                sample_data.time_enc[i],
+                sample_data.actions[i],
+            )
+            times.append((time.perf_counter() - t0) * 1e3)
+        times_arr = np.array(times)
+        rows.append({
+            "method": label,
+            "surrogate_type": "MLP",
+            "mean_ms": float(np.mean(times_arr)),
+            "std_ms": float(np.std(times_arr)),
+            "median_ms": float(np.median(times_arr)),
+            "p95_ms": float(np.percentile(times_arr, 95)),
+        })
+
+    return pd.DataFrame(rows)
+
+
+# ── Multi-seed statistical benchmark ─────────────────────────────────────────
+
+def run_seeded_benchmark(
+    train_data: TrajectoryData,
+    cfg: ExperimentConfig,
+    n_days_rollout: int,
+    benchmark_start_date: str,
+    seeds: list[int],
+    feature_variant: str = "physics",
+    include_nn: bool = True,
+) -> pd.DataFrame:
+    """
+    Run closed-loop benchmark across multiple environment seeds.
+    Returns a long-form DataFrame with per-seed metrics; aggregate with groupby mean/std.
+    """
+    from dataclasses import asdict
+
+    rows = []
+    for seed in seeds:
+        cfg_s = ExperimentConfig(**{**asdict(cfg), "seed": seed})
+
+        # Rule-based baseline
+        df_rbc = rollout_rule_based(cfg_s, n_days=n_days_rollout,
+                                    start_date=benchmark_start_date, noise_scale=0.0,
+                                    seed=seed)
+        m = rollout_metrics(df_rbc)
+        m.update({"method": "rule_based", "seed": seed})
+        rows.append(m)
+
+        # SINDy-MPC (physics)
+        bundle_pi = fit_sindy(train_data, feature_variant=feature_variant,
+                              library_degree=1, period=float(cfg.period),
+                              metadata={"label": f"physics_sindy_mpc_s{seed}"})
+        df_pi = rollout_mpc(bundle_pi, cfg_s, n_days=n_days_rollout,
+                            start_date=benchmark_start_date, objective="full")
+        m = rollout_metrics(df_pi)
+        m.update({"method": "physics_sindy_mpc", "seed": seed})
+        rows.append(m)
+
+        # SINDy-MPC (raw)
+        bundle_raw = fit_sindy(train_data, feature_variant="raw",
+                               library_degree=1, period=float(cfg.period),
+                               metadata={"label": f"raw_sindy_mpc_s{seed}"})
+        df_raw = rollout_mpc(bundle_raw, cfg_s, n_days=n_days_rollout,
+                             start_date=benchmark_start_date, objective="full")
+        m = rollout_metrics(df_raw)
+        m.update({"method": "raw_sindy_mpc", "seed": seed})
+        rows.append(m)
+
+        if include_nn:
+            nn_bundle = fit_nn_surrogate(train_data, feature_variant=feature_variant,
+                                         hidden_sizes=[64, 64], epochs=300,
+                                         period=float(cfg.period),
+                                         metadata={"label": f"nn_mpc_s{seed}"})
+            df_nn = rollout_mpc_nn(nn_bundle, cfg_s, n_days=n_days_rollout,
+                                   start_date=benchmark_start_date, horizon=cfg.horizon)
+            m = rollout_metrics(df_nn)
+            m.update({"method": "nn_mpc", "seed": seed})
+            rows.append(m)
+
+    return pd.DataFrame(rows)
+
+
+def summarise_seeded_benchmark(df: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate multi-seed results: mean ± std per method."""
+    numeric_cols = [c for c in df.columns if c not in ("method", "seed")]
+    agg = df.groupby("method")[numeric_cols].agg(["mean", "std"])
+    agg.columns = ["_".join(c) for c in agg.columns]
+    return agg.reset_index()
+
+
+def save_bundle_nn(bundle: NNBundle, path: Path) -> None:
+    save_bundle(bundle, path)  # reuse pickle-based save
+
+
+def load_bundle_nn(path: Path) -> NNBundle:
+    return load_bundle(path)
+
+
 def save_table(df: pd.DataFrame, path: Path) -> pd.DataFrame:
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path, index=False)
