@@ -1527,11 +1527,17 @@ def coefficient_table(bundle: SINDyBundle) -> pd.DataFrame:
 
 def sign_check_table(bundle: SINDyBundle) -> pd.DataFrame:
     table = coefficient_table(bundle)
+    # Checks are defined over DIRECT actuator/physics terms that exist in every library
+    # variant (raw/physics/physics_no_cross) -- unlike cross-terms (dc_uVent, h_uVent,
+    # t_uBoil), which the confirmatory physics_no_cross recipe excludes by construction and
+    # which therefore always read "missing" there. These direct-term signs are physically
+    # unambiguous and give a meaningful transparency gate for the frozen recipe.
     checks = [
-        ("co2", "dc_uVent", "negative", "ventilation should reduce indoor CO2 gradient"),
-        ("rh", "h_uVent", "negative", "ventilation should reduce humidity"),
-        ("t_in", "t_uBoil", "positive", "heating should increase or maintain temperature"),
-        ("t_in", "S_eff", "positive", "solar gain should increase or maintain temperature"),
+        ("t_in", "uBoil", "positive", "boiler heating should raise/maintain indoor temperature"),
+        ("t_in", "S_eff", "positive", "effective solar gain should raise/maintain indoor temperature"),
+        ("co2", "uCO2", "positive", "CO2 injection should raise indoor CO2"),
+        ("co2", "uVent", "negative", "ventilation should bleed enriched CO2 toward ambient"),
+        ("rh", "uVent", "negative", "ventilation should reduce indoor humidity"),
     ]
     rows = []
     for equation, term, expected, note in checks:
@@ -2439,16 +2445,26 @@ def train_rl(
     train_start_date: str | None = None,
     seed: int = 0,
 ):
-    """Train a PPO or SAC policy on the GreenLight env (reward = scaled EPI)."""
+    """Train a PPO or SAC policy on the GreenLight env (reward = scaled EPI).
+
+    Observations/rewards are wrapped in VecNormalize (running normalization). This is
+    essential for SAC: the Dict obs spans very different magnitudes (CO2 density, vapor
+    pressure, temperatures) and without normalization SAC's off-policy critic diverges to
+    NaN deep into training. Diagnosed: the env is NaN-safe under 3000 bounded random
+    actions and SAC survives short runs; the blow-up only appears far into 200k-step
+    training -> critic explosion on unnormalized obs, not an ODE blow-up. PPO uses the same
+    pipeline for parity. Fitted stats travel with the model (get_vec_normalize_env()).
+    """
     from stable_baselines3 import PPO, SAC
+    from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
     scen = weather_scenario_from_date(train_start_date or cfg.start_date, cfg.location, cfg.growth_year)
-    env = _scenario_reset_env(cfg, n_days=cfg.n_days, scenario=scen)
+    venv = DummyVecEnv([lambda: _scenario_reset_env(cfg, n_days=cfg.n_days, scenario=scen)])
+    venv = VecNormalize(venv, norm_obs=True, norm_reward=True, clip_obs=10.0, clip_reward=10.0)
     Algo = {"ppo": PPO, "sac": SAC}[algo.lower()]
     # GreenLight env exposes a Dict observation space -> MultiInputPolicy.
-    model = Algo("MultiInputPolicy", env, seed=seed, verbose=0)
+    model = Algo("MultiInputPolicy", venv, seed=seed, verbose=0)
     model.learn(total_timesteps=int(train_steps), progress_bar=False)
-    env.close()
     return model
 
 
@@ -2464,10 +2480,14 @@ def rollout_rl(
     env = _make_env(cfg_run, n_days=n_days)
     scen = weather_scenario_from_date(start_date or cfg_run.start_date, cfg_run.location, cfg_run.growth_year)
     obs, _ = env.reset(options={"scenario": scen}, seed=cfg.seed)
+    # Reuse the frozen training-time obs normalization (no reward norm at eval); the raw
+    # env is still stepped so the captured economics/info stay in real units.
+    vecnorm = getattr(model, "get_vec_normalize_env", lambda: None)()
     rows = []
     for step in range(cfg_run.total_steps):
         state, weather_vec = observation_to_arrays(obs)
-        action, _ = model.predict(obs, deterministic=True)
+        policy_obs = vecnorm.normalize_obs(obs) if vecnorm is not None else obs
+        action, _ = model.predict(policy_obs, deterministic=True)
         action = np.clip(np.asarray(action, dtype=np.float64).ravel(), 0.0, 1.0)
         row = {"step": step, "time_h": step * cfg_run.period / 3600.0,
                "controller": label, "solver_failures": 0}

@@ -36,11 +36,24 @@ def main() -> int:
            .agg(epi_mean=("epi", "mean"), epi_std=("epi", "std"),
                 viol_mean=("violation_steps_total", "mean"), n=("epi", "size"))
            .reset_index().sort_values("epi_mean", ascending=False))
-    # % of the offline->ceiling gap recovered by each adapter
+    # Recovery metrics. NOTE: retrained_ceiling can fall BELOW offline here -- retraining
+    # the surrogate on the shifted season yields a WORSE closed-loop controller (a genuine
+    # finding, the surrogate-MPC exploits model error), which makes an offline->ceiling
+    # ratio meaningless (negative denominator). So: (1) report the ceiling-referenced % only
+    # when the ceiling is actually above offline; (2) also report recovery toward rule_based,
+    # the strongest non-adaptive controller under shift and always a valid reference.
     piv = main.groupby("method")["epi"].mean()
-    off, ceil = piv.get("offline", np.nan), piv.get("retrained_ceiling", np.nan)
-    if np.isfinite(off) and np.isfinite(ceil) and abs(ceil - off) > 1e-9:
+    off = piv.get("offline", np.nan)
+    ceil = piv.get("retrained_ceiling", np.nan)
+    rb = piv.get("rule_based", np.nan)
+    if np.isfinite(off) and np.isfinite(ceil) and (ceil - off) > 1e-9:
         agg["gap_recovered_pct"] = ((agg["epi_mean"] - off) / (ceil - off) * 100.0).round(1)
+    else:
+        agg["gap_recovered_pct"] = np.nan
+        print(f"[WARN] retrained_ceiling ({ceil:.3f}) <= offline ({off:.3f}): ceiling-referenced "
+              f"recovery is UNDEFINED (set NaN) -- retrain-on-shift underperforms offline (finding).")
+    if np.isfinite(off) and np.isfinite(rb) and (rb - off) > 1e-9:
+        agg["recovery_vs_rulebased_pct"] = ((agg["epi_mean"] - off) / (rb - off) * 100.0).round(1)
     agg.to_csv(RES / "tables" / "e4_adaptation_table.csv", index=False)
 
     curve = (df[df.method == "dagger"].groupby("dagger_iter")["epi"]

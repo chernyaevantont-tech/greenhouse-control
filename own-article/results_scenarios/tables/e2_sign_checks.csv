@@ -1,5 +1,6 @@
 equation,term,expected_sign,coefficient,verdict,interpretation
-co2,dc_uVent,negative,,missing_or_zero,ventilation should reduce indoor CO2 gradient
-rh,h_uVent,negative,,missing_or_zero,ventilation should reduce humidity
-t_in,t_uBoil,positive,,missing_or_zero,heating should increase or maintain temperature
-t_in,S_eff,positive,0.10770904817668206,consistent,solar gain should increase or maintain temperature
+t_in,uBoil,positive,0.0,missing_or_zero,boiler heating should raise/maintain indoor temperature
+t_in,S_eff,positive,0.07953998927455203,consistent,effective solar gain should raise/maintain indoor temperature
+co2,uCO2,positive,0.10039350800236195,consistent,CO2 injection should raise indoor CO2
+co2,uVent,negative,-0.1569115995113055,consistent,ventilation should bleed enriched CO2 toward ambient
+rh,uVent,negative,-0.2947725386330875,consistent,ventilation should reduce indoor humidity
