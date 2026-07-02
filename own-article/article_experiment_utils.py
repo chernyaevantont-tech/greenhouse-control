@@ -2462,8 +2462,11 @@ def train_rl(
     venv = DummyVecEnv([lambda: _scenario_reset_env(cfg, n_days=cfg.n_days, scenario=scen)])
     venv = VecNormalize(venv, norm_obs=True, norm_reward=True, clip_obs=10.0, clip_reward=10.0)
     Algo = {"ppo": PPO, "sac": SAC}[algo.lower()]
+    # Bound SAC's replay buffer (SB3 pre-allocates the whole thing) so many seed-runs can
+    # share one box without OOM; 200k covers the full 200k-step training.
+    extra = {"buffer_size": 200_000} if algo.lower() == "sac" else {}
     # GreenLight env exposes a Dict observation space -> MultiInputPolicy.
-    model = Algo("MultiInputPolicy", venv, seed=seed, verbose=0)
+    model = Algo("MultiInputPolicy", venv, seed=seed, verbose=0, **extra)
     model.learn(total_timesteps=int(train_steps), progress_bar=False)
     return model
 
