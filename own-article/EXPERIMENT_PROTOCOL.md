@@ -316,8 +316,12 @@ E2 обобщает её до робастного рецепта.
   `grey_box`/`sindy_mpc(dense)`/`sindy_mpc(confirmatory)` **Парето-доминирован**. `sac`
   на фронте лишь как вырожденный угол минимума нарушений (EPI<0).
 - **Абляция «член котла ↔ управляемость»** (методологический вклад §0.3): свип по
-  порогу разреженности `SINDy-MPC(λ)` показывает точку выпадения `uBoil→t_in` и её цену
-  в EPI; артефакты контр-эксперимента `tables/e3_dagger_compare_*.csv`.
+  порогу разреженности `SINDy-MPC(λ)` (`figures/e3_lambda_sweep_ablation.png`,
+  `tables/e3_lambda_sweep_table.csv`, 6 сидов) показывает: котёл `uBoil→t_in` выпадает при
+  λ≈0.05, и closed-loop EPI обрушивается с +4 до −2.6 EUR/м², **тогда как open-loop
+  rollout-RMSE почти не меняется** (2.54→2.62). То есть предрегистрированный
+  open-loop-отбор слеп к closed-loop провалу — ключевой довод против `sparsity` как
+  критерия отбора. Контр-эксперимент dense/DAgger — `tables/e3_dagger_compare_*.csv`.
 
 ### E4. Онлайн-адаптация
 - **Цель:** восстановление EPI под сдвигом погоды.
@@ -326,6 +330,12 @@ E2 обобщает её до робастного рецепта.
   **EKF-SINDy** ([ekf_sindy_rosafalco_2024](../articles/ekf_sindy_rosafalco_2024_arxiv_2404.07536.pdf),
   [online_sindy_kalman_bifurcating_rosafalco_2024](../articles/online_sindy_kalman_bifurcating_rosafalco_2024_arxiv_2411.04842.pdf)).
 - **Критерий:** восстановленный EPI, число нарушений, стоимость адаптации.
+- **Потолок (fix, [run_e4_shift.py](run_e4_shift.py)):** `retrained_ceiling` обучается на
+  бюджете, равном offline (2×n_train сут шифт-сезона) → настоящая верхняя граница; раньше
+  N сут → мог падать ниже offline, делая `gap_recovered` невалидным. Валидация (сдвиг
+  2021-07, 3 сида, единый рецепт): ceiling −0.06 > offline −1.88; DAgger −0.52 и EKF −0.64
+  восстанавливают ~74%/68% зазора offline→ceiling. Оговорка: rollout ceiling иногда рано
+  обрывается (ODE-truncation) — проверить длину прогонов перед финализацией.
 - **Артефакты:** кривые адаптации по итерациям/времени.
 
 ### E5. Генерализация + OOD
