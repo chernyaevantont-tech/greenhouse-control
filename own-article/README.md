@@ -10,6 +10,17 @@ E0–E3 (core hypothesis chain), E4 (online adaptation, Г4а), E5 (generalizati
 OOD, Г4б,в), E6 (sensitivity), E7 (fault injection + safety), E8 (statistical
 validity across all hypotheses).
 
+> **Framing: Path A (honest in-silico benchmark).** The pre-registered central
+> hypothesis (SINDy-MPC is non-dominated / low price of interpretability) is **not
+> confirmed** — a tuned rule-based heuristic and a fairly-implemented PPO are
+> competitive or better on EPI. The paper's contribution is therefore an honest
+> economic benchmark: (1) simple heuristics are Pareto-strong; (2) RL baselines are
+> misleading unless normalized (PPO −13→+3.8 with VecNormalize); (3) sparse system-ID
+> for MPC has a specific failure mode — magnitude-thresholded selection silently drops
+> the control-critical boiler term; (4) SINDy-MPC's value is transparency + safety/OOD/
+> adaptation, not EPI supremacy. **Compare in two axes (EPI × violations)** — EPI does
+> not penalise constraint violations. See `EXPERIMENT_PROTOCOL.md` §0.
+
 ## Notebooks (run in order)
 
 | Notebook | Experiment | Output |
@@ -55,11 +66,24 @@ Run a single notebook: `python run_all_notebooks.py E2_identification_ladder.ipy
   harvested from `env.step(...)` info (gl_gym `GreenhouseReward`); revenue and
   heat/CO₂/electricity costs are decomposed from the same dict. Constraint corridors
   (CO₂∈[300,1600], T∈[15,34], RH∈[50,85]) come from `env.constraints_*`.
+  **EPI does NOT penalise violations** → compare via the Pareto artifact
+  `results_scenarios/figures/e3_pareto_annotated.png` + `tables/e3_pareto_table.csv`
+  (per-method EPI, violations, `scaled_penalty`, non-dominated flag).
 - **Rostov soil** (`rostov_soil.apply_rostov_soil`) is patched automatically inside
   `_make_env` (gated on location) before the first weather load.
 - **Identification ladder** factors: optimizer {STLSQ, SR3, Ensemble, ConstrainedSR3},
   denoise {none, Savitzky–Golay, Kalman}, library {raw, physics, physics_no_cross},
   degree {1,2}. The recommended recipe is frozen (pre-registration) before E3.
+- **One recipe across E3/E4/E5.** All runners load it via
+  `protocol_config.load_frozen_recipe()` (single source of truth = `recipe_frozen.json`);
+  previously E4/E5 hard-coded STLSQ while E3 used the frozen ensemble recipe.
+- **Documented recipe defect (a finding, not a bug).** The confirmatory recipe
+  (`physics_no_cross` + threshold ≈0.05) zeroes the small-magnitude but control-critical
+  boiler term `uBoil→t_in`, so the surrogate has no modelled heating actuator. Restoring
+  it (dense recipe `stlsq/1e-3` or DAgger) lifts EPI +0.82 → +3.8…+6.0 (10-seed
+  counter-experiment, `tables/e3_dagger_compare_*.csv`). The dense model is **equally
+  interpretable** (explicit equations) — only parsimony is lost, not transparency. Root
+  cause: `sparsity` was one of the E2 recipe-selection pareto objectives.
 - **Gates:** MPC-embeddability (degree-1 → CasADi/do-mpc within a step-time budget)
   and transparency (sign/dimension checks + bootstrap structural stability).
 - **E3 controllers:** rule-based · SINDy-MPC (frozen recipe) · grey-box-MPC

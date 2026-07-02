@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import article_experiment_utils as U  # noqa: E402
 import protocol_config as P  # noqa: E402
 
-RECIPE = dict(feature_variant="physics_no_cross", library_degree=1, optimizer="stlsq", denoise="none")
+RECIPE = P.load_frozen_recipe()   # CONFIRMATORY frozen recipe (consistent with E3/E4)
 DEF_TRAIN = "2019:03-01,2019:07-01"
 DEF_TEST = "2020:03-01,2021:07-01,2022:10-01,2023:01-01,2021:03-01"
 

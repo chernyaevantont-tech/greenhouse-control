@@ -141,6 +141,46 @@ class ProtocolConfig:
         return asdict(self)
 
 
+# ── Canonical confirmatory identification recipe (single source of truth) ─────
+
+# Pre-registered CONFIRMATORY recipe: chosen in E2 by open-loop identification metrics
+# BEFORE any closed-loop EPI (guards against circularity, EXPERIMENT_PROTOCOL 1.4.1).
+# NOTE (documented limitation): physics_no_cross + the default STLSQ/ensemble threshold
+# (~0.05) drops the small-magnitude but control-critical boiler term (uBoil) from the
+# temperature equation -- see EXPERIMENT_PROTOCOL 6.3 / results_scenarios sindy_equations.
+CANONICAL_RECIPE = {
+    "feature_variant": "physics_no_cross",
+    "library_degree": 1,
+    "optimizer": "ensemble",
+    "denoise": "none",
+}
+
+
+def load_frozen_recipe() -> dict[str, Any]:
+    """The one identification recipe every E3/E4/E5 runner must agree on.
+
+    Reads results_scenarios/recipe_frozen.json (the pre-registered confirmatory recipe);
+    falls back to CANONICAL_RECIPE if the file is missing. Centralised so the surrogate
+    identification stays IDENTICAL across the closed-loop benchmark (E3), online
+    adaptation (E4) and generalization (E5) -- previously E4/E5 hard-coded STLSQ while E3
+    used the frozen ensemble recipe, an unintended inconsistency.
+    """
+    import json
+    path = results_dir_path() / "recipe_frozen.json"
+    if path.exists():
+        try:
+            rec = json.loads(path.read_text(encoding="utf-8")).get("recipe")
+            if isinstance(rec, dict) and rec:
+                return dict(rec)
+        except Exception:
+            pass
+    return dict(CANONICAL_RECIPE)
+
+
+def results_dir_path():
+    return U.results_dir()
+
+
 # ── Live simulator economics / constraints (read, never invent) ──────────────
 
 def read_env_economics(location: str = "Rostov-on-Don") -> dict[str, Any]:

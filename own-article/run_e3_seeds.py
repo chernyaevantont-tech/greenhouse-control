@@ -54,11 +54,8 @@ def main() -> int:
     econ = P.read_env_economics(pc.location)
     CORR, PRICES = econ["corridors"], econ["prices"]
 
-    recipe_path = RES / "recipe_frozen.json"
-    if recipe_path.exists():
-        recipe = json.loads(recipe_path.read_text(encoding="utf-8"))["recipe"]
-    else:
-        recipe = {"feature_variant": "physics", "library_degree": 1, "optimizer": "stlsq", "denoise": "savgol"}
+    # Single source of truth for the identification recipe (same call as E4/E5).
+    recipe = P.load_frozen_recipe()
 
     test_scen = pc.test_scenario()
     TEST_START = test_scen["start_date"]

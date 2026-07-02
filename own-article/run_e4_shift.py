@@ -18,8 +18,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import article_experiment_utils as U  # noqa: E402
 import protocol_config as P  # noqa: E402
 
-# Adaptive surrogate base: single coefficient set so EKF/DAgger can update it.
-RECIPE = dict(feature_variant="physics_no_cross", library_degree=1, optimizer="stlsq", denoise="none")
+# Adaptive surrogate base = the CONFIRMATORY frozen recipe (consistent with E3/E5). The
+# ensemble optimizer still exposes a single median coefficient set that EKF/DAgger update.
+RECIPE = P.load_frozen_recipe()
 
 
 def main() -> int:
@@ -62,8 +63,14 @@ def main() -> int:
             rec("rule_based", s, U.rollout_rule_based(cfg_s, N, start_date=SS, noise_scale=0.0, seed=s))
             rec("offline", s, U.rollout_mpc(b_off, cfg_s, N, start_date=SS))
             rec("ekf_sindy", s, U.rollout_mpc_ekf(b_off, cfg_s, N, start_date=SS, rebuild_every=96))
-            # retrained-on-shift ceiling
-            tr_s = U.collect_rule_based_dataset(cfg_s, n_days=N, prbs_scale=0.3)
+            # Retrained-on-shift ceiling = genuine upper bound on adaptation. FIX: match
+            # the OFFLINE data budget (2*n_train days on the shift season), not just the
+            # N-day eval window. Previously it trained on only N days -> less data than
+            # offline (2*n_train) -> could fall BELOW offline, making gap_recovered
+            # (metric-offline)/(ceiling-offline) invalid (negative denominator).
+            n_ceil = 2 * n_train
+            ceil_scen = {"year": int(yr), "start_date": SS, "n_days": n_ceil}
+            tr_s = U.collect_rule_based_dataset(pc.cfg_for(ceil_scen, seed=s), n_days=n_ceil, prbs_scale=0.3)
             b_s = U.fit_sindy(tr_s, period=float(pc.period), metadata={"label": "retrained"}, **RECIPE)
             rec("retrained_ceiling", s, U.rollout_mpc(b_s, cfg_s, N, start_date=SS))
             # DAgger: iteratively deploy on the shift, aggregate, refit
