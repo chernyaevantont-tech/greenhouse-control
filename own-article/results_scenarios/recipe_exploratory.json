@@ -1,0 +1,14 @@
+{
+  "recipe": {
+    "feature_variant": "physics",
+    "library_degree": 1,
+    "optimizer": "stlsq",
+    "denoise": "none",
+    "threshold": 0.1
+  },
+  "selected_by": "closed-loop validation EPI on held-out season 2019-05-01 (val_epi 4.905); see tables/e2_closedloop_selection.csv",
+  "frozen_at": "2026-06-30 16:49:50",
+  "role": "EXPLORATORY / post-hoc ONLY — this is NOT the pre-registered recipe",
+  "note": "Selected by closed-loop EPI, which deviates from the pre-registered open-loop selection (EXPERIMENT_PROTOCOL.md 1.4.1). Reported strictly as exploratory sensitivity ('even hindsight recipe tuning does not make SINDy-MPC a leader'), never as the confirmatory E3 result. The confirmatory recipe is physics_no_cross/ensemble (see recipe_frozen.json).",
+  "see_also": "recipe_frozen.json"
+}

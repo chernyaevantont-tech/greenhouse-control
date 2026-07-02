@@ -1,0 +1,4 @@
+equation,text
+t_in,t_in_next_scaled = - 2.389*uVent - 2.144*t_S_eff + 2.092*h_uVent + 1.842*S_eff + 1.135*vpd + 0.6289*rh + 0.579*psat + 0.3955*rad + 0.3578*T_out + 0.2563*uThScr - 0.2254*dc_uVent + 0.1518*t_uBoil
+co2,co2_next_scaled = - 1.834*uVent + 1.682*h_uVent - 0.9485*t_in + 0.8854*co2 + 0.6972*uCO2 + 0.6776*psat + 0.6453*vpd - 0.5897*t_S_eff + 0.3956*S_eff + 0.3785*rh - 0.371*dc_uVent - 0.3532*uBoil
+rh,rh_next_scaled = - 1.953*uVent + 1.774*h_uVent + 1.349*rh + 1.052*vpd - 0.9518*t_S_eff + 0.5473*S_eff - 0.3896*psat - 0.3621*uBoil + 0.2278*t_uBoil + 0.2213*rad - 0.2088*dc_uVent - 0.1044*t_in

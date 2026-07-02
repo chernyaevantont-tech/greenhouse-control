@@ -23,6 +23,11 @@ NOTEBOOKS = [
     "E1_data_and_scenarios.ipynb",
     "E2_identification_ladder.ipynb",
     "E3_closed_loop_benchmark.ipynb",
+    "E4_online_adaptation.ipynb",
+    "E5_generalization_ood.ipynb",
+    "E6_sensitivity.ipynb",
+    "E7_fault_injection.ipynb",
+    "E8_statistical_validity.ipynb",
 ]
 
 

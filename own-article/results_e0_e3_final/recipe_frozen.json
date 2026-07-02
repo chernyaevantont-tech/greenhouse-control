@@ -1,0 +1,10 @@
+{
+  "recipe": {
+    "feature_variant": "physics_no_cross",
+    "library_degree": 1,
+    "optimizer": "ensemble",
+    "denoise": "none"
+  },
+  "selected_by": "pareto(diverged_frac, rollout_rmse, sparsity); gates=embeddable+transparent",
+  "frozen_at": "2026-06-29 11:57:06"
+}

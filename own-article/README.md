@@ -1,13 +1,14 @@
-# Article experiments — E0–E3 (protocol-aligned)
+# Article experiments — E0–E8 (protocol-aligned, complete)
 
 Reproducible notebooks for the **data-efficient interpretable greenhouse SINDy-MPC**
 study, implemented per [`EXPERIMENT_PROTOCOL.md`](EXPERIMENT_PROTOCOL.md). All claims
 are **in-silico** on `gl_gym/GreenLightTomato-v0` (GreenLight-Gym2).
 
-This pass covers the **core hypothesis chain E0→E3** at article grade, on
-**Rostov-on-Don 2018–2023** with the economic indicator **EPI** read directly from
-the simulator. E4–E8 (online adaptation, OOD, sensitivity, faults, full multi-seed)
-are the next pass; the legacy `0x_*.ipynb` notebooks remain as their scaffolding.
+The **full protocol E0–E8** is implemented at article grade on **Rostov-on-Don
+2018–2023** with the economic indicator **EPI** read directly from the simulator:
+E0–E3 (core hypothesis chain), E4 (online adaptation, Г4а), E5 (generalization +
+OOD, Г4б,в), E6 (sensitivity), E7 (fault injection + safety), E8 (statistical
+validity across all hypotheses).
 
 ## Notebooks (run in order)
 
@@ -17,10 +18,20 @@ are the next pass; the legacy `0x_*.ipynb` notebooks remain as their scaffolding
 | `E1_data_and_scenarios.ipynb` | E1 — Rostov splits, excitation (noise + PRBS), budget/κ curve | `.npz` datasets, split + κ tables |
 | `E2_identification_ladder.ipynb` | E2 — denoise×optimizer×library×degree ablation + gates | ablation table, `recipe_frozen.json`, equations |
 | `E3_closed_loop_benchmark.ipynb` | E3 — closed-loop EPI benchmark + statistics | main mean±CI table, Pareto, Wilcoxon |
+| `E4_online_adaptation.ipynb` | E4 — EKF-SINDy + DAgger recovery under OOD shift | adaptation table, DAgger curve |
+| `E5_generalization_ood.ipynb` | E5 — train→test matrix, Mahalanobis/ensemble OOD, guard, ROC | generalization matrix, OOD corr, guard, ROC |
+| `E6_sensitivity.ipynb` | E6 — price/horizon/threshold/uncertainty sensitivity | tornado, price-ranking robustness |
+| `E7_fault_injection.ipynb` | E7 — sensor/actuator faults + safety supervisor | degradation table, supervisor mitigation |
+| `E8_statistical_validity.ipynb` | E8 — Wilcoxon+Holm+bootstrap CI across all hypotheses | significance tables, seed boxplots |
 
 `protocol_config.py` is the single source of truth (split, budgets, seeds, horizons,
 HP budget) and reads the simulator's prices/corridors via `read_env_economics()`.
 Helper code lives in `article_experiment_utils.py`.
+
+**Distributed (article-grade) runners** (heavy grids run across two LAN servers, see
+[`REMOTE_RUN.md`](REMOTE_RUN.md)): `run_e3_seeds.py`, `run_e4_shift.py`,
+`run_e5_grid.py`, each with a matching `merge_*.py`. Snapshots in
+`results_e0_e3_final/` and `results_e4_e8_final/`.
 
 ## How to run
 
@@ -58,4 +69,8 @@ Run a single notebook: `python run_all_notebooks.py E2_identification_ladder.ipy
   Oracle and RL run on a reduced seed set (CPU budget).
 
 All artifacts are written to `results_scenarios/{datasets,models,tables,figures}` plus
-`protocol.json` and `recipe_frozen.json`. The legacy `results/` directory is stale.
+`protocol.json`, `recipe_frozen.json` (CONFIRMATORY — pre-registered open-loop recipe
+`physics_no_cross/ensemble`) and `recipe_exploratory.json` (post-hoc closed-loop recipe
+`physics/stlsq/0.1`, reported as sensitivity only). The legacy `results/` directory is
+archived under `archive/results_legacy/`; the legacy `00`–`07` notebooks are superseded
+by `E0`–`E8`.

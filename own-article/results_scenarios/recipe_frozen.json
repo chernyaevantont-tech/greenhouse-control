@@ -1,10 +1,13 @@
 {
   "recipe": {
-    "feature_variant": "physics",
+    "feature_variant": "physics_no_cross",
     "library_degree": 1,
-    "optimizer": "stlsq",
-    "denoise": "savgol"
+    "optimizer": "ensemble",
+    "denoise": "none"
   },
-  "selected_by": "pareto(diverged_frac, rollout_rmse, sparsity); gates=embeddable+transparent",
-  "frozen_at": "2026-06-26 12:52:02"
+  "selected_by": "pre-registered open-loop identification metrics: pareto(diverged_frac, rollout_rmse, sparsity); gates = MPC-embeddable + transparent",
+  "frozen_at": "2026-06-29 11:57:06",
+  "role": "CONFIRMATORY — the E3 primary result is reported against this recipe",
+  "note": "Pre-registered recipe, frozen by open-loop metrics BEFORE any closed-loop EPI, per EXPERIMENT_PROTOCOL.md 1.4.1 (guards against circularity). A closed-loop-selected alternative (physics/stlsq/0.1) is recorded in recipe_exploratory.json and reported ONLY as post-hoc/exploratory sensitivity, never as the confirmatory result. PHASE-1 TODO: re-run E3 against THIS file to verify the reported e3_main_table numbers correspond to it (provenance was muddied on 2026-06-30 when this file was transiently overwritten with the exploratory recipe).",
+  "see_also": "recipe_exploratory.json"
 }

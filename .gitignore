@@ -30,3 +30,10 @@ models/
 # IDE
 .vscode/
 .idea/
+
+*.npz
+
+# Local infra / pulled logs (not part of the article record)
+.server0_ip
+*.log
+own-article/results_scenarios/remote_logs/

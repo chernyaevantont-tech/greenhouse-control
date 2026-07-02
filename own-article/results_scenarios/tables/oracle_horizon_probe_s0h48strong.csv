@@ -1,0 +1,2 @@
+window_days,horizon,horizon_h,method,seed,secs,epi,revenue,cost_total,cost_heat,cost_elec,cost_co2,fruit_dm_growth,violation_steps_total,t_in_in_corridor_pct,steps
+14,0,0.0,rule_based,0,1.1,0.6301080625235198,4.075421689361788,3.445313626838268,1.8585319826874873,1.121683075940609,0.4650985682101721,165564.00613032264,651,93.08035714285714,1344

@@ -1,0 +1,8 @@
+feature_variant,optimizer,threshold,val_epi
+physics_no_cross,ensemble,0.05,3.483
+physics_no_cross,stlsq,0.05,3.46
+physics_no_cross,stlsq,0.1,3.87
+physics_no_cross,stlsq,0.01,2.861
+physics,stlsq,0.1,4.905
+physics,stlsq,0.05,4.047
+raw,stlsq,0.05,3.863

@@ -1,0 +1,15 @@
+factor,value,epi,seed,nonzero,rep
+mpc_horizon,8.0,0.11531081071824745,1,,
+mpc_horizon,12.0,-0.21248556979745326,1,,
+mpc_horizon,20.0,-0.6223934757058109,1,,
+mpc_horizon,30.0,-0.6541966525245537,1,,
+stlsq_threshold,0.01,0.9994951893753281,1,45.0,
+stlsq_threshold,0.05,-0.6223934757058109,1,28.0,
+stlsq_threshold,0.1,2.9587200595784706,1,15.0,
+stlsq_threshold,0.2,0.8906786822095502,1,11.0,
+coef_uncertainty,0.1,-0.1504524281250009,1,,0.0
+coef_uncertainty,0.1,-2.9072228873775257,1,,1.0
+coef_uncertainty,0.2,-0.726854981091509,1,,0.0
+coef_uncertainty,0.2,-4.59174122581566,1,,1.0
+coef_uncertainty,0.3,-7.3091113235357215,1,,0.0
+coef_uncertainty,0.3,-2.1770571773787233,1,,1.0
