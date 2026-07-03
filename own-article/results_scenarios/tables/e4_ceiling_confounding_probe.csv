@@ -1,0 +1,6 @@
+variant,collect_rows,collect_expected,corr_uVent_t_in,kappa,uVent_to_t_in,uBoil_to_t_in,eval_steps,eval_expected,epi,note
+prbs_0.30_original,3201,5760,0.67,73,-0.134,0.018,,,-14.30,collection truncated by ODE failure; ceiling trained on 33-day fragment
+prbs_0.15,5760,5760,0.63,79,-0.109,0.016,1472,2880,-6.10,collection completes; eval rollout truncates
+prbs_0.10,5760,5760,0.62,80,-0.109,0.018,1471,2880,-6.83,collection completes; eval rollout truncates
+prbs_0.10_noise_0.05,5760,5760,0.63,84,-0.106,0.016,2880,2880,-19.98,collection and eval complete; model undervents all season
+offline_dense_spring_18_19,5760,5760,0.03,20,-0.354,0.030,2880,2880,0.74,reference: 2-year spring diversity breaks the actuator-state confounding
