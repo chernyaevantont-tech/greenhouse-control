@@ -1261,9 +1261,9 @@ def rollout_mpc_ekf(
     cfg: ExperimentConfig,
     n_days: int,
     start_date: str | None = None,
-    forgetting: float = 0.995,
+    forgetting: float = 0.999,
     rebuild_every: int = 96,
-    p0: float = 10.0,
+    p0: float = 0.1,
     max_solver_failures: int = 100,
 ) -> pd.DataFrame:
     """SINDy-MPC with EKF/RLS online adaptation of the surrogate coefficients (E4, Г4а).
@@ -1273,6 +1273,15 @@ def rollout_mpc_ekf(
     factor (per output state). Each step the observed transition updates Xi; the do-mpc
     controller is rebuilt every ``rebuild_every`` steps with the adapted coefficients so
     control tracks the weather shift. Returns the closed-loop frame with EPI fields.
+
+    Defaults (p0=0.1, forgetting=0.999) are the GENTLE prior chosen after diagnosis
+    (scratchpad/diag_ekf.py): the old aggressive prior (p0=10, forgetting=0.995) caused
+    covariance windup under the low excitation of closed-loop data -> erratic coefficient
+    jumps -> the adapted MPC destabilised (EPI -4.3 vs offline +0.5). The gentle prior is
+    stable (bounded P-trace) and non-harmful (EPI +0.7). NOTE: RLS reliably lowers the
+    one-step residual, but one-step fit does NOT track closed-loop EPI here -- control is
+    dominated by discrete actuator decisions (e.g. whether uBoil re-enters the model), so
+    adaptation gains are marginal on mild shifts.
     """
     import copy
 
