@@ -31,7 +31,11 @@ WARNINGS: list[str] = []
 # means what it should: "the plumbing works". Correctness gates stay blocking in both modes.
 SMOKE = False
 COVERAGE_GATES = {"G1 grid complete", "G7 lambda sweep resolves xi==0 region",
-                  "G7 lambda dispersion reported", "G10 oracle horizon sweep"}
+                  "G7 lambda dispersion reported", "G10 oracle horizon sweep",
+                  # A partial smoke legitimately has fewer sweep seeds, and the k8s smoke
+                  # Job chains verify with `&&` -- leaving this blocking would fail the Job
+                  # and stop the documented run order before the real waves start.
+                  "G10 sweep seed subset complete"}
 
 
 def gate(name: str, ok: bool, detail: str, blocking: bool = True) -> None:
