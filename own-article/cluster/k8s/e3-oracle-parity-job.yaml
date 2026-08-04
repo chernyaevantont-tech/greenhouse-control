@@ -1,0 +1,75 @@
+# Reviewer item #6 -- oracle solver-parity / action-replay (E3).
+#
+# Decomposes the oracle-vs-surrogate EPI gap into MODEL error vs OPTIMIZER error:
+#   * mode=action_replay (default, IMPLEMENTED): apply one fixed rule-based action
+#     sequence to BOTH the true simulator and the SINDy surrogate, open-loop, and measure
+#     the surrogate's divergence (per-state one-step & free-running RMSE) = pure model
+#     error. No optimizer involved.
+#   * mode=solver_parity (SCAFFOLD): re-run the oracle under the SAME IPOPT/do-mpc solver
+#     as the surrogate MPC (not CEM), over the true model. This requires embedding the true
+#     CasADi dynamics env.unwrapped.F into a do-mpc model -- see the TODO in
+#     run_oracle_parity.py:build_true_model_mpc. Until wired, this job runs action_replay.
+#
+# Sharding by SEED (completions=20). CPU-only and light (no MPC solve in action_replay):
+# ~1 fit + one 60-day collect + open-loop predict per seed => a few minutes/pod;
+# ~5-10 min wall for all 20.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: e3-oracle-parity
+  namespace: greenhouse-e3
+  labels:
+    app: greenhouse-e3
+    experiment: oracle-parity
+    reviewer-item: "6"
+spec:
+  completionMode: Indexed
+  completions: 20            # == number of seeds
+  parallelism: 20
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app: greenhouse-e3
+        experiment: oracle-parity
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-e3:v3   # mirror-rewritten to local registry
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_oracle_parity.py
+              --mode "$PARITY_MODE"
+              --shard-index "$JOB_COMPLETION_INDEX"
+              --num-shards "$COMPLETIONS"
+              --seeds-all "$SEEDS_ALL"
+              --tag "shard${JOB_COMPLETION_INDEX}"
+              --out /results/oracle_parity
+          env:
+            - name: PARITY_MODE
+              value: "action_replay"   # switch to "solver_parity" once build_true_model_mpc is wired
+            - name: COMPLETIONS
+              value: "20"
+            - name: SEEDS_ALL
+              value: "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19"
+            - name: OMP_NUM_THREADS
+              value: "1"
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          volumeMounts:
+            - name: results
+              mountPath: /results
+      volumes:
+        - name: results
+          persistentVolumeClaim:
+            claimName: e3-results

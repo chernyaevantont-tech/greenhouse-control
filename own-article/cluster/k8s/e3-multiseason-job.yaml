@@ -1,0 +1,109 @@
+# Reviewer item #3 -- multi-season main comparison (E3).
+#
+# The EPI ranking is re-evaluated across SEVERAL test seasons (default 2020,2021,2022,2023)
+# instead of the single 2020 year, to show the ordering holds out-of-distribution.
+# Grid: (controllers) x (test years) x (20 seeds). Training is leakage-free and
+# year-independent (TRAIN=2018/2019), so run_multiseason.py fits/trains each model ONCE per
+# (seed, controller) and rolls it out on every test year.
+#
+# Sharding: by SEED (completions=20). Each pod runs CONTROLLERS x TEST_YEARS for its seed
+# and writes /results/multiseason/e3_multiseason_shard<index>.csv.
+#
+# Controllers are split into SEPARATE Job submissions by cost (as the old server0/server1
+# split did), so one slow controller does not stretch every pod. THIS file is the CPU
+# "cheap" wave; the RL-GPU and oracle waves are the commented variants at the bottom.
+#
+# Long pole = oracle_mpc (~5250 s/season => ~5.8 h/seed x4 seasons; ~6 h wall at
+# parallelism 20). Cheap wave (rule_based/sindy/grey/nn) ~1-1.5 h wall. RL wave: PPO
+# ~500 s + SAC ~4400 s training per seed (+4 short rollouts each).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: e3-multiseason-cheap
+  namespace: greenhouse-e3
+  labels:
+    app: greenhouse-e3
+    experiment: multiseason
+    reviewer-item: "3"
+    wave: cheap
+spec:
+  completionMode: Indexed
+  completions: 20            # == number of seeds
+  parallelism: 20
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app: greenhouse-e3
+        experiment: multiseason
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-e3:v3   # mirror-rewritten to local registry
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_multiseason.py
+              --shard-index "$JOB_COMPLETION_INDEX"
+              --num-shards "$COMPLETIONS"
+              --seeds-all "$SEEDS_ALL"
+              --controllers "$CONTROLLERS"
+              --test-years "$TEST_YEARS"
+              --tag "shard${JOB_COMPLETION_INDEX}"
+              --out /results/multiseason
+          env:
+            - name: COMPLETIONS
+              value: "20"
+            - name: SEEDS_ALL
+              value: "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19"
+            - name: CONTROLLERS
+              value: "rule_based,sindy_mpc,grey_box_mpc,nn_mpc"
+            - name: TEST_YEARS
+              value: "2020,2021,2022,2023"
+            - name: OMP_NUM_THREADS
+              value: "1"
+          resources:
+            requests:
+              cpu: "2"
+              memory: 4Gi
+            limits:
+              cpu: "4"
+              memory: 8Gi
+          volumeMounts:
+            - name: results
+              mountPath: /results
+      volumes:
+        - name: results
+          persistentVolumeClaim:
+            claimName: e3-results
+# ─────────────────────────────────────────────────────────────────────────────
+# VARIANT B -- RL wave (PPO/SAC), OPTIONAL GPU. Submit as a SECOND Job: copy this file,
+# set metadata.name: e3-multiseason-rl, and change ONLY the following:
+#
+#   env:
+#     - name: CONTROLLERS
+#       value: "ppo,sac"                 # RL controllers only
+#     # ...keep COMPLETIONS/SEEDS_ALL/TEST_YEARS as above
+#   resources:
+#     requests:
+#       cpu: "2"
+#       memory: 6Gi                       # SAC pre-allocates a 200k-step replay buffer
+#       nvidia.com/gpu: "1"               # <-- request one RTX 3050; drop these 2 lines for CPU
+#     limits:
+#       cpu: "4"
+#       memory: 10Gi
+#       nvidia.com/gpu: "1"               # GPU limit MUST equal request (integer, non-overcommit)
+#   parallelism: 5                        # GPU-quota bound (ns quota requests.nvidia.com/gpu; see runbook §14)
+#
+# The image's PyPI torch wheel is CUDA-capable, so the SAME image runs GPU RL pods and CPU
+# pods. All nodes are schedulable with 1x RTX 3050 and no taints, so no nodeSelector/
+# toleration is needed; add `nodeSelector: {nvidia.com/gpu.present: "true"}` only if you
+# later taint CPU-only nodes.
+# ─────────────────────────────────────────────────────────────────────────────
+# VARIANT C -- oracle wave (the long pole). Copy this file, set
+# metadata.name: e3-multiseason-oracle, CONTROLLERS: "oracle_mpc", CPU-only,
+# and consider parallelism: 20 with a longer activeDeadlineSeconds. ~6 h wall.

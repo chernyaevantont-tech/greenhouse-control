@@ -1,0 +1,76 @@
+# Reviewer item #1 -- boiler knock-out / knock-in ablation (E3).
+#
+# 20 seeds x 3 conditions {baseline, knockout, knockin} PLUS the physics-library
+# interaction check (uBoil alone vs uBoil+t*uBoil). All conditions for one seed are
+# computed together inside run_knockout_ablation.py (one SINDy fit -> three coefficient
+# variants), so the natural shard unit is a SEED.
+#
+# Indexed Job: completions == number of seeds (20). Each pod owns seeds_all[index::20],
+# i.e. exactly one seed here, and writes /results/knockout/e3_knockout_shard<index>.csv.
+# The merge step (submit.sh) aggregates them into e3_knockout_ablation.csv.
+#
+# CPU-only: the whole workload is CPU-bound (IPOPT + gl_gym integration). No GPU.
+# Expected wallclock: ~6 closed-loop 60-day rollouts/seed at ~100-140 s each => ~10-15 min
+# per pod; all 20 pods run concurrently => ~15-20 min total on the cluster.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: e3-knockout
+  namespace: greenhouse-e3
+  labels:
+    app: greenhouse-e3
+    experiment: knockout
+    reviewer-item: "1"
+spec:
+  completionMode: Indexed
+  completions: 20            # == number of seeds
+  parallelism: 20            # all seeds at once (20 pods x 2 CPU ~= 40 cores)
+  backoffLimit: 6            # whole-job retry budget across indexes
+  ttlSecondsAfterFinished: 86400   # auto-clean the Job object after 24 h
+  template:
+    metadata:
+      labels:
+        app: greenhouse-e3
+        experiment: knockout
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          # Custom image pushed to the local registry as localhost:5000/agro/greenhouse-e3;
+          # referenced by its docker.io name so containerd's mirror rewrites it to the local
+          # registry (cluster-runbook.md §"local-first"; §18 devpi image uses this same
+          # docker.io/agro/... pattern). Do NOT use a raw 10.10.0.2:5000/ ref (HTTPS error).
+          image: docker.io/agro/greenhouse-e3:v3
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article
+          command: ["sh", "-c"]
+          args:
+            # JOB_COMPLETION_INDEX is auto-injected into every indexed-Job pod.
+            - >
+              python run_knockout_ablation.py
+              --shard-index "$JOB_COMPLETION_INDEX"
+              --num-shards "$COMPLETIONS"
+              --seeds-all "$SEEDS_ALL"
+              --tag "shard${JOB_COMPLETION_INDEX}"
+              --out /results/knockout
+          env:
+            - name: COMPLETIONS
+              value: "20"
+            - name: SEEDS_ALL
+              value: "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19"
+            - name: OMP_NUM_THREADS
+              value: "1"
+          resources:
+            requests:
+              cpu: "2"
+              memory: 3Gi
+            limits:
+              cpu: "4"
+              memory: 6Gi
+          volumeMounts:
+            - name: results
+              mountPath: /results
+      volumes:
+        - name: results
+          persistentVolumeClaim:
+            claimName: e3-results

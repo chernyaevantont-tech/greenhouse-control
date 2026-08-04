@@ -1,0 +1,43 @@
+# E3 cluster-compute dependencies (own-article closed-loop benchmark).
+#
+# Pins are the EXACT versions of the environment this harness was validated against
+# (fit_sindy -> build_mpc_controller -> rollout_mpc -> epi_metrics, plus the RL and
+# oracle paths all run green on these). This is the article-COMPUTE stack only -- it
+# deliberately omits the repo web/orchestration stack (fastapi, langgraph, langchain-*),
+# which the E3 runners never import.
+#
+# NOTE: the repo-root requirements.txt carries OLDER constraints (scikit-learn<1.6,
+# gymnasium==0.29.0, gl_gym>=0.3.2). Those predate the pysindy 2.x upgrade; the versions
+# below are what actually runs. numpy stays <2.0 (gl_gym requirement).
+#
+# pip resolves these through the cluster's local devpi PyPI mirror automatically when
+# PIP_INDEX_URL is set (see Dockerfile ARG / cluster-runbook.md §18); otherwise from PyPI.
+#
+# INSTALL ORDER MATTERS: gl_gym requires numpy<2.0 while the pysindy 2.1.0 wheel declares
+# numpy>=2.0 (it runs on 1.26.4 anyway). A single `pip install -r` fails the resolver, so
+# the Dockerfile installs this file WITHOUT pysindy, then `pip install --no-deps pysindy==2.1.0`.
+# Verified 2026-07-17 against ../greenlight/sindylom/.venv; same pins as the repo-root
+# requirements.txt scientific stack (which is the authoritative full-repo manifest).
+
+numpy==1.26.4          # <2.0 required by gl_gym
+scipy==1.17.1
+pandas==2.3.3
+scikit-learn==1.8.0    # pysindy 2.x is compatible with sklearn>=1.6 (unlike the 1.7 line)
+
+# Simulation / identification / control
+gl_gym==0.3.1          # GreenLightGym env; bundles the Rostov-on-Don ERA5 weather CSVs
+gymnasium==1.2.3
+pysindy==2.1.0
+casadi==3.7.2          # self-contained IPOPT; no system IPOPT needed
+do-mpc==5.1.1
+
+# RL baselines (PPO/SAC) and the NN surrogate
+# torch from PyPI is the CUDA-capable wheel: it runs on CPU nodes AND lets the optional
+# nvidia.com/gpu PPO/SAC pods (see e3-multiseason-job.yaml) use the GPU with the SAME image.
+# For a slim CPU-only image instead, install torch from the CPU index on a host with direct
+# internet (admin-01 Wi-Fi):  pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cpu
+torch==2.11.0
+stable-baselines3==2.9.0
+
+# Figures / merge steps
+matplotlib==3.10.8

@@ -1,0 +1,2 @@
+seed,n_samples,n_iters,cem_budget,probe_days,epi,viol,secs
+4,96,3,288,14,0.19971934084169954,1054,2720.7

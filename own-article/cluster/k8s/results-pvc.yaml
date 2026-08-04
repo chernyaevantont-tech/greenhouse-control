@@ -1,0 +1,27 @@
+# Shared results volume for all E3 jobs: a Longhorn RWX ("home as one VM") PVC.
+#
+# This is the scp/rsync replacement from the old server0/server1 setup: every pod on every
+# node mounts THIS one volume at /results and writes its partial CSV there, so a single
+# merge step at the end reads them all -- no cross-host copying.
+#
+# Longhorn provisions ReadWriteMany via its share-manager (NFS) so many pods across
+# different nodes can write concurrently (cluster-runbook.md §19).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: greenhouse-e3
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: e3-results
+  namespace: greenhouse-e3
+  labels:
+    app: greenhouse-e3
+spec:
+  accessModes:
+    - ReadWriteMany          # RWX: concurrent writers across nodes
+  storageClassName: longhorn # distributed/replicated pool (NOT the default local-path)
+  resources:
+    requests:
+      storage: 20Gi          # CSVs/figures are small; ample headroom for datasets/models
