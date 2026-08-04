@@ -1,0 +1,43 @@
+# Build context for own-article/cluster/Dockerfile.
+#
+# Without this the context is ~581 MB, of which ~551 MB is never used by the image:
+# .git (225 MB), the reference-paper PDFs (228 MB) and the exploratory notebooks (98 MB).
+# The Dockerfile only needs own-article/ source plus own-article/cluster/weather/.
+#
+# NOT excluded, deliberately: own-article/results_scenarios/. The legacy runners resolve
+# `protocol_config.load_frozen_recipe()` against results_scenarios/recipe_frozen.json at
+# RUNTIME, so dropping it would break run_multiseason/run_e3_seeds inside the image.
+# (own-article/regen/ does not depend on it -- it fails loud on its own config instead.)
+
+.git
+.gitignore
+
+# Reference PDFs and bibliography -- cited by the paper, never imported by the compute.
+articles/
+
+# Exploratory notebooks: superseded by the scripted runners, and the heaviest single item
+# after .git and articles/ because outputs are committed inside them.
+**/*.ipynb
+.ipynb_checkpoints/
+
+# Manuscript sources and build products.
+own-article/paper/
+own-article/archive/
+
+# Results already pulled off the cluster: the image produces results, it never reads these.
+own-article/cluster/results_pull/
+
+# Unrelated subprojects.
+dashboard/
+docs/
+models/
+tests/
+
+# Local noise.
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+*.tar
+scratchpad/
