@@ -1,3 +1,3 @@
 comparison,n,mean_reduction,ci_low,ci_high,p_value,significant
-E5 guard: violations unguarded->guarded,20,710.7,348.6675,1059.0549999999998,0.002712249755859375,True
-E7 supervisor: violations unsup->sup,18,2037.3333333333333,1628.9930555555557,2465.0652777777777,7.62939453125e-06,True
+E5 guard: violations unguarded->guarded,200,860.235,732.156125,988.9934999999999,2.0583360969985905e-24,True
+E7 supervisor: violations unsup->sup,120,1303.7,1149.5858333333333,1477.218125,6.1488084788565175e-21,True

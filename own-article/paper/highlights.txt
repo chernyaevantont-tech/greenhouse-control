@@ -1,0 +1,9 @@
+CEA Highlights (3–5 bullets, each ≤ 85 characters incl. spaces)
+
+1. Pre-registered SINDy-MPC recipe fails economically despite a valid open-loop fit
+2. A sparsity threshold silently zeroes the boiler term, collapsing closed-loop EPI
+3. Open-loop rollout error stays flat while closed-loop profit drops 3.8 to 1.0 EUR/m2
+4. Tuned agronomic rules match or beat every learned controller on 20-seed EPI
+5. The interpretable model's value is safety and OOD guarding, not economic supremacy
+
+(char counts: 81, 82, 84, 74, 84 — all within 85)

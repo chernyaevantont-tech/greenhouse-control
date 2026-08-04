@@ -1,15 +1,42 @@
-# Core scientific stack
-numpy>=1.26,<2.0   # gl_gym requires numpy<2.0
-scipy>=1.12
-pandas>=2.2
-scikit-learn>=1.4,<1.6   # pysindy incompatible with sklearn>=1.6 (_preprocess_data API change)
+# greenhouse-control — dependency manifest (full repo: article compute + web API + orchestration).
+#
+# Pins below reflect the ACTUAL working environment, verified 2026-07-17 against the
+# compute venv at ../greenlight/sindylom/.venv (Python 3.14; every module of own-article/
+# and greenhouse_mvp's sindy/control/environment layers imports green on these versions).
+# The frozen exact-pin subset used to build the cluster image lives in
+# own-article/cluster/requirements-cluster.txt (compute-only: no fastapi/langgraph/pytest).
+#
+# ─────────────────────────────────────────────────────────────────────────────────────
+# KNOWN INSTALL CONFLICT (numpy).  gl_gym requires numpy<2.0, but the pysindy 2.1.0 wheel
+# declares numpy>=2.0 in its metadata (it nonetheless runs correctly on numpy 1.26.4 — the
+# working env was assembled by bypassing that check).  A plain `pip install -r requirements.txt`
+# therefore fails with a resolver conflict.  Install in two steps instead:
+#     pip install -r requirements.txt --no-deps pysindy
+#     pip install $(grep -v '^pysindy' requirements.txt | grep -vE '^\s*#|^\s*$')
+# or, more simply:
+#     pip install numpy==1.26.4
+#     pip install --no-deps pysindy==2.1.0
+#     pip install -r requirements.txt      # numpy already satisfied; pysindy already present
+# (uv users: add `[tool.uv] override-dependencies = ["numpy<2.0"]` and it resolves directly.)
+# ─────────────────────────────────────────────────────────────────────────────────────
 
-# Simulation / control
-gl_gym>=0.3.2
-gymnasium==0.29.0   # pinned by gl_gym
-do-mpc>=4.6
-casadi>=3.6
-pysindy>=1.7
+# Core scientific stack
+numpy>=1.26,<2.0          # hard cap from gl_gym (working: 1.26.4)
+scipy>=1.12               # working: 1.17.1
+pandas>=2.2               # working: 2.3.3
+scikit-learn>=1.8,<2.0    # pysindy 2.x needs sklearn>=1.6 excluding 1.6.0/1.7.1 (working: 1.8.0)
+
+# Simulation / identification / control
+gl_gym>=0.3.1             # GreenLightGym env; bundles the Rostov-on-Don ERA5 weather CSVs (working: 0.3.1)
+gymnasium>=1.2,<2.0       # required by gl_gym and stable-baselines3 (>=0.29.1,<2.0); working: 1.2.3
+do-mpc>=5.1               # MPC embedding (do_mpc + CasADi/IPOPT); working: 5.1.1
+casadi>=3.7               # self-contained IPOPT, no system IPOPT needed; working: 3.7.2
+pysindy>=2.1              # 2.x API used by fit_sindy (EnsembleOptimizer, .coefficients()); working: 2.1.0
+
+# Article E3: RL baselines (PPO/SAC), NN surrogate, figure generation
+torch>=2.8,<3.0           # stable-baselines3 2.9 requires >=2.8; CUDA wheel also runs CPU (working: 2.11.0)
+stable-baselines3>=2.9    # PPO/SAC baselines (working: 2.9.0)
+matplotlib>=3.8           # figure scripts (make_figures_ru.py, merge_*.py); working: 3.10.8
 
 # Web API
 fastapi>=0.111
@@ -21,10 +48,10 @@ langchain-core>=0.1
 langchain-openai>=0.1
 
 # HTTP client (used internally by langchain-openai)
-httpx>=0.27
+httpx>=0.27               # working: 0.28.1
 
 # Schema validation
-pydantic>=2.6
+pydantic>=2.6             # working: 2.13.0
 
 # Tests
 pytest>=8.0

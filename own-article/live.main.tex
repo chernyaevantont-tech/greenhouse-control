@@ -1,0 +1,715 @@
+%% ============================================================================
+%% main.tex — When sparsity hides the actuator
+%% Elsevier elsarticle. Compile: pdflatex main; bibtex main; pdflatex x2.
+%% Figures: ../results_scenarios/figures/  |  Bib: ../../articles/references.bib
+%% Prose = assembled section drafts (paper/sections/*.md). Numbers = 20-seed regen.
+%% NOTE: first full draft — run a final numeric pass vs source CSVs before submission.
+%% ============================================================================
+\documentclass[preprint,3p,authoryear]{elsarticle}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\graphicspath{{../results_scenarios/figures/}}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{xcolor}
+\journal{Computers and Electronics in Agriculture}
+
+\begin{document}
+
+\begin{document}
+
+\begin{frontmatter}
+
+\title{When sparsity hides the actuator: a pre-registered economic benchmark of
+SINDy-MPC for greenhouse climate control}
+
+\author[a]{Author One}
+\author[a]{Author Two}
+\affiliation[a]{organization={Affiliation, Department},
+  city={City}, country={Country}}
+
+\begin{abstract}
+Interpretable data-driven surrogates such as sparse identification of nonlinear
+dynamics (SINDy) are attractive for greenhouse model predictive control (MPC)
+because they yield explicit, inspectable equations rather than black boxes.
+Whether this interpretability comes at an economic cost, however, is rarely tested
+under a fair protocol: baselines are often untuned, the metric is a tracking proxy
+rather than profit, and---most subtly---the identification recipe is chosen by
+open-loop prediction quality. We report a pre-registered, in-silico economic
+benchmark of ten controllers on the GreenLight tomato simulator (Rostov-on-Don,
+2018--2023 ERA5 weather), using the simulator's own economic performance indicator
+(EPI, seasonal profit) as the primary metric and a two-axis Pareto criterion
+(EPI versus constraint violations), over 20 seeds with paired non-parametric
+statistics. The pre-registered SINDy-MPC recipe, frozen by open-loop metrics
+before any closed-loop evaluation, is economically among the weakest interpretable
+controllers ($1.18$ vs $4.63~\mathrm{EUR/m^2}$ for a tuned rule-based baseline). A
+one-parameter ablation traces the cause: the sparsity threshold silently zeroes
+the boiler term in the temperature equation---the only modelled heating
+actuator---and closed-loop EPI collapses from $3.8$ to $1.0~\mathrm{EUR/m^2}$ while
+the open-loop rollout error stays flat ($2.25\rightarrow2.39$). The open-loop
+selection criterion is thus blind to the closed-loop failure it induces. Restoring
+the term, by a denser threshold or by DAgger, recovers EPI to parity with the
+heuristic without loss of interpretability, and the repaired model coincides with a
+first-principles grey-box model. A controller cast designed as differential
+diagnosis rules out the obvious alternatives: the true-model oracle over-spends and
+is not a ceiling, a normalized PPO improves but does not win, and a black-box
+NN-MPC is worst---so neither insufficient fidelity nor interpretability is the
+bottleneck. The interpretable surrogate's demonstrable value lies instead in safety
+and out-of-distribution guarding, not in economic supremacy. We conclude that
+parsimony is not interpretability, that sparsity must be removed from
+model-selection objectives when the downstream task is closed-loop control, and
+that open-loop-frozen pre-registration can systematically certify a
+control-catastrophic model.
+\end{abstract}
+
+%% Highlights are submitted as a separate file (see highlights.txt); elsarticle
+%% does not define a `highlights' environment, so they are not included here.
+
+\begin{keyword}
+greenhouse climate control \sep model predictive control \sep
+sparse identification of nonlinear dynamics \sep interpretable machine learning \sep
+identification for control \sep economic benchmarking
+\end{keyword}
+
+\end{frontmatter}
+
+%% ===========================================================================
+\section{Introduction}
+\label{sec:intro}
+
+Greenhouse horticulture is an energy-intensive industry in which climate control
+decisions translate directly into profit: heating, CO\textsubscript{2} enrichment
+and supplemental lighting are the dominant variable costs, and they must be balanced
+against the revenue from crop growth. Model predictive control (MPC) is a natural
+fit, since it optimises a finite-horizon objective subject to the temperature,
+humidity and CO\textsubscript{2} constraints that define a productive climate
+\citep{vanhenten1994thesis,mayne2000constrained,lin2021greenhousempc}. MPC, however,
+needs a model, and first-principles greenhouse models are laborious to build and
+calibrate. This has motivated data-driven surrogates, and in particular sparse
+identification of nonlinear dynamics (SINDy), which recovers explicit governing
+equations as a sparse combination of candidate terms
+\citep{brunton2016sindy,brunton2016sindyc,kaiser2018sindympc}. Unlike neural
+surrogates, a SINDy model is a glass box: its equations can be read, sign-checked
+against physics, and embedded analytically in an MPC solver. For a grower or a
+certifying body, this interpretability is not a luxury but a practical requirement
+for trust and debugging.
+
+The central empirical question is whether interpretability costs performance---whether
+an interpretable SINDy-MPC is Pareto-competitive with black-box alternatives, or pays
+a measurable ``price of interpretability''. Answering it fairly is harder than it
+appears, because the greenhouse-control and learned-control literatures are prone to
+three benchmarking pathologies. First, \emph{untuned baselines}: learned controllers
+are frequently compared against a weak rule-based straw man, whereas a well-tuned
+agronomic heuristic is a strong competitor. Second, \emph{proxy metrics}:
+setpoint-tracking error is reported in place of economic profit, even though the two
+are not monotonically related. Third, and most subtly, \emph{open-loop model
+selection}: the surrogate's hyper-parameters are chosen by open-loop prediction
+accuracy, on the tacit assumption that a more accurate model yields better control.
+This last assumption is exactly what identification-for-control has warned against for
+three decades \citep{gevers1993,vandenhof1995closedloop}, and what objective mismatch
+has re-established for learned dynamics \citep{lambert2020objective,jacobiandmd2022}.
+
+We address all three by running a \textbf{pre-registered, in-silico economic
+benchmark}. The primary metric is the simulator's own economic performance indicator
+(EPI)---seasonal profit harvested directly from the reward model, not a proxy---and,
+because EPI does not penalise constraint violations, the primary comparison is a
+two-axis Pareto criterion (EPI versus violations). Baselines include a tuned
+rule-based heuristic and fairly implemented reinforcement-learning controllers under
+an equal hyper-parameter budget. The identification recipe is frozen by open-loop and
+transparency criteria \emph{before} any closed-loop evaluation, following
+pre-registration practice \citep{pineau2021repro}, precisely so that recipe selection
+cannot contaminate the honest comparison. We evaluate ten controllers over 20 seeds
+with paired non-parametric statistics
+\citep{wilcoxon1945,holm1979,efron1994bootstrap}.
+
+The pre-registered hypothesis---that SINDy-MPC is non-dominated with a low price of
+interpretability---is \textbf{not} confirmed. But the value of the benchmark is not
+the negative headline; it is the mechanism we uncover. The ten controllers function
+as a differential diagnosis that isolates \emph{why} the pre-registered interpretable
+controller underperforms, and the answer is specific and transferable.
+
+\paragraph{Contributions}
+(1) An \textbf{honest economic benchmark} on a validated agronomic simulator, with
+EPI verified term-for-term against the simulator's reward, a tuned rule-based
+baseline, an equal hyper-parameter budget, and 20-seed paired statistics---filling a
+gap left by RL-only greenhouse benchmarks \citep{vanlaatum2025greenlightgym}.
+(2) A \textbf{mechanism}: the STLSQ sparsity threshold silently removes the
+control-critical boiler actuator term, and closed-loop EPI causally tracks its
+presence while open-loop error does not.
+(3) A \textbf{pre-registration trap}: an open-loop-frozen recipe-selection procedure,
+the standard guard against circular inference, systematically selects the
+control-catastrophic model.
+(4) A \textbf{re-definition of interpretability's value}: transparency plus safety
+and out-of-distribution guarding, not economic supremacy---and the observation that
+\emph{parsimony is not interpretability}.
+
+%% ===========================================================================
+\section{Related work}
+\label{sec:related}
+
+\subsection{Greenhouse climate control}
+Optimal and predictive control of greenhouse climate spans van Henten's
+optimal-control formulation of the coupled climate--crop system
+\citep{vanhenten1994thesis,vanhenten2009timescale}, modern MPC
+\citep{lin2021greenhousempc,chenyou2020ddrmpc}, and stochastic optimal control under
+weather uncertainty \citep{vanmourik2023stochastic}. Reinforcement learning (RL) has
+been compared against MPC with mixed economic outcomes: RL can raise production but
+often at worse profitability
+\citep{morcego2023rlvsmpc,mallick2024rlmpc,adaptiverobust2025greenhouse}. Our
+simulator is GreenLight \citep{katzin2020greenlight,katzin2021led}, wrapped by
+GreenLight-Gym \citep{vanlaatum2025greenlightgym}. That benchmark, however, is an RL
+\emph{environment}---it provides a fast differentiable simulator and benchmarks RL
+algorithms---and does not perform an honest economic \emph{controller} comparison
+against a tuned rule-based baseline, nor does it consider interpretable
+sparse-identification surrogates or the open-loop/closed-loop selection question. Our
+study occupies that gap.
+
+\subsection{Sparse identification and SINDy-MPC}
+SINDy recovers parsimonious governing equations by sparse regression over a candidate
+library \citep{brunton2016sindy}, extends to actuated systems
+\citep{brunton2016sindyc}, and combines naturally with MPC in the low-data limit
+\citep{kaiser2018sindympc}. Robustness has been improved by ensembling
+\citep{fasel2022ensemble}, relaxed/constrained optimisation \citep{champion2020sr3},
+and mature tooling \citep{desilva2020pysindy,kaptanoglu2022pysindy}. The
+sequentially-thresholded least-squares (STLSQ) core is, however, sensitive to its
+sparsity threshold: too large a threshold removes physically important
+small-coefficient terms, degrading the dynamics
+\citep{cortiella2021sparse,mangan2017modelselection}, a problem that recent optimisers
+explicitly target \citep{balanceguided2026}. Prior work treats this as an
+\emph{identification} pathology and proposes better \emph{optimisers}; we instead
+\emph{diagnose} its consequence inside an economic MPC loop, with a causal link to
+profit, and show that a standard open-loop selection protocol walks straight into it.
+
+\subsection{Identification for control and objective mismatch}
+That open-loop prediction accuracy is a poor proxy for closed-loop control is a
+foundational message of identification-for-control: the loop, not the fit, must
+arbitrate model quality \citep{gevers1993,hjalmarsson1994closing,%
+vandenhof1995closedloop,hjalmarsson2005experiment}. The same phenomenon was sharpened
+for learned dynamics as \emph{objective mismatch}---one-step likelihood is not
+correlated with control performance \citep{lambert2020objective,wei2023unified}---with
+related remedies in value-aware and control-oriented model learning
+\citep{farahmand2017value,jacobiandmd2022,controlorientedsurvey2025}. Our contribution
+is neither the general principle nor a new remedy, but a concrete, interpretable, and
+causally verified instance of it: because our surrogate is a glass box, the failure is
+legible term-by-term---a single removed actuator---rather than diagnosed by
+re-weighting a black-box model. To restore the term we use dataset aggregation
+(DAgger) \citep{ross2011dagger}, an established bridge between an MPC expert and a
+learned model \citep{sun2017deeply,tagliabue2021guided,espin2024deepmpc}.
+
+%% ===========================================================================
+\section{Methods}
+\label{sec:methods}
+
+\subsection{Primary metric: economic performance indicator (EPI)}
+All controllers are scored by the simulator's own economics rather than a proxy. At
+each step the GreenLight reward model returns a profit $\pi_k = g_k - c_k$, where the
+gain $g_k = (x^{\mathrm{fruit}}_k - x^{\mathrm{fruit}}_{k-1})\,\tfrac{10^{-6}}{\mathrm{dmfm}}\,p_{\mathrm{fruit}}$
+is the revenue from fruit dry-matter growth (converted to fresh weight through the
+dry-to-fresh ratio $\mathrm{dmfm}=0.065$ and priced at
+$p_{\mathrm{fruit}}=1.6~\mathrm{EUR/kg}$), and the variable cost $c_k$ sums heating,
+lighting and CO\textsubscript{2} dosing priced at $0.09~\mathrm{EUR/kWh}$,
+$0.30~\mathrm{EUR/kWh}$ and $0.30~\mathrm{EUR/kg}$. The seasonal indicator is
+$\mathrm{EPI}=\sum_k \pi_k$ $[\mathrm{EUR/m^2}]$. We verified that the per-step
+economics used by every controller (and by the oracle, Section~\ref{sec:oracle}) are
+\emph{identical} term-for-term to the simulator's reward, so EPI is the ground-truth
+objective and not an approximation.
+
+EPI intentionally omits constraint penalties. Because a controller can raise EPI by
+spending more time outside the productive corridors (CO\textsubscript{2}$\in[300,1600]$~ppm,
+$T\in[15,34]~^\circ$C, RH$\in[50,85]\%$), the primary comparison is a \textbf{two-axis
+Pareto criterion}---EPI versus the seasonal count of violation steps---reported with a
+non-dominated frontier (Fig.~\ref{fig:pareto}). As a secondary, dimensionally
+consistent severity scalar we report \texttt{scaled\_pen}, the violation area per
+constraint normalised by the simulator's own scaling. We deliberately do not combine
+EPI and violations into a single ``EUR-penalised EPI'', since the simulator does not
+price violations and any conversion would be arbitrary.
+
+\subsection{Simulator, location and data}
+Experiments use the GreenLight tomato model \citep{katzin2020greenlight} through the
+GreenLight-Gym interface \citep{vanlaatum2025greenlightgym}. The location is
+Rostov-on-Don ($47.24^\circ$N, $39.71^\circ$E); real weather for 2018--2023 is from
+ERA5/ERA5-Land via Open-Meteo, with derived sky and soil terms. A season is 60 days
+starting 1 March, at a 15-minute control period. We use a leakage-free year split:
+training on 2018--2019, in-distribution test on 2020, and 2021--2023 held out as
+out-of-distribution (OOD). Identification data are collected by the rule-based
+controller augmented with a pseudo-random binary excitation signal (PRBS, amplitude
+$0.3$) on the actuators, with the regression condition number monitored.
+
+\subsection{Controllers}
+\label{sec:controllers}
+We compare \textbf{ten controllers} spanning five families
+(Table~\ref{tab:controllers}): a tuned \textbf{rule-based} agronomic heuristic (the
+lower reference and the DAgger expert); the proposed \textbf{SINDy-MPC} in four
+variants---the pre-registered \emph{confirmatory} recipe, a boiler-preserving
+\emph{dense} recipe, and DAgger-repaired versions of each; a reduced first-principles
+\textbf{grey-box MPC} that reuses the same solver; a \textbf{neural-network MPC}
+(NN-MPC, $64{\times}64$ surrogate); two reinforcement-learning policies, \textbf{PPO}
+\citep{schulman2017ppo} and \textbf{SAC} \citep{haarnoja2018sac}, via
+Stable-Baselines3 \citep{raffin2021sb3}; and an \textbf{oracle} MPC that plans over
+the true simulator dynamics (Section~\ref{sec:oracle}). All learned controllers
+receive an equal hyper-parameter budget (16 trials). RL is trained for
+$2\times10^5$ environment steps with observation and reward normalisation
+(VecNormalize), whose omission we found to distort the RL result badly
+(Section~\ref{sec:rlnn}).
+
+\subsection{Proposed pipeline and pre-registration}
+\label{sec:prereg}
+The proposed method is a four-stage pipeline: (i) collect data with the rule-based
+controller plus PRBS; (ii) identify an interpretable discrete one-step map
+$x_{k+1}=\Xi\,\Theta(x_k,u_k,d_k)$ by sparse regression, degree~1 for analytic MPC
+embeddability; (iii) embed the surrogate in a CasADi/do-mpc solver that optimises an
+EPI-aligned objective under the climate constraints on a finite horizon; and (iv)
+optionally adapt online (DAgger or EKF-SINDy) with an OOD monitor and a safe fallback.
+The \textbf{identification recipe}---denoising, optimiser and library---is not fixed a
+priori: it is selected in an ablation (E2) and then \emph{frozen} by open-loop
+identification metrics (multi-step rollout stability, MPC-embeddability, transparency)
+\textbf{before and independently of} any closed-loop EPI on the held-out test season.
+This pre-registration guards against circular inference. The frozen \emph{confirmatory}
+recipe is a \texttt{physics\_no\_cross} library, degree~1, ensemble optimiser; a
+closed-loop-selected \emph{exploratory} recipe is recorded separately and reported
+only as post-hoc sensitivity. The identical frozen recipe is loaded by every
+downstream experiment through a single source of truth.
+
+\subsection{Gates and statistics}
+\label{sec:stats}
+A model is admitted only if it passes a \textbf{transparency} gate (glass-box
+equations, a threshold fraction of passed physical sign/dimension checks, bootstrap
+structural stability of the active-term set) and an \textbf{MPC-embeddability} gate.
+These gates are, deliberately, open-loop; the consequences are the subject of
+Section~\ref{sec:mechanism}. The valid source of variance is the re-collection of
+training data \emph{per seed}: each seed re-collects the identification dataset and
+re-fits the surrogate, so per-seed models genuinely differ. We use 20 seeds for all
+controllers; SAC converged on only 10 of 20 and is reported on those. Pairwise
+comparisons use the Wilcoxon signed-rank test paired by seed \citep{wilcoxon1945} with
+Holm correction \citep{holm1979}, reporting Cohen's $d$ and bootstrap 95\% confidence
+intervals \citep{efron1994bootstrap,demsar2006}.
+
+\subsection{The oracle}
+\label{sec:oracle}
+The oracle is a receding-horizon cross-entropy-method (CEM) controller that plans
+directly over the true simulator integrator (48 sampled action sequences, a 3-hour
+horizon, two refinement iterations, warm-started from the rule-based action), with the
+same economic objective as the MPC. The gap between it and a surrogate-based MPC
+isolates model fidelity. It is, however, \textbf{not} an upper bound on seasonal EPI:
+a short receding horizon greedily maximises short-horizon profit, and the sampling
+optimiser degrades at longer horizons. We treat it as a fidelity control, not a
+ceiling (Section~\ref{sec:oracleresult}).
+
+%% ===========================================================================
+\section{Results}
+\label{sec:results}
+
+We report the benchmark not as a leaderboard but as a \textbf{differential
+diagnosis}: the controller cast is an elimination structure whose purpose is to
+explain why the pre-registered interpretable controller underperforms and to rule out
+the obvious alternative causes. Table~\ref{tab:scorecard} summarises the verdicts on
+the pre-registered hypotheses; the subsections supply the evidence.
+
+\subsection{Identification ladder and the frozen recipe}
+The E2 ablation over denoising, optimiser, library and degree (42 recipes) selected,
+by open-loop rollout stability and the transparency and embeddability gates, a
+\texttt{physics\_no\_cross}/degree-1/ensemble recipe as the \emph{confirmatory}
+recipe, frozen before any closed-loop evaluation. Multi-step rollout divergence is
+negligible for this recipe (diverged-trajectory fraction $\approx 0$ for budgets
+$\ge 3$ days), so it passes the open-loop bar that pre-registration relies on.
+Hypothesis \textbf{H2} (a stable-rollout recipe exists) is thus met---but, as
+Section~\ref{sec:mechanism} shows, open-loop stability is necessary and not sufficient.
+
+\subsection{Closed-loop economic benchmark}
+\label{sec:e3}
+Table~\ref{tab:e3main} reports the 20-seed closed-loop EPI, violations and severity
+for all ten controllers, with paired significance against the rule-based baseline;
+Fig.~\ref{fig:pareto} shows the EPI--violation Pareto plane. The result is clean and
+sobering for the proposed method. Only the DAgger-repaired SINDy-MPC reaches the top:
+$5.23\pm2.40~\mathrm{EUR/m^2}$, statistically indistinguishable from the rule-based
+$4.63$ ($\Delta=+0.59$, $p_{\mathrm{Holm}}=0.26$). \textbf{Every other controller is
+significantly worse than the tuned heuristic}, including the grey-box MPC ($3.79$,
+$p_{\mathrm{Holm}}=0.017$), PPO ($3.36$, $p_{\mathrm{Holm}}=0.001$), the
+pre-registered confirmatory SINDy-MPC ($1.18$, $p_{\mathrm{Holm}}=0.009$), SAC
+($-2.41$) and NN-MPC ($-5.09$, $p_{\mathrm{Holm}}\approx2\times10^{-5}$). The
+non-dominated frontier comprises the DAgger-repaired SINDy-MPC, the rule-based
+heuristic, PPO, and---only as a degenerate minimum-violation corner with negative
+EPI---SAC. On the severity axis the DAgger SINDy-MPC even accrues a lower total
+violation severity than the rule-based controller ($426$ vs $485$) despite more
+violation steps, which is why we report both axes. The pre-registered central
+hypothesis is therefore not confirmed; the only interpretable controller that matches
+the heuristic does so through a repair whose necessity we now explain.
+
+\subsection{The mechanism: sparsity hides the actuator}
+\label{sec:mechanism}
+The pre-registered confirmatory recipe is economically the weakest interpretable
+controller ($1.18\pm4.33$, against $4.63$ for the rule-based baseline and $3.79$ for
+the grey-box MPC that shares its solver and feature library). Crucially, this recipe
+was \emph{not} selected for weak closed-loop control---it was frozen, before any
+closed-loop evaluation, as the most parsimonious model passing the open-loop and
+transparency gates. The recipe our pre-registration certified as
+identification-optimal is thus the recipe that fails in the loop.
+
+We isolate the cause with a one-parameter ablation: holding the feature library
+(\texttt{physics\_no\_cross}, degree~1) and the MPC fixed, we sweep the STLSQ sparsity
+threshold $\lambda$ over $[10^{-6},10^{-1}]$ and, at each value and for 20 seeds,
+record (i) the number of surviving coefficients, (ii) the signed boiler coefficient in
+the temperature equation, $\Xi_{u_{\mathrm{Boil}}\rightarrow T_{\mathrm{in}}}$---the
+greenhouse's only modelled active heating actuator, (iii) the \emph{open-loop}
+rollout-RMSE of $T_{\mathrm{in}}$ on the deployment season, and (iv) the
+\emph{closed-loop} EPI (Fig.~\ref{fig:lambda}, Table~\ref{tab:lambda}).
+
+Two curves move in opposite directions. As $\lambda$ increases from $10^{-6}$ to
+$0.1$ the model becomes parsimonious (surviving terms $54\rightarrow20$) and the
+boiler coefficient decays and vanishes:
+$\Xi_{u_{\mathrm{Boil}}\rightarrow T_{\mathrm{in}}}\approx0.035$ for
+$\lambda\le0.02$, $0.032$ at $\lambda=0.03$, $0.006$ at $\lambda=0.05$, and exactly
+$0$ at $\lambda=0.1$. Closed-loop EPI tracks this collapse---from a peak of $4.67$ at
+$\lambda=0.02$ to $0.99$ at $\lambda=0.05$, precisely where the boiler term is
+thresholded out. Once the surrogate contains no heating actuator, the MPC cannot plan
+heating, and in a heating-dominated spring climate the loss is severe. The open-loop
+metric, by contrast, is almost inert: rollout-RMSE moves only from $2.25$ to $2.39$
+(a $6\%$ change) while EPI swings by a factor of five and the boiler term disappears.
+The pre-registered open-loop criterion is thus \emph{blind to the closed-loop failure
+it causes}. This is a concrete, physically legible instance of the objective mismatch
+between predictive accuracy and control performance
+\citep{lambert2020objective,jacobiandmd2022}, and a sparse-identification realisation
+of the identification-for-control principle that the closed loop must arbitrate model
+quality \citep{gevers1993,vandenhof1995closedloop}.
+
+If removal of the boiler term is the cause, restoring it should recover performance.
+Two independent interventions do (Table~\ref{tab:e3main}). A dense recipe
+(\texttt{stlsq}, $\lambda=10^{-3}$) keeps
+$\Xi_{u_{\mathrm{Boil}}\rightarrow T_{\mathrm{in}}}\approx0.034$ and lifts EPI from
+$1.18$ to $3.81$; DAgger applied to the confirmatory recipe reintroduces the term
+through closed-loop data and lifts EPI to $5.23$, indistinguishable from the
+rule-based baseline. Across all SINDy-MPC variants, EPI is monotone in the presence of
+the boiler coefficient: whenever
+$\Xi_{u_{\mathrm{Boil}}\rightarrow T_{\mathrm{in}}}\neq0$, EPI rises from $\approx1$ to
+$4$--$5~\mathrm{EUR/m^2}$. The boiler coefficient is a one-dimensional causal proxy
+for economic competence.
+
+Finally, the dense fix is not a black box: it is the same glass-box map with more
+non-zero terms, and the repaired dense SINDy-MPC ($3.81$) coincides with the
+first-principles grey-box MPC ($3.79$) to within noise
+(Fig.~\ref{fig:pareto}). Once over-sparsification is removed, the data-driven
+interpretable surrogate collapses onto the physical model it was meant to replace.
+What sparsity removed was neither accuracy nor transparency but the
+\emph{controllability} conferred by a single small-magnitude actuator term. Two
+consequences follow: \texttt{sparsity} should not be a model-selection objective when
+the task is closed-loop control \citep{farahmand2017value,cortiella2021sparse,%
+balanceguided2026}, and a transparency gate that certifies a model whose key actuator
+has been zeroed is incomplete---a dropped key actuator should itself be a gate failure.
+
+\subsection{Ruling out model fidelity: the oracle over-spends}
+\label{sec:oracleresult}
+If the surrogate simply were not accurate enough, an MPC over the \emph{true} model
+should win. It does not: the oracle returns only $1.99\pm0.68~\mathrm{EUR/m^2}$
+(Table~\ref{tab:e3main}), below the heuristic, the DAgger and dense/grey-box models,
+and PPO. A horizon probe explains why: EPI \emph{falls} rather than rises with horizon
+($+0.26$ at 3~h, $+0.04$ at 12~h, $-0.51$ at 24~h on a 14-day window where the
+rule-based controller scores $+0.63$). Fruit growth and revenue rise toward the
+heuristic's level as the horizon lengthens, but cost---chiefly electricity and
+CO\textsubscript{2}---rises faster, so the oracle attains comparable production more
+expensively. This is greedy over-spend from a short receding horizon, not a fidelity
+deficit, and it means the ``gap-to-oracle'' framing (hypothesis \textbf{H1}) is not a
+meaningful ceiling here. Importantly, this is a structural property of short-horizon
+economic MPC, not an experimental error: the oracle correctly maximises the very
+quantity the simulator rewards, only greedily and over too short a window.
+
+\subsection{Ruling out an interpretability bottleneck: RL and NN-MPC}
+\label{sec:rlnn}
+Would a black-box learner have won? No. First, RL baselines are treacherous without
+normalisation: a naive PPO scores $-13~\mathrm{EUR/m^2}$, but standard
+observation/reward normalisation lifts it to $+3.4$---a reproducibility lesson, not a
+property of RL \citep{henderson2018matters}. Even so, at 20 seeds the normalised PPO
+($3.36$) remains significantly below the heuristic, and SAC is unstable, diverging on
+10 of 20 seeds. Second, the black-box NN-MPC is the worst controller in the study
+($-5.09~\mathrm{EUR/m^2}$), beaten by every interpretable SINDy variant.
+Interpretability is not what costs the win.
+
+\subsection{Online adaptation is a null}
+\label{sec:e4}
+Under spring OOD shifts (2021--2023, same planting season), the offline surrogate
+already generalises well---mean EPI $\approx0$, beating the rule-based controller's
+$-2.9$ under the same shift---leaving little gap for adaptation. Over 60
+(shift $\times$ seed) pairs, DAgger improves on the static offline model by only
+$+0.39~\mathrm{EUR/m^2}$ ($p=0.088$, not significant), and online EKF-SINDy is
+significantly \emph{worse} ($-2.17$, $p<10^{-6}$); an earlier smaller sample ($n=9$)
+suggesting a significant DAgger gain does not survive. Hypothesis \textbf{H4a} is not
+supported. The failure under shift is not gradual coefficient drift but a data
+problem: single-season on-shift data are intrinsically confounded
+($\mathrm{corr}(u_{\mathrm{Vent}},T_{\mathrm{in}})=+0.67$ against $+0.03$ for
+multi-year offline data), so a re-fit mislearns the ventilation effect. What confers
+OOD robustness is structure (keeping the boiler term) and guarding, not coefficient
+adaptation.
+
+\subsection{Where the interpretable model pays off: safety and OOD guarding}
+\label{sec:safety}
+The demonstrable value of the transparent surrogate is safety. Its two epistemic
+signals---Mahalanobis distance on the exogenous inputs \citep{mahalanobis1936,%
+lee2018mahalanobis} and ensemble prediction variance \citep{lakshminarayanan2017ensembles}---correlate
+with error and profit (Mahalanobis: $+0.63$ with rollout-RMSE, $-0.50$ with EPI;
+ensemble std: $-0.57$ with EPI). Gating the controller on the Mahalanobis signal, with
+a fallback to the rule-based policy on OOD steps, cuts seasonal violations from $1723$
+to $863$ (a $50\%$ reduction) while \emph{improving} EPI (from $-2.06$ to $-1.48$); the
+reduction is highly significant over 200 pairs ($p\approx10^{-24}$). Under injected
+faults (Table~\ref{tab:e7}), a residual-based supervisor with the same fallback
+significantly mitigates all six fault types, reducing violations by $1304$ steps on
+average ($p\approx6\times10^{-21}$, 120 pairs). Hypothesis \textbf{H4b} is the study's
+strongest positive result.
+
+\subsection{Robustness of the ranking}
+\label{sec:e6}
+A sensitivity analysis (Fig.~\ref{fig:tornado}) shows the ranking is governed by
+prices far more than design choices: the EPI range from the fruit price ($19.7$) and
+energy price ($13.3~\mathrm{EUR/m^2}$) dwarfs surrogate-coefficient uncertainty ($2.7$), the
+sparsity threshold ($1.3$) and the MPC horizon ($0.6$). The ranking is not robust to
+the energy price: when energy is expensive, the thrifty grey-box model overtakes the
+energy-intensive heuristic. The ``winner'' is thus an economic contingency as much as
+a control-design fact---further reason to report the Pareto structure, not a scalar.
+
+%% ===========================================================================
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Do not select a control surrogate by open-loop metrics}
+The central lesson is procedural. Our pre-registration froze the recipe by open-loop
+metrics to avoid circular inference---and thereby selected the model that fails in the
+loop, because that metric is blind to the closed-loop consequence
+(Section~\ref{sec:mechanism}). This is not an argument against pre-registration but
+against pre-registering the \emph{wrong} criterion. Two corrections follow. First,
+\textbf{sparsity should not be a model-selection objective} for closed-loop control: a
+small-coefficient term can be dynamically negligible for prediction yet
+control-critical. Control-relevant or value-aware selection
+\citep{farahmand2017value,jacobiandmd2022}, closed-loop-in-the-loop validation, or
+optimisers protecting small important terms
+\citep{balanceguided2026,cortiella2021sparse} are the remedies. Second, \textbf{the
+transparency gate is incomplete}: a gate that certifies a model whose only heating
+actuator has been zeroed is not verifying control-relevant transparency; a dropped key
+actuator, detectable against the known actuation structure, should be a gate failure.
+
+\subsection{Parsimony is not interpretability}
+It is tempting to read our negative result as a ``price of interpretability''. It is
+not. The repair that recovers performance---restoring the boiler term---does not
+sacrifice transparency: the dense model is the same glass-box map, less parsimonious.
+Strikingly, it coincides with the grey-box model to within noise ($3.81$ vs $3.79$):
+once over-sparsification is removed, the data-driven surrogate collapses onto the
+physical model it replaces. What sparsity destroyed was neither accuracy nor
+interpretability but \emph{controllability}. Optimising parsimony in the name of
+interpretability can silently break control.
+
+\subsection{Why a tuned heuristic is hard to beat}
+The heuristic's strength and the oracle's over-spend share a root cause. Seasonal
+profit is dominated by fruit growth over days to weeks, whereas a receding economic
+MPC with a several-hour horizon optimises near-term profit and greedily trims heating
+and CO\textsubscript{2} that would have paid off later
+(Section~\ref{sec:oracleresult}). A well-tuned rule set encodes, implicitly, the
+long-horizon trade-offs a short-horizon optimiser cannot see. The productive route to
+beating strong heuristics is therefore a genuinely long-horizon economic
+formulation---a terminal value function on crop state, or a gradient-based multi-day
+optimiser---which we identify as the key open problem.
+
+\subsection{Beyond greenhouses, and limitations}
+The mechanism is not specific to horticulture: any pipeline that identifies a sparse
+surrogate, selects sparsity by prediction-oriented criteria, and embeds it in a
+controller is exposed to the same failure. The greenhouse makes it vivid because the
+missing term is a named actuator whose coefficient we can watch track profit. Our
+claims are in-silico and do not transfer to a physical greenhouse without separate
+validation. The headline E3 result uses a single test season, so deterministic
+controllers have zero test-weather variance and the reported variance reflects
+surrogate re-identification only; a multi-season economic benchmark is needed to
+characterise variance fully. The DAgger parity comes at an additional closed-loop data
+budget (three aggregation iterations of five days). The oracle is a short-horizon CEM
+and not a ceiling. Finally, SAC converged on only 10 of 20 seeds and is reported as a
+robustness observation rather than a tuned competitor.
+
+%% ===========================================================================
+\section{Conclusions}
+\label{sec:conclusions}
+
+We measured the price of interpretability for sparse-identification MPC in greenhouse
+climate control under a protocol designed to be honest: economic profit from the
+simulator as the metric, a tuned rule-based baseline, fairly normalised RL, an equal
+hyper-parameter budget, and a recipe frozen by pre-registration. The pre-registered
+claim---SINDy-MPC Pareto-competitive at a low price of interpretability---was not
+confirmed. But the contribution is the mechanism it exposed. A tuned heuristic is a
+strong economic reference; the only interpretable controller that matches it does so
+through a repair, necessitated by a specific, transferable failure---the STLSQ
+threshold silently removes the control-critical boiler term, collapsing closed-loop
+profit while leaving open-loop error unchanged, so an open-loop pre-registered
+selection systematically certifies a control-catastrophic model. Read as a
+differential diagnosis, the cast rules out the intuitive alternatives: the true-model
+oracle over-spends and is no ceiling, a normalised PPO improves but does not win, and a
+black-box NN-MPC is worst. The value of the transparent surrogate is real but lies
+elsewhere than EPI: an OOD guard halves violations while improving profit, and a fault
+supervisor mitigates six fault modes. Parsimony is not interpretability, and sparsity
+does not belong among model-selection objectives when the downstream task is
+closed-loop control. Future work should pursue a genuine economic ceiling---a
+long-horizon or terminal-value controller accounting for multi-day fruit
+dynamics---control-relevant recipe selection immune to the sparsity trap, and sim-to-real
+validation.
+
+\section*{Reproducibility}
+All experiments are fully scripted and seed-controlled. We release the controller
+implementations, the pre-registered frozen recipe, the distributed 20-seed runners and
+mergers, and the analysis producing every table and figure. EPI is read from the
+simulator's reward model, and its per-step economics were verified term-for-term
+against the oracle's objective.
+
+%% ===========================================================================
+%% ===============================  TABLES  ==================================
+%% ===========================================================================
+
+\begin{table*}[t]
+\centering
+\caption{Controllers as differential diagnosis. The cast is an elimination structure:
+each controller answers a rival hypothesis for why the pre-registered interpretable
+method underperforms.}
+\label{tab:controllers}
+\small
+\begin{tabular}{@{}p{3.1cm}p{2.4cm}p{5.4cm}p{4.0cm}@{}}
+\toprule
+Controller & Class & Rival hypothesis it rules out & Answer from data \\
+\midrule
+Rule-based & tuned heuristic & Is there a strong simple target? (also DAgger expert) & Yes---EPI 4.63, the bar \\
+Grey-box MPC & reduced physics & Is the MPC/library itself weak? & No---3.79 works; isolates the threshold as cause \\
+SINDy-MPC (confirmatory) & proposed, pre-reg. & the method under test & Fails: 1.18 (boiler dropped) \\
+SINDy-MPC (dense/+DAgger) & proposed, repaired & Can the defect be fixed while interpretable? & Yes---3.8--5.2, still glass-box \\
+Oracle (3\,h CEM) & true-model MPC & Would a more accurate model fix it? & No---1.99, over-spends \\
+NN-MPC & black-box surrogate & Would a black-box surrogate win? & No---$-5.09$, worst \\
+PPO / SAC & black-box RL & Is interpretability the bottleneck? & No---both below the heuristic \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\begin{table*}[t]
+\centering
+\caption{E3 closed-loop economic benchmark (20 seeds), sorted by EPI. $\Delta$EPI and
+$p_{\mathrm{Holm}}$ are paired Wilcoxon vs Rule-based (Holm-corrected). Frontier
+$=$ non-dominated in (EPI $\uparrow$, violation-steps $\downarrow$). Rule-based and
+SINDy-MPC(conf+DAgger) are statistically tied at the top; all others are significantly
+worse.}
+\label{tab:e3main}
+\small
+\begin{tabular}{@{}lrrrrrrrc@{}}
+\toprule
+Controller & EPI & Viol. & scaled & $T$-corr & $n$ & $\Delta$EPI & $p_{\mathrm{Holm}}$ & Front. \\
+ & (EUR/m$^2$) & steps & pen & \% & & vs RB & & \\
+\midrule
+SINDy-MPC (conf+DAgger) & $5.23\pm2.40$ & 4302 & 426 & 62 & 20 & $+0.59$ & 0.26 (ns) & $\bullet$ \\
+Rule-based & $4.63\pm0.00$ & 2458 & 485 & 95 & 20 & --- & --- & $\bullet$ \\
+SINDy-MPC (dense) & $3.81\pm1.27$ & 6073 & 1206 & 65 & 20 & $-0.82$ & 0.017 & \\
+Grey-box MPC & $3.79\pm1.27$ & 6083 & 1209 & 65 & 20 & $-0.85$ & 0.017 & \\
+PPO & $3.36\pm1.59$ & 1842 & 392 & 84 & 20 & $-1.28$ & 0.001 & $\bullet$ \\
+SINDy-MPC (dense+DAgger) & $3.23\pm2.21$ & 4467 & 624 & 66 & 20 & $-1.40$ & 0.031 & \\
+Oracle (3\,h CEM) & $1.99\pm0.68$ & 2816 & 379 & 72 & 20 & $-2.65$ & 2e{-}5 & \\
+SINDy-MPC (confirmatory) & $1.18\pm4.33$ & 5357 & 793 & 50 & 20 & $-3.46$ & 0.009 & \\
+SAC & $-2.41\pm1.24$ & 1683 & 179 & 82 & 10 & $-7.04$ & 0.010 & $\bullet$ \\
+NN-MPC & $-5.09\pm3.11$ & 4368 & 767 & 70 & 20 & $-9.72$ & 2e{-}5 & \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\begin{table}[t]
+\centering
+\caption{Hypothesis scorecard (pre-registered H1--H4, 20-seed verdicts).}
+\label{tab:scorecard}
+\small
+\begin{tabular}{@{}p{2.0cm}p{2.0cm}p{3.2cm}@{}}
+\toprule
+Hypothesis & Verdict & Evidence \\
+\midrule
+Central & Not confirmed & conf+DAgger ties RB ($p{=}0.26$); confirmatory sig.\ worse \\
+H1 (gap-to-oracle) & Not met; framing broken & Oracle 1.99 $<$ RB/PPO/grey-box \\
+H2 (rollout stability) & Met, but insufficient & RMSE stable yet closed-loop collapses \\
+H3 (transparency) & Partial & beats NN-MPC; confirmatory $<$ grey-box \\
+H4a (adaptation) & Not supported & DAgger $+0.39$, $p{=}0.088$; EKF worse \\
+H4b (OOD guard) & Supported (strong) & guard $-50\%$ viol, $p{\approx}10^{-24}$ \\
+H4c (no exploitation) & Partial & confirmatory over-violates; guard mitigates \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Sparsity-threshold sweep ($\lambda$) of the \texttt{physics\_no\_cross}
+degree-1 surrogate, 20 seeds. The boiler coefficient and closed-loop EPI collapse
+around $\lambda\!\approx\!0.05$ while open-loop rollout-RMSE stays flat.}
+\label{tab:lambda}
+\small
+\begin{tabular}{@{}rrrrr@{}}
+\toprule
+$\lambda$ & nonzero & $\Xi_{u_{\mathrm{Boil}}\to T_{\mathrm{in}}}$ & rollout-RMSE & EPI \\
+\midrule
+$10^{-6}$ & 54.0 & 0.036 & 2.25 & 3.79 \\
+$10^{-3}$ & 49.9 & 0.036 & 2.25 & 3.81 \\
+0.01 & 41.8 & 0.036 & 2.27 & 4.00 \\
+0.02 & 38.4 & 0.035 & 2.27 & 4.67 \\
+0.03 & 34.8 & 0.032 & 2.28 & 3.49 \\
+0.04 & 30.8 & 0.021 & 2.37 & 1.14 \\
+0.05 & 27.7 & 0.006 & 2.38 & 0.99 \\
+0.10 & 20.3 & 0.000 & 2.39 & 2.49 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Fault injection (E7): EPI and violation steps without/with the residual
+supervisor; fault-free baseline EPI $1.94$, viol.\ $2587$. The supervisor reduces
+violations for all six faults ($p\approx6\times10^{-21}$ overall).}
+\label{tab:e7}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Fault & EPI (unsup) & viol (unsup) & EPI (sup) & viol (sup) \\
+\midrule
+$T_{\mathrm{in}}$ stuck & 0.86 & 4163 & 0.99 & 2055 \\
+RH offset & $-0.07$ & 4125 & 0.90 & 2013 \\
+$u_{\mathrm{Vent}}$ dead & 2.01 & 3617 & 2.14 & 2558 \\
+$T_{\mathrm{in}}$ offset & 1.62 & 3412 & 1.12 & 2165 \\
+$u_{\mathrm{Lamp}}$ dead & 1.99 & 2574 & 2.40 & 1885 \\
+$u_{\mathrm{Boil}}$ stuck & $-3.18$ & 1816 & $-2.16$ & 1208 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%% ===========================================================================
+%% ==============================  FIGURES  ==================================
+%% ===========================================================================
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{e3_lambda_sweep_ablation.png}
+\caption{The mechanism. Sweeping the STLSQ sparsity threshold $\lambda$: closed-loop
+EPI (blue) collapses as the boiler coefficient $u_{\mathrm{Boil}}\!\to\!T_{\mathrm{in}}$
+(green) is thresholded to zero, while the open-loop rollout-RMSE (red) stays flat.
+Open-loop model selection is blind to the closed-loop failure.}
+\label{fig:lambda}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{e3_pareto_annotated.png}
+\caption{E3 Pareto plane (EPI $\times$ violations, 20 seeds). The non-dominated
+frontier (red) is rule-based, SINDy-MPC(conf+DAgger), PPO, and SAC (degenerate
+minimum-violation corner). The repaired dense SINDy-MPC coincides with the grey-box
+model---parsimony $\neq$ interpretability.}
+\label{fig:pareto}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{e6_sensitivity.png}
+\caption{Sensitivity (E6). The EPI range is dominated by prices (fruit, energy) far
+more than by design choices (surrogate-coefficient uncertainty, sparsity threshold, horizon); the
+ranking is not robust to the energy price.}
+\label{fig:tornado}
+\end{figure}
+
+%% ===========================================================================
+\bibliographystyle{elsarticle-num}
+\bibliography{../../articles/references}
+
+\end{document}
+
+\end{document}
