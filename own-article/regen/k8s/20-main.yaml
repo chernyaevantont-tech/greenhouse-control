@@ -1,0 +1,176 @@
+# The E3 table: 10 controllers x 4 test years x 20 seeds = 800 seasons.
+#
+# Four Jobs, split ONLY by per-run cost so one slow controller does not stretch every pod.
+# All four share the same config hash, so the merge is a concatenation, not a reconciliation.
+# Every wave shards round-robin by seed (completions = 20 = len(SEEDS)).
+#
+# Long pole = oracle_mpc. Note it now runs at horizon 20 (parity with the surrogate MPC)
+# rather than 12, and with the same 100-failure solver budget as everyone else, so it is
+# both slower and no longer silently truncated -- budget ~10 h wall at parallelism 20.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-main-cheap
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: cheap }
+spec:
+  completionMode: Indexed
+  completions: 20
+  parallelism: 20
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: cheap }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v1
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment main
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 20
+              --controllers rule_based,sindy_mpc_conf,sindy_mpc_dense,sindy_mpc_lowthr,nn_mpc
+              --tag "cheap${JOB_COMPLETION_INDEX}" --out /results/raw
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v1" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+# DAgger variants: 3 aggregation iterations x 5-day episodes on the TRAIN scenario before
+# the surrogate is frozen, so each seed pays ~3 extra MPC rollouts up front.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-main-dagger
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: dagger }
+spec:
+  completionMode: Indexed
+  completions: 20
+  parallelism: 20
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: dagger }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v1
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment main
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 20
+              --controllers sindy_mpc_conf_dagger,sindy_mpc_dense_dagger
+              --tag "dagger${JOB_COMPLETION_INDEX}" --out /results/raw
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v1" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+# RL wave. SAC pre-allocates a 200k-step replay buffer -> the memory request. Add
+# nvidia.com/gpu to requests AND limits (equal, integer) and drop parallelism to the GPU
+# quota if you want the accelerated path; the workload is CPU-viable either way.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-main-rl
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: rl }
+spec:
+  completionMode: Indexed
+  completions: 20
+  parallelism: 10
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: rl }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v1
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment main
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 20
+              --controllers ppo,sac
+              --tag "rl${JOB_COMPLETION_INDEX}" --out /results/raw
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v1" }
+          resources:
+            requests: { cpu: "2", memory: 6Gi }
+            limits: { cpu: "4", memory: 10Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+# Oracle wave -- the long pole. activeDeadlineSeconds is generous because horizon 20 with a
+# 100-failure budget can no longer bail out early the way the horizon-12/10-failure setup did.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-main-oracle
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: oracle }
+spec:
+  completionMode: Indexed
+  completions: 20
+  parallelism: 20
+  backoffLimit: 6
+  activeDeadlineSeconds: 172800
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: oracle }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v1
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment main
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 20
+              --controllers oracle_mpc
+              --tag "oracle${JOB_COMPLETION_INDEX}" --out /results/raw
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v1" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }

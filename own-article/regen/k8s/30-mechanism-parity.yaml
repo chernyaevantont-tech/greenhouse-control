@@ -1,0 +1,94 @@
+# The two supporting experiments. Both are cheap next to the main table.
+#
+# mechanism -- why the confirmatory surrogate fails, with the confound removed:
+#   lambda  13-point threshold sweep, extended PAST the point where the boiler coefficient
+#           first hits exactly zero. The 2026-07 grid stopped there, and at that point EPI
+#           was HIGHER than at the previous one -- which is why the sweep alone cannot
+#           carry the causal claim.
+#   knock   single-coefficient knock-out / knock-in. This is the causal experiment.
+#   cross   the same on the `physics` library, separating uBoil from the bilinear
+#           t_in*uBoil term that the 2026-07 run showed also carries heating.
+#
+# parity -- what the oracle's shortfall actually is:
+#   horizon 4-point oracle horizon sweep including h=20, the surrogate MPC's horizon, so
+#           "insufficient fidelity" is no longer confounded with "short horizon".
+#   replay  one-step vs free-run surrogate error, i.e. model error separated from
+#           optimiser error.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-mechanism
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: mechanism }
+spec:
+  completionMode: Indexed
+  completions: 20
+  parallelism: 20
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: mechanism }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v1
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment mechanism
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 20
+              --tag "mech${JOB_COMPLETION_INDEX}" --out /results/raw
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v1" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-parity
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: parity }
+spec:
+  completionMode: Indexed
+  completions: 20
+  parallelism: 20
+  backoffLimit: 6
+  activeDeadlineSeconds: 172800
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: parity }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v1
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment parity
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 20
+              --tag "par${JOB_COMPLETION_INDEX}" --out /results/raw
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v1" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }

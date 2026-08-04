@@ -1,0 +1,21 @@
+{
+  "regen_id": "regen-v2",
+  "role": "CONFIRMATORY — the primary result is reported against this recipe",
+  "recipe": {
+    "feature_variant": "physics_no_cross",
+    "library_degree": 1,
+    "optimizer": "ensemble",
+    "denoise": "none",
+    "threshold": 0.05
+  },
+  "selected_by": "pre-registered open-loop identification metrics: pareto(diverged_frac, rollout_rmse, sparsity); gates = MPC-embeddable + transparent (EXPERIMENT_PROTOCOL.md 1.4.1)",
+  "originally_frozen_at": "2026-06-29 11:57:06",
+  "restated_at": "2026-08-03",
+  "what_changed_vs_recipe_frozen_json": "The threshold is now EXPLICIT. The 2026-06-29 file omitted it, so the confirmatory model silently took article_experiment_utils.fit_sindy's function default (0.05). The value is unchanged — 0.05 is what was actually run — but it is now part of the artifact and of config_hash, so the recipe determines the model instead of merely describing it.",
+  "authority": "regen_config.CONFIRMATORY is the executable source of truth; this file is the human-readable record and MUST be kept identical to it.",
+  "companions": {
+    "dense": "physics_no_cross / degree 1 / stlsq / threshold 1e-3 — boiler-preserving repair",
+    "lowthr": "physics_no_cross / degree 1 / stlsq / threshold 1e-6 — formerly mislabelled grey_box_mpc; NOT a first-principles model (see README G-1)",
+    "cross": "physics / degree 1 / stlsq / threshold 1e-6 — adds the four bilinear terms incl. t_in*uBoil, for the interaction block only"
+  }
+}

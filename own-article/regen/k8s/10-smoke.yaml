@@ -1,0 +1,46 @@
+# Gate 0: --fast smoke over 2 seeds, ALL experiments, ~10 min.
+#
+# Nothing else may be submitted until this is green. Its output is NOT publishable
+# (3-day seasons, 1 DAgger iteration, 1500 RL steps) -- it exists to prove the image, the
+# volume, the config hash and every code path before ~250 CPU-hours are spent.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-smoke
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: smoke }
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: smoke }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v1
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python repro.py --selftest &&
+              for e in main mechanism parity ladder adapt guard faults design; do
+                python run_regen.py --experiment $e --seeds 0,1 --fast
+                  --tag smoke --out /results/smoke || exit 1;
+              done &&
+              python run_regen.py --merge --out /results/smoke &&
+              python make_tables.py --out /results/smoke &&
+              python verify_regen.py --smoke --out /results/smoke
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v1" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts:
+            - { name: results, mountPath: /results }
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }

@@ -1,0 +1,24 @@
+# Isolated namespace + results volume for regen-v2.
+#
+# Deliberately NOT the `greenhouse-e3` namespace/PVC: the whole point of the regeneration
+# is that no 2026-06/07 partial can end up in the merged tables. A fresh PVC makes that
+# structural rather than a matter of care.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: greenhouse-regen
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: regen-results
+  namespace: greenhouse-regen
+  labels:
+    app: greenhouse-regen
+spec:
+  accessModes:
+    - ReadWriteMany            # RWX: every shard pod writes its partial here
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 20Gi

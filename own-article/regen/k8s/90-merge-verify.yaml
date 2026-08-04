@@ -1,0 +1,40 @@
+# Merge + gate. Run only after all six waves report Complete.
+#
+# The merge concatenates every partial in /results/raw and derives EVERY table the paper
+# uses from that one file, so the lineage is single-source by construction. verify_regen.py
+# then runs the acceptance gates; a non-zero exit means the run is not publishable.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-merge
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: merge }
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: merge }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: merge
+          image: docker.io/agro/greenhouse-regen:v1
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python repro.py --fingerprint &&
+              python run_regen.py --merge --out /results/raw &&
+              python make_tables.py --out /results/raw &&
+              python verify_regen.py --out /results/raw
+          env:
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v1" }
+          resources:
+            requests: { cpu: "1", memory: 2Gi }
+            limits: { cpu: "2", memory: 4Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
