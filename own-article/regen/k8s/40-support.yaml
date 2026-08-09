@@ -33,7 +33,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: worker
-          image: docker.io/agro/greenhouse-regen:v1
+          image: docker.io/agro/greenhouse-regen:v2
           imagePullPolicy: IfNotPresent
           workingDir: /app/own-article/regen
           command: ["sh", "-c"]
@@ -44,7 +44,7 @@ spec:
               --tag "ladder${JOB_COMPLETION_INDEX}" --out /results/raw
           env:
             - { name: OMP_NUM_THREADS, value: "1" }
-            - { name: REGEN_IMAGE, value: "greenhouse-regen:v1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v2" }
           resources:
             requests: { cpu: "2", memory: 4Gi }
             limits: { cpu: "4", memory: 8Gi }

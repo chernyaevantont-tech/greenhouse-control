@@ -19,7 +19,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: merge
-          image: docker.io/agro/greenhouse-regen:v1
+          image: docker.io/agro/greenhouse-regen:v3
           imagePullPolicy: IfNotPresent
           workingDir: /app/own-article/regen
           command: ["sh", "-c"]
@@ -30,7 +30,7 @@ spec:
               python make_tables.py --out /results/raw &&
               python verify_regen.py --out /results/raw
           env:
-            - { name: REGEN_IMAGE, value: "greenhouse-regen:v1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v3" }
           resources:
             requests: { cpu: "1", memory: 2Gi }
             limits: { cpu: "2", memory: 4Gi }

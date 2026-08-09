@@ -157,7 +157,30 @@ LADDER_VARIANTS = ("raw", "physics", "physics_no_cross")
 LADDER_DEGREES = (1, 2)
 LADDER_OPTIMIZERS = ("stlsq", "sr3", "constrained", "ensemble")
 LADDER_DENOISE = ("none", "savgol", "kalman")
-LADDER_ROLLOUT_BUDGETS_DAYS = (1, 3, 7)
+# Open-loop rollout horizons for the ladder, IN STEPS -- the same defaults the original E2
+# used (`evaluate_sindy`'s `rollout_horizons=(4, 20, 96)`), i.e. 1 h / 5 h / 1 day.
+#
+# The first regen got this wrong and it produced a false alarm worth recording. The paper
+# says the frozen recipe barely diverges "при длине прогноза не менее 3 суток" -- literally
+# "at a forecast length of at least 3 days". That reads as a rollout horizon, so this
+# constant was named ..._BUDGETS_DAYS = (1, 3, 7) and fed to evaluate_sindy as horizons of
+# 96/288/672 steps -- up to SEVEN days of free running. Everything diverges over seven days:
+# the frozen recipe scored diverged_frac 0.21 and rollout RMSE 12.4 against the historical
+# E2's 0.0 and 2.76, on an identical fit (28 non-zero terms both times), and the harness
+# duly reported that the pre-registered recipe fails its own gates. It does not.
+#
+# `e2_stability_vs_budget.csv` settles it: `budget_days` there is the TRAINING-DATA budget
+# (1 day -> diverged 0.55, 3 days and up -> 0.0), not a forecast horizon. The manuscript's
+# wording conflates the two and should say "объём обучающих данных", not "длина прогноза".
+#
+# Deliberately NOT part of `_declared()`/config_hash: it only affects the ladder, and adding
+# it would invalidate the hash of every already-computed wave. The value is recorded per row
+# instead, so ladder provenance stays self-contained.
+LADDER_ROLLOUT_HORIZONS_STEPS = (4, 20, 96)
+
+# The training-data budget curve (E2's other axis). Not currently swept by the ladder;
+# kept here so the two ideas cannot silently merge again.
+LADDER_TRAIN_BUDGETS_DAYS = (1, 3, 7, 14, 30, 60)
 
 # E4 online adaptation: static surrogate vs data aggregation vs EKF/RLS, on the OOD years.
 ADAPT_MODES = ("static", "dagger", "ekf")
@@ -187,6 +210,12 @@ SENS_HORIZONS = (8, 12, 20, 30)
 SENS_THRESHOLDS = (0.01, 0.05, 0.1, 0.2)
 SENS_COEF_PERTURB = (0.1, 0.2, 0.3)
 SENS_PERTURB_REPS = 2
+
+# Bootstrap draws per seed for the ensemble recipes (experiment `draws`).
+# Deliberately NOT in _declared()/config_hash: it adds a new experiment rather than changing
+# any existing one, and hashing it would invalidate every already-computed wave. Recorded
+# per row as `n_draws_declared` instead.
+ENSEMBLE_DRAWS = 10
 
 # Oracle optimiser budget: does a bigger search help, or is the horizon binding?
 ORACLE_BUDGETS = ((48, 2), (96, 3), (192, 4))

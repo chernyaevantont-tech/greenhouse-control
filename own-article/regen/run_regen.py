@@ -93,16 +93,27 @@ def pin_rng(*parts) -> int:
     return rs
 
 
-def fit_sindy_seeded(data, pc, *, seed: int, label: str, recipe: dict):
+def fit_sindy_seeded(data, pc, *, seed: int, label: str, recipe: dict, draw: int = 0):
     """The ONLY way this driver fits a surrogate: RNG pinned first, seed recorded in metadata.
 
     The recipe dict is folded into the RNG key, so two recipes on one seed get independent
     draws while a rerun of the same (seed, label, recipe) reproduces bit-for-bit.
     """
     key = ",".join(f"{k}={recipe[k]}" for k in sorted(recipe))
-    rs = pin_rng(C.REGEN_ID, "fit", label, key, seed)
+    # `draw` selects WHICH bootstrap realisation of an ensemble fit we take. It is folded
+    # into the RNG key only when non-zero, so draw=0 reproduces every earlier run bit for
+    # bit -- adding an argument to pin_rng would otherwise silently change the key, and with
+    # it every number already computed.
+    #
+    # Why this exists: for `optimizer="ensemble"` the bagging draw is a variance component
+    # of the same order as the seed-to-seed variance, and both the 2026-07 run and the first
+    # regen collapsed it to ONE realisation per seed reported as a point estimate. That is
+    # how the same pipeline produced "+2.43, first in all four seasons" and "-0.12, fourth".
+    # Sweeping `draw` turns it into a measured axis instead of an unstated one.
+    parts = [C.REGEN_ID, "fit", label, key, seed] + ([draw] if draw else [])
+    rs = pin_rng(*parts)
     b = U.fit_sindy(data, period=float(pc.period),
-                    metadata={"label": label, "rng_seed": rs}, **recipe)
+                    metadata={"label": label, "rng_seed": rs, "draw": int(draw)}, **recipe)
     return b
 
 
@@ -115,26 +126,32 @@ def _rng_of(model) -> int:
 
 # ── model construction (year-independent: fit once, roll on every test year) ──
 
-def build_model(ctrl: str, pc, train_s, seed: int, fast: bool):
+def build_model(ctrl: str, pc, train_s, seed: int, fast: bool, draw: int = 0):
     """Fit/train the year-independent model for one controller. None if it needs none.
 
     Leakage note: every branch below sees TRAIN years only. The DAgger loop
     (`D.dagger_final`) aggregates rollouts on the TRAIN scenario, so the refined surrogate
     is year-independent and the test season enters at rollout time only.
+
+    `draw` picks a bootstrap realisation for the ensemble-based recipes; 0 is the historical
+    behaviour and reproduces every earlier run exactly. It matters most for the DAgger
+    variants: `dagger_final` refits FOUR times (initial + 3 aggregation rounds), so each
+    round was an independent lottery on whether the boiler term survives -- which is why the
+    DAgger row moved so much more between runs than any single-fit controller.
     """
     recipe_of = {"sindy_mpc_conf": "confirmatory", "sindy_mpc_dense": "dense",
                  # `sindy_mpc_lowthr` was `grey_box_mpc`. Same estimator as `dense`, only
                  # threshold 1e-6. NOT a first-principles model -- README G-1.
                  "sindy_mpc_lowthr": "lowthr"}
     if ctrl in recipe_of:
-        return fit_sindy_seeded(train_s, pc, seed=seed, label=ctrl,
+        return fit_sindy_seeded(train_s, pc, seed=seed, label=ctrl, draw=draw,
                                 recipe=C.load_recipe(recipe_of[ctrl]))
     if ctrl in ("sindy_mpc_conf_dagger", "sindy_mpc_dense_dagger"):
         rec = C.load_recipe("confirmatory" if ctrl == "sindy_mpc_conf_dagger" else "dense")
         cfg_tr = pc.cfg_for(pc.train_scenarios()[0], seed=seed)
         iters = 1 if fast else C.DAGGER_ITERS
         # dagger_final refits internally; pinning once makes the WHOLE loop reproducible.
-        rs = pin_rng(C.REGEN_ID, "fit", ctrl, seed)
+        rs = pin_rng(C.REGEN_ID, "fit", ctrl, seed) if not draw else pin_rng(C.REGEN_ID, "fit", ctrl, seed, draw)
         b = D.dagger_final(train_s, cfg_tr, rec, iterations=iters,
                            episode_days=C.DAGGER_EPISODE_DAYS)
         b.metadata.setdefault("rng_seed", rs)
@@ -199,6 +216,31 @@ def score(df: pd.DataFrame, econ, pc) -> dict:
     m["steps_expected"] = expected
     m["season_fraction"] = round(steps / expected, 4) if expected else float("nan")
     m["truncated"] = bool(steps < expected)
+
+    # A short season has TWO causes, and conflating them is a real analysis error -- the
+    # first regen ran into it. `rollout_mpc` leaves the loop either because the solver
+    # failed once too often, or because the SIMULATOR ended the episode (`terminated or
+    # truncated`), which GreenLight does when the climate/crop state leaves its admissible
+    # range.
+    #
+    #   solver_aborted  the controller never got an action; the season says nothing about
+    #                   its economics and the run is not comparable. Exclude.
+    #   env_terminated  the controller drove the greenhouse into a state the simulator
+    #                   refuses to continue. That IS the economic outcome -- the grower
+    #                   loses the rest of the season -- and dropping it flatters exactly
+    #                   the controllers that wreck the house. Keep.
+    #
+    # Measured on the 2026-08-04 run: 20 oracle seasons in 2022 hit the solver budget,
+    # while 42 others (31 of them nn_mpc) were ended by the simulator with zero solver
+    # failures. Dropping all 62 removed 31 of nn_mpc's 80 seasons -- survivorship bias of
+    # the exact kind this paper criticises elsewhere.
+    #
+    # The break fires on failure number MAX+1 but the last recorded row still carries MAX,
+    # so the test is `>=`, not `>`.
+    sf = int(m.get("solver_failures", 0) or 0)
+    m["solver_aborted"] = bool(m["truncated"] and sf >= C.MAX_SOLVER_FAILURES)
+    m["stop_reason"] = ("complete" if not m["truncated"]
+                        else "solver_aborted" if m["solver_aborted"] else "env_terminated")
     return m
 
 
@@ -453,7 +495,8 @@ def merge(out: Path) -> int:
                        ("adapt", ["block", "condition", "seed", "test_year"]),
                        ("guard", ["block", "condition", "seed", "test_year"]),
                        ("faults", ["block", "condition", "seed", "test_year"]),
-                       ("design", ["block", "condition", "seed", "test_year"])):
+                       ("design", ["block", "condition", "seed", "test_year"]),
+                       ("draws", ["method", "draw", "seed", "test_year"])):
         parts = [p for p in sorted(glob.glob(str(out / f"{kind}_*.csv")))
                  if os.path.basename(p) != f"{kind}.csv" and os.path.getsize(p) > 0]
         if not parts:
@@ -525,6 +568,7 @@ def main() -> int:
         "guard",        # E5  shift detection + OOD guard
         "faults",       # E7  six fault modes x supervisor
         "design",       # E6  horizon / threshold / coefficient perturbation
+        "draws",        # bootstrap draw as a measured variance axis (ensemble recipes)
     ])
     ap.add_argument("--blocks", default="", help="mechanism/parity sub-blocks (default: all)")
     ap.add_argument("--seeds")
@@ -536,6 +580,7 @@ def main() -> int:
     ap.add_argument("--tag", default="local")
     ap.add_argument("--out", default="")
     ap.add_argument("--merge", action="store_true")
+    ap.add_argument("--draws", type=int, default=0, help="bootstrap draws per seed (experiment `draws`)")
     ap.add_argument("--fast", action="store_true", help="minutes-long smoke, NOT publishable")
     args = ap.parse_args()
 
@@ -561,7 +606,8 @@ def main() -> int:
     import experiments_support as X
     fn = {"main": exp_main, "mechanism": exp_mechanism, "parity": exp_parity,
           "ladder": X.exp_ladder, "adapt": X.exp_adapt, "guard": X.exp_guard,
-          "faults": X.exp_faults, "design": X.exp_design}[args.experiment]
+          "faults": X.exp_faults, "design": X.exp_design,
+          "draws": __import__("exp_draws").exp_draws}[args.experiment]
     rc = fn(args, seeds, pc, econ, out)
     _log(f"{args.experiment} tag={args.tag} DONE")
     return rc

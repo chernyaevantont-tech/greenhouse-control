@@ -19,6 +19,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
 
+import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 import regen_config as C  # noqa: E402
@@ -53,7 +54,24 @@ def _load(out: Path, name: str) -> pd.DataFrame | None:
     if not p.exists():
         gate(f"{name}.csv exists", False, f"missing {p}")
         return None
-    return pd.read_csv(p)
+    return _with_stop_reason(pd.read_csv(p))
+
+
+def _with_stop_reason(d: pd.DataFrame) -> pd.DataFrame:
+    """Derive `stop_reason` for runs produced before run_regen.score() recorded it.
+
+    The break fires on failure MAX+1 while the last written row still carries MAX, hence
+    `>=`. Keeps the 2026-08-04 output analysable without recomputing 356 CPU-hours.
+    """
+    if "stop_reason" in d.columns or "truncated" not in d.columns:
+        return d
+    tr = d["truncated"].astype(bool)
+    sf = d.get("solver_failures", pd.Series(0, index=d.index)).fillna(0)
+    d = d.copy()
+    d["stop_reason"] = np.where(~tr, "complete",
+                                np.where(sf >= C.MAX_SOLVER_FAILURES,
+                                         "solver_aborted", "env_terminated"))
+    return d
 
 
 def check_provenance(out: Path, frames: dict[str, pd.DataFrame]) -> None:
@@ -92,10 +110,23 @@ def check_main(d: pd.DataFrame) -> None:
 
     # G2 truncation -- an aborted season forgoes revenue AND cost, so its EPI is measured on
     # a different horizon. Previously silent: oracle truncated 40/80, nn_mpc 34/80.
-    if "truncated" in d:
-        t = d[d.truncated.astype(bool)]
-        by = t.groupby("method").size().to_dict() if len(t) else {}
-        gate("G2 no truncated seasons", len(t) == 0, f"{len(t)} truncated runs {by}")
+    # G2 short seasons. Only a SOLVER ABORT is disqualifying: the controller never produced
+    # an action, so the season says nothing about its economics. A simulator-terminated
+    # season is an outcome -- the controller drove the greenhouse somewhere GreenLight will
+    # not continue from, and the grower loses the rest of the year. Blocking on those would
+    # have thrown away 31 of nn_mpc's 80 seasons and flattered exactly the controller that
+    # wrecks the house, which is the survivorship bias this paper criticises elsewhere.
+    if "stop_reason" in d.columns:
+        ab = d[d.stop_reason == "solver_aborted"]
+        env = d[d.stop_reason == "env_terminated"]
+        gate("G2 no solver aborts", len(ab) == 0,
+             f"{len(ab)} solver aborts {ab.groupby('method').size().to_dict() if len(ab) else {}}")
+        gate("G2 simulator-terminated seasons (kept, reported)", True,
+             f"{len(env)} kept as outcomes "
+             f"{env.groupby('method').size().to_dict() if len(env) else {}}", blocking=False)
+    elif "truncated" in d.columns:
+        gate("G2 stop_reason recorded", False,
+             "no `stop_reason` column -- rerun with the current run_regen.score()")
     else:
         gate("G2 truncation recorded", False, "no `truncated` column")
 
@@ -199,9 +230,15 @@ def check_parity(d: pd.DataFrame) -> None:
         else:
             gate("G10 oracle at surrogate horizon", False,
                  f"h={C.HORIZON} absent -> fidelity and horizon stay confounded")
-        if "truncated" in hz:
+        # Same distinction as G2: a solver abort disqualifies the run, a simulator
+        # termination is a result about the oracle's own behaviour.
+        if "stop_reason" in hz.columns:
+            ab = int((hz.stop_reason == "solver_aborted").sum())
+            gate("G10 oracle: no solver aborts", ab == 0, f"{ab} solver-aborted oracle runs")
+        elif "truncated" in hz.columns:
             t = int(hz.truncated.astype(bool).sum())
-            gate("G10 oracle seasons complete", t == 0, f"{t} truncated oracle runs")
+            gate("G10 oracle seasons complete", t == 0,
+                 f"{t} truncated oracle runs (cause unknown: no `stop_reason`)")
 
 
 def main() -> int:

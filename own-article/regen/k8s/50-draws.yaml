@@ -1,0 +1,50 @@
+# The bootstrap draw as a MEASURED variance axis.
+#
+# `optimizer="ensemble"` resamples the identification data; which resample you get is random
+# and pysindy 2.1.0 exposes no random_state. Both the 2026-07 run and the first regen took
+# ONE realisation per seed and reported it as the method's performance -- which is how one
+# pipeline on one dataset produced "+2.43, first in all four seasons" and "-0.12, fourth".
+#
+# This sweeps draw = 0..9 for the two ensemble-based controllers and carries the STLSQ
+# `dense` at a single draw as a negative control (its spread across draws must be zero).
+# Sharded by seed like every other wave; ~2 h wall at parallelism 20.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-draws
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: draws }
+spec:
+  completionMode: Indexed
+  completions: 20
+  parallelism: 20
+  backoffLimit: 6
+  activeDeadlineSeconds: 172800
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: draws }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v4
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment draws
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 20
+              --draws 10
+              --tag "draws${JOB_COMPLETION_INDEX}" --out /results/raw
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v4" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }

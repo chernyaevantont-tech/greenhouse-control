@@ -44,7 +44,10 @@ def exp_ladder(args, seeds, pc, econ, out: Path) -> int:
     import run_regen as R
 
     rows, path = [], out / f"ladder_{args.tag}.csv"
-    budgets = C.LADDER_ROLLOUT_BUDGETS_DAYS[:2] if args.fast else C.LADDER_ROLLOUT_BUDGETS_DAYS
+    # Horizons in STEPS, matching the original E2. See regen_config for why this is not a
+    # day count -- the first regen fed 7-day horizons here and wrongly concluded that the
+    # pre-registered recipe fails its own open-loop gates.
+    horizons = C.LADDER_ROLLOUT_HORIZONS_STEPS[:2] if args.fast else C.LADDER_ROLLOUT_HORIZONS_STEPS
     variants = C.LADDER_VARIANTS[:2] if args.fast else C.LADDER_VARIANTS
     degrees = (1,) if args.fast else C.LADDER_DEGREES
     opts = ("stlsq", "ensemble") if args.fast else C.LADDER_OPTIMIZERS
@@ -64,12 +67,13 @@ def exp_ladder(args, seeds, pc, econ, out: Path) -> int:
                         row = {"block": "ladder", "condition": rec_id, "seed": s,
                                "variant": variant, "degree": degree, "optimizer": opt,
                                "denoise": den, "n_days_train": pc.n_days_train,
+                               "rollout_horizons": ",".join(str(h) for h in horizons),
                                **C.stamp()}
                         try:
                             b = R.fit_sindy_seeded(train, pc, seed=s, label=rec_id, recipe=rec)
                             row["nonzero"] = int(np.count_nonzero(b.model.coefficients()))
                             row["kappa"] = float(getattr(b, "condition_number", np.nan))
-                            row.update(_openloop_stability(b, train, budgets))
+                            row.update(_openloop_stability(b, train, horizons))
                             row.update(_transparency(b))
                             row["embeddable"] = _embeddable(b, pc, s)
                             row["secs"] = round(time.time() - t0, 1)
@@ -84,12 +88,16 @@ def exp_ladder(args, seeds, pc, econ, out: Path) -> int:
     return 0
 
 
-def _openloop_stability(bundle, data, budgets) -> dict:
-    """Multi-step rollout error and divergence fraction -- the frozen selection criteria."""
+def _openloop_stability(bundle, data, horizons) -> dict:
+    """Multi-step rollout error and divergence fraction -- the frozen selection criteria.
+
+    `horizons` are STEPS and are passed straight through. They used to be days, converted
+    here into steps; that turned E2's 1-day worst case into a 7-day one and made every
+    configuration look unstable. See regen_config.LADDER_ROLLOUT_HORIZONS_STEPS.
+    """
     out = {}
     try:
-        ev = U.evaluate_sindy(bundle, data, rollout_horizons=tuple(
-            int(b * 86400 // 900) for b in budgets))
+        ev = U.evaluate_sindy(bundle, data, rollout_horizons=tuple(int(h) for h in horizons))
         roll = ev[ev.metric_scope == "rollout"]
         t = roll[roll.state == "t_in"]
         if len(t):
@@ -148,12 +156,29 @@ def exp_adapt(args, seeds, pc, econ, out: Path) -> int:
     if args.fast:
         years = years[:1]
 
+    # Both surrogates here use the CONFIRMATORY (ensemble) recipe, so they carry the
+    # bootstrap-draw axis. Reporting one realisation per seed is exactly the defect the
+    # `draws` experiment exposed -- a single draw misplaced the DAgger variant by
+    # +0.81 EUR/m2 and reordered the field. Sweep it here too.
+    # fast mode still runs TWO draws: otherwise the smoke never exercises the loop it is
+    # meant to validate. Two is enough to catch a broken index or a missing column.
+    _d = int(getattr(args, "draws", 0) or 1)
+    n_draws = min(2, _d) if args.fast else _d
+
     for s in seeds:
         train = C.build_train_dataset(pc, seed=s, fast=args.fast)
-        static = R.fit_sindy_seeded(train, pc, seed=s, label="adapt_static",
-                                    recipe=C.load_recipe("confirmatory"))
-        dagger = R.build_model("sindy_mpc_conf_dagger", pc, train, s, args.fast)
-        for y in years:
+        for dr in range(n_draws):
+            static = R.fit_sindy_seeded(train, pc, seed=s, label="adapt_static", draw=dr,
+                                        recipe=C.load_recipe("confirmatory"))
+            dagger = R.build_model("sindy_mpc_conf_dagger", pc, train, s, args.fast, draw=dr)
+            _adapt_rollouts(R, rows, path, static, dagger, pc, econ, s, dr, years, args)
+    R._write(rows, path)
+    return 0
+
+
+def _adapt_rollouts(R, rows, path, static, dagger, pc, econ, s, dr, years, args) -> None:
+    """One (seed, draw): three adaptation modes over every OOD season."""
+    for y in years:
             pc_y = _year_cfg(pc, y)
             sc = C.test_scenario(pc_y, y)
             cfg = pc_y.cfg_for(sc, seed=s)
@@ -169,23 +194,22 @@ def exp_adapt(args, seeds, pc, econ, out: Path) -> int:
                                            start_date=sc["start_date"], objective="full",
                                            max_solver_failures=C.MAX_SOLVER_FAILURES)
                     else:
-                        R.pin_rng(C.REGEN_ID, "ekf", s, y)
+                        R.pin_rng(C.REGEN_ID, "ekf", s, y, dr)
                         df = U.rollout_mpc_ekf(static, cfg, n_days=pc_y.n_days_test,
                                                start_date=sc["start_date"],
                                                forgetting=C.EKF_FORGETTING, p0=C.EKF_P0,
                                                max_solver_failures=C.MAX_SOLVER_FAILURES)
                     m = R.score(df, econ, pc_y)
                     m.update({"block": "adapt", "condition": mode, "mode": mode,
-                              "seed": s, "test_year": y,
+                              "seed": s, "draw": int(dr), "test_year": y,
                               "secs": round(time.time() - t0, 1), **C.stamp()})
                     rows.append(m)
                     R._write(rows, path)
-                    R._log(f"seed {s} adapt/{mode} y{y} EPI={m.get('epi', float('nan')):.3f}")
+                    R._log(f"seed {s} draw {dr} adapt/{mode} y{y} "
+                           f"EPI={m.get('epi', float('nan')):.3f}")
                 except Exception as exc:  # noqa: BLE001
-                    R._log(f"seed {s} adapt/{mode} y{y} FAILED "
+                    R._log(f"seed {s} draw {dr} adapt/{mode} y{y} FAILED "
                            f"{type(exc).__name__}: {str(exc)[:120]}")
-    R._write(rows, path)
-    return 0
 
 
 # ── E5: distribution-shift detection and the OOD guard ───────────────────────
@@ -198,26 +222,42 @@ def exp_guard(args, seeds, pc, econ, out: Path) -> int:
     (b) the closed-loop effect of handing control to the rule base when the signal fires.
     """
     import run_regen as R
-    from sklearn.metrics import roc_auc_score
+
 
     rows, path = [], out / f"guard_{args.tag}.csv"
     years = [y for y in C.TEST_YEARS if y != C.IN_DIST_YEAR]
     if args.fast:
         years = years[:1]
 
+    # Same reason as exp_adapt: the guarded controller is fitted with the CONFIRMATORY
+    # (ensemble) recipe, and so is the spread estimator, so both carry the draw axis.
+    # fast mode still runs TWO draws: otherwise the smoke never exercises the loop it is
+    # meant to validate. Two is enough to catch a broken index or a missing column.
+    _d = int(getattr(args, "draws", 0) or 1)
+    n_draws = min(2, _d) if args.fast else _d
+
     for s in seeds:
         train = C.build_train_dataset(pc, seed=s, fast=args.fast)
-        b = R.fit_sindy_seeded(train, pc, seed=s, label="guard",
-                               recipe=C.load_recipe("confirmatory"))
-        maha = U.fit_mahalanobis(train)
-        R.pin_rng(C.REGEN_ID, "ens_var", s)
-        ens = U.fit_ensemble_for_variance(train, feature_variant=C.CONFIRMATORY["feature_variant"],
-                                          n_models=C.ENSEMBLE_VARIANCE_MODELS,
-                                          period=float(pc.period))
+        maha = U.fit_mahalanobis(train)                       # deterministic, draw-free
         d_train = U.mahalanobis_distances(maha, train.weather, train.time_enc)
         thr = float(np.quantile(d_train, C.GUARD_QUANTILE))
+        for dr in range(n_draws):
+            b = R.fit_sindy_seeded(train, pc, seed=s, label="guard", draw=dr,
+                                   recipe=C.load_recipe("confirmatory"))
+            R.pin_rng(C.REGEN_ID, "ens_var", s, dr)
+            ens = U.fit_ensemble_for_variance(
+                train, feature_variant=C.CONFIRMATORY["feature_variant"],
+                n_models=C.ENSEMBLE_VARIANCE_MODELS, period=float(pc.period))
+            _guard_rollouts(R, rows, path, b, maha, ens, thr, pc, econ, s, dr, years, args)
+    R._write(rows, path)
+    return 0
 
-        for y in years:
+
+def _guard_rollouts(R, rows, path, b, maha, ens, thr, pc, econ, s, dr, years, args) -> None:
+    """One (seed, draw): shift signals + guarded vs plain rollout on every OOD season."""
+    from sklearn.metrics import roc_auc_score
+
+    for y in years:
             pc_y = _year_cfg(pc, y)
             sc = C.test_scenario(pc_y, y)
             cfg = pc_y.cfg_for(sc, seed=s)
@@ -231,7 +271,7 @@ def exp_guard(args, seeds, pc, econ, out: Path) -> int:
                 dist, err = dist[:n], err[:n]
                 std = U.ensemble_pred_std(ens, test_d)[:n]
                 big = err > np.quantile(err, 0.9)
-                rows.append({"block": "signal", "condition": "mahalanobis", "seed": s,
+                rows.append({"block": "signal", "condition": "mahalanobis", "seed": s, "draw": int(dr),
                              "test_year": y, "threshold": thr,
                              "r_dist_err": float(np.corrcoef(dist, err)[0, 1]),
                              "r_std_err": float(np.corrcoef(std, err)[0, 1]),
@@ -251,18 +291,16 @@ def exp_guard(args, seeds, pc, econ, out: Path) -> int:
                                                    start_date=sc["start_date"],
                                                    max_solver_failures=C.MAX_SOLVER_FAILURES)
                     m = R.score(df, econ, pc_y)
-                    m.update({"block": "guard", "condition": mode, "seed": s,
+                    m.update({"block": "guard", "condition": mode, "seed": s, "draw": int(dr),
                               "test_year": y, "threshold": thr,
                               "guard_activations": int(df.get("guard_active", pd.Series(dtype=int)).sum())
                               if "guard_active" in df else -1,
                               "secs": round(time.time() - t0, 1), **C.stamp()})
                     rows.append(m)
                 R._write(rows, path)
-                R._log(f"seed {s} guard y{y} thr={thr:.2f} ok")
+                R._log(f"seed {s} draw {dr} guard y{y} thr={thr:.2f} ok")
             except Exception as exc:  # noqa: BLE001
-                R._log(f"seed {s} guard y{y} FAILED {type(exc).__name__}: {str(exc)[:120]}")
-    R._write(rows, path)
-    return 0
+                R._log(f"seed {s} draw {dr} guard y{y} FAILED {type(exc).__name__}: {str(exc)[:120]}")
 
 
 def _one_step_abs_error(bundle, data) -> np.ndarray:

@@ -24,11 +24,16 @@ spec:
           workingDir: /app/own-article/regen
           command: ["sh", "-c"]
           args:
+            # NOTE: uniform indentation is load-bearing. In a YAML folded scalar (`>`) a
+            # line indented MORE than the first one keeps its newline instead of being
+            # folded into a space. An earlier version indented the loop body, so the shell
+            # received a line break in the middle of the run_regen.py invocation: the
+            # experiment ran with default --tag/--out and the orphaned flags then failed as
+            # a command of their own. Keep every line at the same column.
             - >
               python repro.py --selftest &&
               for e in main mechanism parity ladder adapt guard faults design; do
-                python run_regen.py --experiment $e --seeds 0,1 --fast
-                  --tag smoke --out /results/smoke || exit 1;
+              python run_regen.py --experiment $e --seeds 0,1 --fast --tag smoke --out /results/smoke || exit 1;
               done &&
               python run_regen.py --merge --out /results/smoke &&
               python make_tables.py --out /results/smoke &&

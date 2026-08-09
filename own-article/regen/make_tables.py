@@ -106,8 +106,29 @@ def _holm(pvals: list[float]) -> list[float]:
 
 # ── tables ───────────────────────────────────────────────────────────────────
 
+def _usable(d: pd.DataFrame) -> pd.DataFrame:
+    """Rows whose economics are comparable: everything except solver aborts.
+
+    A simulator-terminated season is a RESULT, not a defect -- the controller drove the
+    greenhouse somewhere GreenLight will not continue from, and the truncated EPI is what
+    the grower actually gets. Excluding it would drop 31 of nn_mpc's 80 seasons and flatter
+    precisely the controller that wrecks the house. Only a solver abort, where the
+    controller never produced an action, is genuinely uninformative.
+
+    `stop_reason` is written by run_regen.score(); it is derived here for runs produced
+    before that column existed, so old output stays analysable.
+    """
+    if "stop_reason" in d.columns:
+        return d[d.stop_reason != "solver_aborted"]
+    if "truncated" not in d.columns:
+        return d
+    tr = d["truncated"].astype(bool)
+    sf = d.get("solver_failures", pd.Series(0, index=d.index)).fillna(0)
+    return d[~(tr & (sf >= C.MAX_SOLVER_FAILURES))]
+
+
 def table_main(d: pd.DataFrame, tdir: Path, claims: list) -> None:
-    valid = d[~d["truncated"].astype(bool)] if "truncated" in d.columns else d
+    valid = _usable(d)
     by_year = (valid.groupby(["test_year", "method"])
                .agg(epi_mean=("epi", "mean"), epi_std=("epi", "std"),
                     epi_median=("epi", "median"),
@@ -171,7 +192,7 @@ def table_prices(d: pd.DataFrame, tdir: Path, claims: list) -> None:
     need = {"revenue", "cost_heat", "cost_co2", "cost_elec"}
     if not need <= set(d.columns):
         return
-    valid = d[~d["truncated"].astype(bool)] if "truncated" in d.columns else d
+    valid = _usable(d)
     base = valid[valid.test_year == C.IN_DIST_YEAR]
     if not len(base):
         return
@@ -301,6 +322,73 @@ def table_ladder(d: pd.DataFrame, tdir: Path, claims: list) -> None:
                    "tables/ladder.csv"))
 
 
+def table_draws(d: pd.DataFrame, tdir: Path, claims: list) -> None:
+    """The bootstrap draw as a measured variance axis (contribution B2).
+
+    Three products the single-draw protocol cannot deliver:
+      * variance decomposition -- how much spread is data (seed) vs bootstrap (draw);
+      * P(a method tops the field on ONE run) -- how lucky a single publication was;
+      * the boiler term's survival rate, which is the structural cause underneath both.
+
+    The STLSQ control (`sindy_mpc_dense`) must show a draw spread of exactly zero. If it
+    does not, the axis is leaking somewhere it should not and the rest is untrustworthy.
+    """
+    if d is None or not len(d) or "draw" not in d.columns:
+        return
+    usable = _usable(d)
+    per = usable.groupby(["method", "seed", "draw"]).epi.mean().reset_index()
+
+    rows = []
+    for m, g in per.groupby("method"):
+        # Between-seed: average out the draw, then look at the spread over seeds.
+        # Between-draw: average out the seed, then look at the spread over draws.
+        between_seed = g.groupby("seed").epi.mean().std(ddof=1)
+        between_draw = g.groupby("draw").epi.mean().std(ddof=1)
+        # Within-seed spread across draws, averaged -- the quantity a single-draw protocol
+        # silently discards.
+        within = g.groupby("seed").epi.std(ddof=1).mean()
+        rows.append({"method": m, "mean": g.epi.mean(), "sd_total": g.epi.std(ddof=1),
+                     "sd_between_seeds": between_seed, "sd_between_draws": between_draw,
+                     "sd_within_seed_across_draws": within,
+                     "n_seeds": g.seed.nunique(), "n_draws": g.draw.nunique()})
+    var = pd.DataFrame(rows).sort_values("sd_within_seed_across_draws", ascending=False)
+    var.to_csv(tdir / "draws_variance.csv", index=False)
+
+    ctrl = var[var.method == "sindy_mpc_dense"]
+    if len(ctrl):
+        claims.append(("Draw axis: STLSQ control spread (must be 0)",
+                       f"{ctrl.sd_within_seed_across_draws.iloc[0]:.2e}",
+                       "tables/draws_variance.csv"))
+    ens = var[var.method.isin(("sindy_mpc_conf", "sindy_mpc_conf_dagger"))]
+    for _, r in ens.iterrows():
+        claims.append((f"Variance split, {r.method}",
+                       f"within-seed across draws {r.sd_within_seed_across_draws:.2f} vs "
+                       f"between-seed {r.sd_between_seeds:.2f} EUR/m2",
+                       "tables/draws_variance.csv"))
+
+    # Boiler survival per method -- the structural cause of the spread above.
+    if "xi_uboil" in usable.columns:
+        sv = (usable.groupby(["method", "seed", "draw"]).xi_uboil.first().reset_index()
+              .assign(alive=lambda t: t.xi_uboil.abs() > 1e-12)
+              .groupby("method").alive.agg(["mean", "size"]).reset_index()
+              .rename(columns={"mean": "boiler_survival_rate", "size": "n_fits"}))
+        sv.to_csv(tdir / "draws_boiler_survival.csv", index=False)
+        for _, r in sv[sv.method.isin(("sindy_mpc_conf", "sindy_mpc_conf_dagger"))].iterrows():
+            claims.append((f"Boiler term survives, {r.method}",
+                           f"{r.boiler_survival_rate:.0%} of {int(r.n_fits)} fits",
+                           "tables/draws_boiler_survival.csv"))
+
+    # P(leads) across the (seed, draw) grid: how often would this method top a one-run study?
+    piv = per.pivot_table(index=["seed", "draw"], columns="method", values="epi")
+    if piv.shape[1] > 1:
+        lead = piv.idxmax(axis=1).value_counts(normalize=True).rename("p_leads").reset_index()
+        lead.columns = ["method", "p_leads"]
+        lead.to_csv(tdir / "draws_p_leads.csv", index=False)
+        claims.append(("P(method leads on a single run), across seed x draw",
+                       "; ".join(f"{r.method}={r.p_leads:.0%}" for _, r in lead.iterrows()),
+                       "tables/draws_p_leads.csv"))
+
+
 # ── driver ───────────────────────────────────────────────────────────────────
 
 def main() -> int:
@@ -321,11 +409,17 @@ def main() -> int:
         table_main(main_d, tdir, claims)
         table_prices(main_d, tdir, claims)
         if "truncated" in main_d.columns:
-            n_tr = int(main_d.truncated.astype(bool).sum())
-            claims.append(("Truncated seasons excluded", f"{n_tr} of {len(main_d)}",
-                           "main.csv (column `truncated`)"))
+            n_keep = len(_usable(main_d))
+            n_drop = len(main_d) - n_keep
+            n_env = int(main_d.truncated.astype(bool).sum()) - n_drop
+            claims.append((
+                "Short seasons: kept vs excluded",
+                f"{n_drop} of {len(main_d)} excluded (solver aborts); "
+                f"{n_env} simulator-terminated seasons KEPT as outcomes",
+                "main.csv (`stop_reason`)"))
     table_mechanism(load("mechanism"), tdir, claims)
     table_ladder(load("ladder"), tdir, claims)
+    table_draws(load("draws"), tdir, claims)
     for nm in ("parity", "adapt", "guard", "faults", "design"):
         table_simple(load(nm), nm, tdir, claims)
 

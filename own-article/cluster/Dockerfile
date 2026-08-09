@@ -35,7 +35,24 @@ COPY own-article/cluster/requirements-cluster.txt /app/requirements-cluster.txt
 # (it runs correctly on numpy 1.26.4 regardless). A single `pip install -r` therefore
 # fails with a resolver conflict, so install everything else first (numpy<2.0 wins), then
 # add pysindy WITHOUT its declared deps — exactly how the reference venv was assembled.
-RUN grep -v '^pysindy' /app/requirements-cluster.txt > /app/req-core.txt \
+# TORCH_INDEX_URL (optional): install torch from a dedicated index BEFORE the bulk install,
+# so the pin in req-core.txt is already satisfied and pip does not fetch the default wheel.
+# Empty (the default) keeps the historical behaviour exactly -- the CUDA wheel from PyPI --
+# so greenhouse-e3 images rebuild unchanged.
+#
+# Why it exists: the CUDA wheel plus its nvidia-* companions are ~3 GB, and on admin-01's
+# Wi-Fi (~300 kB/s) that is a 3-6 hour build. The regen workload never requests
+# nvidia.com/gpu -- RL is CPU-viable and no manifest asks for a GPU -- so for that image the
+# ~200 MB CPU wheel is the same computation for a fraction of the download:
+#   --build-arg TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
+# The resulting version reads 2.11.0+cpu, which satisfies the `torch==2.11.0` pin (PEP 440
+# local-version rules) and is recorded verbatim by repro.env_fingerprint(), so the swap is
+# visible in every result row's provenance rather than silent.
+ARG TORCH_INDEX_URL=""
+RUN if [ -n "$TORCH_INDEX_URL" ]; then \
+        python -m pip install --no-cache-dir torch==2.11.0 --index-url "$TORCH_INDEX_URL"; \
+    fi \
+    && grep -v '^pysindy' /app/requirements-cluster.txt > /app/req-core.txt \
     && python -m pip install --no-cache-dir -r /app/req-core.txt \
     && python -m pip install --no-cache-dir --no-deps pysindy==2.1.0
 

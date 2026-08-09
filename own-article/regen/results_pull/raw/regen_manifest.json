@@ -1,0 +1,130 @@
+{
+  "config_hash": "637c6b535a9e",
+  "controllers": [
+    "rule_based",
+    "sindy_mpc_conf",
+    "sindy_mpc_dense",
+    "sindy_mpc_lowthr",
+    "nn_mpc",
+    "sindy_mpc_conf_dagger",
+    "sindy_mpc_dense_dagger",
+    "ppo",
+    "sac",
+    "oracle_mpc"
+  ],
+  "dagger_episode_days": 5,
+  "dagger_iters": 3,
+  "git_sha": "unknown",
+  "horizon": 20,
+  "image": "greenhouse-regen:v1",
+  "lambda_grid": [
+    1e-06,
+    0.001,
+    0.01,
+    0.02,
+    0.03,
+    0.04,
+    0.05,
+    0.06,
+    0.07,
+    0.08,
+    0.1,
+    0.15,
+    0.2
+  ],
+  "location": "Rostov-on-Don",
+  "max_solver_failures": 100,
+  "nn_epochs": 300,
+  "nn_hidden": [
+    64,
+    64
+  ],
+  "noise_scale": 0.1,
+  "oracle_cem": {
+    "elite_frac": 0.2,
+    "n_iters": 2,
+    "n_samples": 48,
+    "sample_std": 0.3
+  },
+  "oracle_horizon_sweep": [
+    12,
+    20,
+    48,
+    96
+  ],
+  "oracle_sweep_seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "period": 900,
+  "prbs_scale": 0.3,
+  "recipes": {
+    "confirmatory": {
+      "denoise": "none",
+      "feature_variant": "physics_no_cross",
+      "library_degree": 1,
+      "optimizer": "ensemble",
+      "threshold": 0.05
+    },
+    "cross": {
+      "denoise": "none",
+      "feature_variant": "physics",
+      "library_degree": 1,
+      "optimizer": "stlsq",
+      "threshold": 1e-06
+    },
+    "dense": {
+      "denoise": "none",
+      "feature_variant": "physics_no_cross",
+      "library_degree": 1,
+      "optimizer": "stlsq",
+      "threshold": 0.001
+    },
+    "lowthr": {
+      "denoise": "none",
+      "feature_variant": "physics_no_cross",
+      "library_degree": 1,
+      "optimizer": "stlsq",
+      "threshold": 1e-06
+    }
+  },
+  "regen_id": "regen-v2",
+  "rl_train_steps": 200000,
+  "season_days": 60,
+  "season_start_md": "03-01",
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19
+  ],
+  "test_years": [
+    2020,
+    2021,
+    2022,
+    2023
+  ],
+  "train_years": [
+    2018,
+    2019
+  ]
+}
