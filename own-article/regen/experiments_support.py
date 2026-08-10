@@ -518,3 +518,72 @@ def exp_holdout(args, seeds, pc, econ, out):
                                f"div={row.get('diverged_frac', float('nan')):.3f}")
     R._write(rows, path)
     return 0
+
+
+# N-2 (регистр дефектов, G-4). Эталон на правилах назван в статье «настроенным», и на этом
+# держится весь довод о честности сравнения, — но артефакта настройки нет: уставки зашиты в
+# make_rule_based_controller, тогда как обучаемым регуляторам дан явный бюджет 16 попыток.
+# После N-7 это стало важнее: заголовок работы — «сырой набор обходит всех», а обойти
+# НЕнастроенный эталон куда слабее, чем настроенный.
+#
+# Перебираются экономически значимые уставки; диапазоны агрономически осмысленные, центр —
+# текущее зашитое значение.
+RB_TUNE_SPACE = {
+    "temp_setpoint_day":   (17.0, 23.0),   # сейчас 19.5
+    "temp_setpoint_night": (14.0, 20.0),   # сейчас 16.5
+    "co2_day":             (400.0, 1200.0),  # сейчас 800
+    "lamp_rad_sum_limit":  (5.0, 25.0),    # сейчас 10
+}
+RB_TUNE_TRIALS = 16                        # ровно бюджет RL-регуляторов
+
+
+def exp_tune_rb(args, seeds, pc, econ, out):
+    """N-2: перебор уставок эвристики на ОБУЧАЮЩИХ годах, затем прогон лучшей на тестовых.
+
+    Отбор идёт только по 2018-2019, тестовые сезоны 2020-2023 в нём не участвуют, поэтому
+    сравнение остаётся честным. Эвристика детерминирована, так что seed влияет лишь на
+    выбор пробных точек: один прогон на конфигурацию.
+    """
+    import run_regen as R
+
+    rows, path = [], out / f"tune_rb_{args.tag}.csv"
+    rng = np.random.default_rng(20260810)
+    trials = [dict(zip(RB_TUNE_SPACE, vals)) for vals in
+              zip(*[rng.uniform(lo, hi, RB_TUNE_TRIALS) for lo, hi in RB_TUNE_SPACE.values()])]
+    trials.insert(0, {})                    # нулевая попытка = текущие зашитые уставки
+
+    def score_on(years, params, tag):
+        vals = []
+        for y in years:
+            pc_y = _year_cfg(pc, y)
+            sc = C.test_scenario(pc_y, y) if y in C.TEST_YEARS else \
+                [s for s in pc.train_scenarios() if s["start_date"].startswith(str(y))][0]
+            cfg = pc_y.cfg_for(sc, seed=0)
+            df = U.rollout_rule_based(cfg, n_days=pc.n_days_test,
+                                      start_date=sc["start_date"], seed=0,
+                                      noise_scale=0.0, rb_params=params or None)
+            m = R.score(df, econ, pc)
+            m.update({"block": tag, "test_year": int(y), "seed": 0, **params, **C.stamp()})
+            rows.append(m)
+            R._write(rows, path)
+            vals.append(float(m.get("epi", np.nan)))
+        return float(np.mean(vals))
+
+    train_years = [int(s["start_date"][:4]) for s in pc.train_scenarios()]
+    best, best_epi = None, -np.inf
+    for i, params in enumerate(trials):
+        try:
+            epi = score_on(train_years, params, f"tune_trial{i}")
+        except Exception as exc:                                   # noqa: BLE001
+            R._log(f"попытка {i} FAILED {type(exc).__name__}: {str(exc)[:100]}")
+            continue
+        R._log(f"попытка {i:2d} обуч.EPI={epi:+.3f} {params}")
+        if epi > best_epi:
+            best, best_epi = params, epi
+    R._log(f"ЛУЧШАЯ на обучающих: EPI={best_epi:+.3f} {best}")
+
+    # и только теперь — тестовые сезоны, лучшей конфигурацией и исходной, для сравнения
+    score_on(list(C.TEST_YEARS), best or {}, "tuned_test")
+    score_on(list(C.TEST_YEARS), {}, "stock_test")
+    R._write(rows, path)
+    return 0

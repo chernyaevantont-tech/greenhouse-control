@@ -294,10 +294,18 @@ def _build_step_context(env):
     )
 
 
-def make_rule_based_controller():
+def make_rule_based_controller(**overrides):
+    """Агрономическая эвристика. Без аргументов — ровно те же уставки, что и раньше.
+
+    `**overrides` добавлены для N-2 (регистр дефектов, G-4): эталон называется в статье
+    «настроенным», но артефакта настройки не существует — значения ниже зашиты, а обучаемым
+    регуляторам дан явный бюджет в 16 попыток. Либо перебор проводится, либо слово
+    «настроенный» снимается. Пустой вызов остаётся побитово эквивалентным прежнему, поэтому
+    ни одно уже посчитанное число не меняется.
+    """
     from gl_gym.components.rule_based import RuleBasedController
 
-    return RuleBasedController(
+    params = dict(
         lamps_on=0,
         lamps_off=18,
         lamps_day_start=-1,
@@ -328,6 +336,8 @@ def make_rule_based_controller():
         co2Band=-100,
         useBlScr=1,
     )
+    params.update(overrides)
+    return RuleBasedController(**params)
 
 
 def observation_to_arrays(obs: dict) -> tuple[np.ndarray, np.ndarray]:
@@ -355,6 +365,7 @@ def collect_rule_based_dataset(
     noise_period: int | None = None,
     prbs_scale: float = 0.0,
     prbs_period: int = 16,
+    rb_params: dict | None = None,
 ) -> TrajectoryData:
     """Collect rule-based GreenLight trajectories with optional excitation.
 
@@ -372,7 +383,8 @@ def collect_rule_based_dataset(
     scenario = weather_scenario_from_date(start_date, cfg.location, cfg.growth_year)
 
     env = _make_env(cfg, n_days=cfg.n_days)
-    controller = make_rule_based_controller()
+    # rb_params: пусто -> прежнее поведение побитово (N-2, см. make_rule_based_controller)
+    controller = make_rule_based_controller(**(rb_params or {}))
     rng = np.random.default_rng(seed)
     obs, reset_info = env.reset(options={"scenario": scenario}, seed=seed)
     scenario = reset_info.get("scenario", scenario)
@@ -971,6 +983,7 @@ def rollout_rule_based(
     start_date: str | None = None,
     seed: int | None = None,
     noise_scale: float = 0.0,
+    rb_params: dict | None = None,
 ) -> pd.DataFrame:
     data = collect_rule_based_dataset(
         cfg,
@@ -978,6 +991,7 @@ def rollout_rule_based(
         start_date=start_date,
         seed=seed,
         noise_scale=noise_scale,
+        rb_params=rb_params,
     )
     df = data.to_frame()
     df["controller"] = "rule_based"

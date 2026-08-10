@@ -104,6 +104,9 @@ def _digest(arr) -> str:
     return hashlib.sha256(a.tobytes()).hexdigest()[:16]
 
 
+RL_IN_SELFTEST = False       # V4, включается ключом --rl
+
+
 def selftest(fast: bool = True) -> int:
     """Run the pipeline twice under identical seeds; every digest must match.
 
@@ -149,6 +152,24 @@ def selftest(fast: bool = True) -> int:
         d["rollout_epi"] = f"{float(df['profit'].sum()):.12e}" if "profit" in df else "n/a"
         d["rollout_states"] = _digest(df[list(U.STATE_NAMES)].to_numpy())
 
+        # V4: PPO/SAC were never covered here. The README states outright that "PPO/SAC
+        # reproducibility has not been re-verified under the new pinning", so the paper's
+        # blanket reproducibility claim was unsupported for two of its ten controllers.
+        # SB3 takes an explicit `seed=`, but its env resets, action sampling and torch
+        # init are separate streams -- whether they land identically has to be measured.
+        # Off by default because training is the expensive part; enable with --rl.
+        if RL_IN_SELFTEST:
+            for algo in ("ppo", "sac"):
+                seed_everything(0)
+                sc_tr = pc.train_scenarios()[0]
+                steps = 2000 if fast else pc.rl_train_steps
+                model = U.train_rl(algo, pc.cfg_for(sc_tr, seed=0), steps,
+                                   train_start_date=sc_tr["start_date"], seed=0)
+                par = model.policy.parameters() if hasattr(model, "policy") else []
+                flat = np.concatenate([p.detach().cpu().numpy().ravel() for p in par]) \
+                    if par else np.zeros(1)
+                d[f"{algo}_policy"] = _digest(flat)
+
         results[attempt] = d
         print(f"  attempt {attempt}: " + " ".join(f"{k}={v[:10]}" for k, v in d.items()))
 
@@ -170,11 +191,15 @@ def main() -> int:
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--fingerprint", action="store_true")
     ap.add_argument("--full", action="store_true", help="selftest on the real 60-day season")
+    ap.add_argument("--rl", action="store_true",
+                    help="V4: включить PPO/SAC в самотест (долго)")
     a = ap.parse_args()
     if a.fingerprint:
         print(json.dumps(env_fingerprint(), indent=2))
         return 0
     if a.selftest:
+        global RL_IN_SELFTEST
+        RL_IN_SELFTEST = bool(a.rl)
         return selftest(fast=not a.full)
     ap.print_help()
     return 1

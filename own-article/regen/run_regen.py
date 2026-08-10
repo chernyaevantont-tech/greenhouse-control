@@ -591,6 +591,7 @@ def main() -> int:
         "design",       # E6  horizon / threshold / coefficient perturbation
         "draws",        # bootstrap draw as a measured variance axis (ensemble recipes)
         "holdout",      # B-3: same open-loop selection, metrics on a HELD-OUT train year
+        "tune_rb",      # N-2: tune the rule-based reference on TRAIN years (G-4)
     ])
     ap.add_argument("--blocks", default="", help="mechanism/parity sub-blocks (default: all)")
     ap.add_argument("--seeds")
@@ -651,7 +652,7 @@ def main() -> int:
     fn = {"main": exp_main, "mechanism": exp_mechanism, "parity": exp_parity,
           "ladder": X.exp_ladder, "adapt": X.exp_adapt, "guard": X.exp_guard,
           "faults": X.exp_faults, "design": X.exp_design,
-          "holdout": X.exp_holdout,
+          "holdout": X.exp_holdout, "tune_rb": X.exp_tune_rb,
           "draws": __import__("exp_draws").exp_draws}[args.experiment]
     rc = fn(args, seeds, pc, econ, out)
     _log(f"{args.experiment} tag={args.tag} DONE")

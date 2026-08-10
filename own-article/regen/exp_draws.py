@@ -45,10 +45,18 @@ import numpy as np
 import regen_config as C
 
 
-# Controllers whose fit actually has a draw axis. The STLSQ pair is carried at a single
-# draw as a negative control: its spread across draws must be exactly zero.
-DRAW_CONTROLLERS = ("sindy_mpc_conf", "sindy_mpc_conf_dagger")
-CONTROL_CONTROLLERS = ("sindy_mpc_dense",)
+# Controllers whose fit actually has a draw axis. The STLSQ ones are carried at a single
+# draw as a negative control: their spread across draws must be exactly zero.
+#
+# `sindy_mpc_raw_ens` added 2026-08-10 (E-A). It is ensemble-based, so it carries the same
+# lottery, and after N-7 it is the HEADLINE controller (+4.07 EUR/m2, first in all four
+# seasons). Reporting it as a point estimate over an unmeasured draw axis would repeat
+# exactly the defect this experiment exists to fix -- and it is the same defect that
+# produced "+2.43, first in all four seasons" for a controller whose true mean is -0.12.
+# `sindy_mpc_raw` (STLSQ, same library) is the matched control: if the raw library's
+# advantage is real it must show up at zero draw spread too.
+DRAW_CONTROLLERS = ("sindy_mpc_conf", "sindy_mpc_conf_dagger", "sindy_mpc_raw_ens")
+CONTROL_CONTROLLERS = ("sindy_mpc_dense", "sindy_mpc_raw")
 
 
 def exp_draws(args, seeds, pc, econ, out: Path) -> int:
