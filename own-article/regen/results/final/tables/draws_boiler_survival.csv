@@ -1,0 +1,4 @@
+method,boiler_survival_rate,n_fits
+sindy_mpc_conf,0.12,200
+sindy_mpc_conf_dagger,0.81,200
+sindy_mpc_dense,1.0,20

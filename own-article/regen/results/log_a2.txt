@@ -1,0 +1,191 @@
+[regen] adapt tag=a2 seeds=[2] fast=False cfg=637c6b535a9e git=f8f1aef out=results\raw
+[regen] seed 2 draw 0 adapt/static y2021 EPI=-1.969
+[regen] seed 2 draw 0 adapt/dagger y2021 EPI=2.847
+[regen] seed 2 draw 0 adapt/ekf y2021 EPI=-1.516
+[regen] seed 2 draw 0 adapt/static y2022 EPI=-0.334
+[regen] seed 2 draw 0 adapt/dagger y2022 EPI=5.802
+CasADi - 2026-08-10 00:01:35 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:01:35 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:01:35 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:01:35 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:01:35 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:01:35 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:01:35 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:01:35 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:01:35 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:01:35 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+At t = 90.2794 and h = 5.93014e-05, the corrector convergence test failed repeatedly or with |h| = hmin.
+Error in ODE approximation
+[regen] seed 2 draw 0 adapt/ekf y2022 EPI=2.508
+[regen] seed 2 draw 0 adapt/static y2023 EPI=4.510
+[regen] seed 2 draw 0 adapt/dagger y2023 EPI=2.002
+[regen] seed 2 draw 0 adapt/ekf y2023 EPI=-5.010
+[regen] seed 2 draw 1 adapt/static y2021 EPI=-2.104
+[regen] seed 2 draw 1 adapt/dagger y2021 EPI=0.190
+[regen] seed 2 draw 1 adapt/ekf y2021 EPI=-2.698
+[regen] seed 2 draw 1 adapt/static y2022 EPI=5.395
+[regen] seed 2 draw 1 adapt/dagger y2022 EPI=5.488
+[regen] seed 2 draw 1 adapt/ekf y2022 EPI=-2.384
+[regen] seed 2 draw 1 adapt/static y2023 EPI=4.270
+[regen] seed 2 draw 1 adapt/dagger y2023 EPI=1.926
+[regen] seed 2 draw 1 adapt/ekf y2023 EPI=-3.200
+[regen] seed 2 draw 2 adapt/static y2021 EPI=-2.052
+[regen] seed 2 draw 2 adapt/dagger y2021 EPI=-1.803
+[regen] seed 2 draw 2 adapt/ekf y2021 EPI=-1.968
+[regen] seed 2 draw 2 adapt/static y2022 EPI=-0.410
+[regen] seed 2 draw 2 adapt/dagger y2022 EPI=5.858
+CasADi - 2026-08-10 00:27:14 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:27:14 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:27:14 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:27:14 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:27:14 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:27:14 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:27:14 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:27:14 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:27:14 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:27:14 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+At t = 272.213 and h = 0.000255014, the corrector convergence test failed repeatedly or with |h| = hmin.
+Error in ODE approximation
+[regen] seed 2 draw 2 adapt/ekf y2022 EPI=-3.854
+[regen] seed 2 draw 2 adapt/static y2023 EPI=4.379
+[regen] seed 2 draw 2 adapt/dagger y2023 EPI=4.657
+[regen] seed 2 draw 2 adapt/ekf y2023 EPI=-4.287
+[regen] seed 2 draw 3 adapt/static y2021 EPI=-2.157
+[regen] seed 2 draw 3 adapt/dagger y2021 EPI=2.689
+[regen] seed 2 draw 3 adapt/ekf y2021 EPI=-4.563
+[regen] seed 2 draw 3 adapt/static y2022 EPI=-0.399
+[regen] seed 2 draw 3 adapt/dagger y2022 EPI=5.501
+CasADi - 2026-08-10 00:40:53 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:40:53 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:40:53 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:40:53 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:40:53 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:40:53 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:40:53 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:40:53 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:40:53 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:40:53 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:40:53 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:40:53 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:40:53 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+At t = 108.254 and h = 7.36696e-05, the corrector convergence test failed repeatedly or with |h| = hmin.
+Error in ODE approximation
+[regen] seed 2 draw 3 adapt/ekf y2022 EPI=-5.739
+[regen] seed 2 draw 3 adapt/static y2023 EPI=4.219
+[regen] seed 2 draw 3 adapt/dagger y2023 EPI=1.794
+[regen] seed 2 draw 3 adapt/ekf y2023 EPI=-0.830
+[regen] seed 2 draw 4 adapt/static y2021 EPI=-1.966
+[regen] seed 2 draw 4 adapt/dagger y2021 EPI=-1.757
+[regen] seed 2 draw 4 adapt/ekf y2021 EPI=-2.203
+[regen] seed 2 draw 4 adapt/static y2022 EPI=0.291
+[regen] seed 2 draw 4 adapt/dagger y2022 EPI=5.889
+CasADi - 2026-08-10 00:54:24 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:54:24 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:54:24 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:54:24 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:54:24 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:54:24 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:54:24 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:54:24 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:54:24 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:54:24 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+At t = 169.668 and h = 6.56191e-05, the corrector convergence test failed repeatedly or with |h| = hmin.
+Error in ODE approximation
+[regen] seed 2 draw 4 adapt/ekf y2022 EPI=1.439
+[regen] seed 2 draw 4 adapt/static y2023 EPI=4.473
+[regen] seed 2 draw 4 adapt/dagger y2023 EPI=4.741
+CasADi - 2026-08-10 00:58:57 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:58:57 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:58:57 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:58:57 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:58:57 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:58:57 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:58:57 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:58:57 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:58:57 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 00:58:57 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+At t = 110.929 and h = 8.70418e-05, the corrector convergence test failed repeatedly or with |h| = hmin.
+Error in ODE approximation
+[regen] seed 2 draw 4 adapt/ekf y2023 EPI=-5.142
+[regen] seed 2 draw 5 adapt/static y2021 EPI=-1.869
+[regen] seed 2 draw 5 adapt/dagger y2021 EPI=0.393
+[regen] seed 2 draw 5 adapt/ekf y2021 EPI=-2.480
+[regen] seed 2 draw 5 adapt/static y2022 EPI=5.699
+[regen] seed 2 draw 5 adapt/dagger y2022 EPI=5.749
+[regen] seed 2 draw 5 adapt/ekf y2022 EPI=-1.854
+[regen] seed 2 draw 5 adapt/static y2023 EPI=4.526
+[regen] seed 2 draw 5 adapt/dagger y2023 EPI=1.933
+[regen] seed 2 draw 5 adapt/ekf y2023 EPI=-3.902
+[regen] seed 2 draw 6 adapt/static y2021 EPI=-2.156
+[regen] seed 2 draw 6 adapt/dagger y2021 EPI=2.857
+[regen] seed 2 draw 6 adapt/ekf y2021 EPI=-1.335
+[regen] seed 2 draw 6 adapt/static y2022 EPI=-0.441
+[regen] seed 2 draw 6 adapt/dagger y2022 EPI=5.720
+[regen] seed 2 draw 6 adapt/ekf y2022 EPI=3.479
+[regen] seed 2 draw 6 adapt/static y2023 EPI=4.333
+[regen] seed 2 draw 6 adapt/dagger y2023 EPI=4.557
+[regen] seed 2 draw 6 adapt/ekf y2023 EPI=-6.407
+[regen] seed 2 draw 7 adapt/static y2021 EPI=-1.916
+[regen] seed 2 draw 7 adapt/dagger y2021 EPI=2.901
+[regen] seed 2 draw 7 adapt/ekf y2021 EPI=-2.941
+[regen] seed 2 draw 7 adapt/static y2022 EPI=-0.166
+[regen] seed 2 draw 7 adapt/dagger y2022 EPI=5.771
+CasADi - 2026-08-10 01:36:48 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 01:36:48 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 01:36:48 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 01:36:48 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 01:36:48 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 01:36:48 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 01:36:48 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 01:36:48 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 01:36:48 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 01:36:48 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+At t = 893.308 and h = 2.55288e-05, the corrector convergence test failed repeatedly or with |h| = hmin.
+Error in ODE approximation
+[regen] seed 2 draw 7 adapt/ekf y2022 EPI=-0.164
+[regen] seed 2 draw 7 adapt/static y2023 EPI=4.615
+[regen] seed 2 draw 7 adapt/dagger y2023 EPI=4.626
+[regen] seed 2 draw 7 adapt/ekf y2023 EPI=-4.868
+[regen] seed 2 draw 8 adapt/static y2021 EPI=-2.059
+[regen] seed 2 draw 8 adapt/dagger y2021 EPI=2.899
+[regen] seed 2 draw 8 adapt/ekf y2021 EPI=-1.160
+[regen] seed 2 draw 8 adapt/static y2022 EPI=5.523
+[regen] seed 2 draw 8 adapt/dagger y2022 EPI=5.667
+[regen] seed 2 draw 8 adapt/ekf y2022 EPI=-1.850
+[regen] seed 2 draw 8 adapt/static y2023 EPI=4.347
+[regen] seed 2 draw 8 adapt/dagger y2023 EPI=4.502
+CasADi - 2026-08-10 01:56:15 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 01:56:15 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 01:56:15 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 01:56:15 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 01:56:15 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 01:56:15 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 01:56:15 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 01:56:15 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 01:56:15 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 01:56:15 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+At t = 144.139 and h = 8.89005e-05, the corrector convergence test failed repeatedly or with |h| = hmin.
+Error in ODE approximation
+[regen] seed 2 draw 8 adapt/ekf y2023 EPI=-5.060
+[regen] seed 2 draw 9 adapt/static y2021 EPI=-1.929
+[regen] seed 2 draw 9 adapt/dagger y2021 EPI=2.927
+[regen] seed 2 draw 9 adapt/ekf y2021 EPI=-7.326
+[regen] seed 2 draw 9 adapt/static y2022 EPI=5.627
+[regen] seed 2 draw 9 adapt/dagger y2022 EPI=5.702
+CasADi - 2026-08-10 02:06:01 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 02:06:01 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 02:06:01 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 02:06:01 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 02:06:01 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 02:06:01 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 02:06:01 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 02:06:01 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 02:06:01 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-10 02:06:01 WARNING("F:jacF failed: NaN detected for output jac_ode_x, at nonzero index 49 (row 5, col 5).") [.../casadi/core/oracle_function.cpp:408]
+At t = 165.721 and h = 9.22346e-05, the corrector convergence test failed repeatedly or with |h| = hmin.
+Error in ODE approximation
+[regen] seed 2 draw 9 adapt/ekf y2022 EPI=0.852
+[regen] seed 2 draw 9 adapt/static y2023 EPI=4.469
+[regen] seed 2 draw 9 adapt/dagger y2023 EPI=4.585
+[regen] seed 2 draw 9 adapt/ekf y2023 EPI=-1.711
+[regen] adapt tag=a2 DONE
