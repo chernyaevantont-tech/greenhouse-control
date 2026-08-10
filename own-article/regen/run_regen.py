@@ -175,6 +175,16 @@ def build_model(ctrl: str, pc, train_s, seed: int, fast: bool, draw: int = 0):
     raise ValueError(f"unknown controller {ctrl}")
 
 
+# Diagnostic override for --max-solver-failures. Kept OUT of regen_config so that
+# _declared()/config_hash cannot move: the budget actually used is recorded per row in the
+# `max_solver_failures` column, which is where provenance for it belongs.
+_BUDGET_OVERRIDE: int | None = None
+
+
+def _budget() -> int:
+    return C.MAX_SOLVER_FAILURES if _BUDGET_OVERRIDE is None else _BUDGET_OVERRIDE
+
+
 def rollout(ctrl: str, model, pc, year: int, seed: int, fast: bool,
             horizon: int | None = None) -> pd.DataFrame:
     """One closed-loop season. Horizon and solver budget are the SAME for everyone (D4/D5)."""
@@ -191,10 +201,10 @@ def rollout(ctrl: str, model, pc, year: int, seed: int, fast: bool,
                 "sindy_mpc_conf_dagger", "sindy_mpc_dense_dagger",
                 "sindy_mpc_raw", "sindy_mpc_raw_ens"):        # N-7 ext
         return U.rollout_mpc(model, cfg, n_days=N, start_date=start, objective="full",
-                             max_solver_failures=C.MAX_SOLVER_FAILURES)
+                             max_solver_failures=_budget())
     if ctrl == "nn_mpc":
         return U.rollout_mpc_nn(model, cfg, n_days=N, start_date=start, horizon=h,
-                                max_solver_failures=C.MAX_SOLVER_FAILURES)
+                                max_solver_failures=_budget())
     if ctrl in ("ppo", "sac"):
         return U.rollout_rl(model, cfg, n_days=N, start_date=start, label=ctrl)
     if ctrl == "oracle_mpc":
@@ -203,7 +213,7 @@ def rollout(ctrl: str, model, pc, year: int, seed: int, fast: bool,
                                     n_iters=C.ORACLE_CEM["n_iters"],
                                     elite_frac=C.ORACLE_CEM["elite_frac"],
                                     sample_std=C.ORACLE_CEM["sample_std"],
-                                    max_solver_failures=C.MAX_SOLVER_FAILURES)
+                                    max_solver_failures=_budget())
     raise ValueError(f"unknown controller {ctrl}")
 
 
@@ -242,7 +252,7 @@ def score(df: pd.DataFrame, econ, pc) -> dict:
     # The break fires on failure number MAX+1 but the last recorded row still carries MAX,
     # so the test is `>=`, not `>`.
     sf = int(m.get("solver_failures", 0) or 0)
-    m["solver_aborted"] = bool(m["truncated"] and sf >= C.MAX_SOLVER_FAILURES)
+    m["solver_aborted"] = bool(m["truncated"] and sf >= _budget())
     m["stop_reason"] = ("complete" if not m["truncated"]
                         else "solver_aborted" if m["solver_aborted"] else "env_terminated")
     return m
@@ -281,7 +291,7 @@ def exp_main(args, seeds, pc, econ, out: Path) -> int:
                     m.update({"method": c, "seed": s, "test_year": y,
                               "xi_uboil": xi, "rng_seed": _rng_of(model),
                               "horizon": pc.horizon,
-                              "max_solver_failures": C.MAX_SOLVER_FAILURES,
+                              "max_solver_failures": _budget(),
                               "secs": round(time.time() - t0, 1), **C.stamp()})
                     rows.append(m)
                     _write(rows, path)
@@ -593,6 +603,21 @@ def main() -> int:
     ap.add_argument("--merge", action="store_true")
     ap.add_argument("--draws", type=int, default=0, help="bootstrap draws per seed (experiment `draws`)")
     ap.add_argument("--fast", action="store_true", help="minutes-long smoke, NOT publishable")
+    # E-C: the MPC horizon was never tuned -- C.HORIZON=20 for everyone, while the RL
+    # controllers each got a 16-trial hyper-parameter budget. design.csv shows the choice is
+    # worth more than any effect the paper reports (2020, dense: h=8 -> 6.11, h=20 -> 3.63),
+    # so the asymmetry runs AGAINST the surrogate MPC. This override sweeps it without
+    # touching C.HORIZON: _declared()/config_hash are unchanged, and the value actually used
+    # is already recorded per row in the `horizon` column.
+    ap.add_argument("--horizon", type=int, default=None,
+                    help="override the MPC horizon for this run (E-C); recorded per row")
+    # verify_regen's two blocking failures are both `oracle_mpc` solver aborts (20 in the
+    # main grid, all of season 2022; 10 in the horizon sweep). Defect D4 was exactly this
+    # shape -- a budget, not a property -- so the distinction has to be measured rather than
+    # assumed. This override raises the cap for a diagnostic run; C.MAX_SOLVER_FAILURES and
+    # therefore config_hash are untouched, and the value used is recorded per row.
+    ap.add_argument("--max-solver-failures", type=int, default=None,
+                    help="override the solver-failure budget for this run (diagnostic)")
     args = ap.parse_args()
 
     out = Path(args.out) if args.out else (HERE / "results")
@@ -608,6 +633,13 @@ def main() -> int:
         pass
 
     pc = C.protocol(args.fast)
+    if args.horizon is not None:                      # E-C, see --horizon
+        pc = dataclasses.replace(pc, horizon=int(args.horizon))
+    if args.max_solver_failures is not None:          # диагностика, см. --max-solver-failures
+        global _BUDGET_OVERRIDE
+        _BUDGET_OVERRIDE = int(args.max_solver_failures)
+        _log(f"ВНИМАНИЕ: бюджет отказов решателя переопределён на {_BUDGET_OVERRIDE} "
+             f"(канон {C.MAX_SOLVER_FAILURES}); прогон диагностический, не для публикации")
     econ = P_read_econ()
     seeds = _seeds(args)
     C.write_manifest(out)

@@ -14,7 +14,7 @@
   ],
   "dagger_episode_days": 5,
   "dagger_iters": 3,
-  "git_sha": "67c0dff",
+  "git_sha": "546e783",
   "horizon": 20,
   "image": "local",
   "lambda_grid": [
