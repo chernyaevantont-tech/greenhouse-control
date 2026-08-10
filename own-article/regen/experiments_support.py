@@ -455,3 +455,66 @@ def K_variant(bundle, edits, label):
 def _year_cfg(pc, year: int):
     import dataclasses
     return dataclasses.replace(pc, test_year=int(year))
+
+
+def exp_holdout(args, seeds, pc, econ, out):
+    """B-3: тот же разомкнутый отбор, но метрика считается на ОТЛОЖЕННОМ годе.
+
+    Ладдер учит на 2018+2019 и меряет устойчивость на тех же данных
+    (`exp_ladder` -> `_openloop_stability(b, train, ...)`), то есть ВНУТРИВЫБОРОЧНО.
+    Утечки тестовых сезонов при этом нет -- 2020-2023 в отборе не участвуют, -- но
+    заявлять "отбор по многошаговой устойчивости предсказывает замкнутый результат"
+    надёжнее, если порядок библиотек держится и на данных, которых модель не видела.
+
+    Здесь: подгонка на ОДНОМ обучающем году, метрики -- на ДРУГОМ, в обе стороны.
+    Всё разомкнуто, замкнутых прогонов нет, поэтому дёшево.
+    """
+    import run_regen as R
+
+    rows, path = [], out / f"holdout_{args.tag}.csv"
+    scen = pc.train_scenarios()
+    if len(scen) < 2:
+        R._log("нужно >=2 обучающих года")
+        return 1
+    horizons = C.LADDER_ROLLOUT_HORIZONS_STEPS
+    variants = C.LADDER_VARIANTS
+    opts = ("stlsq", "ensemble")
+
+    for s in seeds:
+        # по одному набору данных на обучающий год
+        data = {}
+        for sc in scen:
+            cfg = pc.cfg_for(sc, seed=s)
+            data[sc["start_date"][:4]] = U.collect_rule_based_dataset(
+                cfg, n_days=pc.n_days_train, start_date=sc["start_date"], seed=s,
+                noise_scale=C.NOISE_SCALE, prbs_scale=C.PRBS_SCALE)
+        years = sorted(data)
+        for fit_y in years:
+            for eval_y in years:
+                for variant in variants:
+                    for opt in opts:
+                        rec = {"feature_variant": variant, "library_degree": 1,
+                               "optimizer": opt, "denoise": "none",
+                               "threshold": C.CONFIRMATORY["threshold"]}
+                        cond = f"{variant}/d1/{opt}/none"
+                        row = {"block": "holdout", "condition": cond, "seed": s,
+                               "variant": variant, "optimizer": opt,
+                               "fit_year": fit_y, "eval_year": eval_y,
+                               "in_sample": fit_y == eval_y,
+                               "rollout_horizons": ",".join(str(h) for h in horizons),
+                               **C.stamp()}
+                        try:
+                            b = R.fit_sindy_seeded(data[fit_y], pc, seed=s,
+                                                   label=f"ho_{cond}_{fit_y}", recipe=rec)
+                            row["nonzero"] = int(np.count_nonzero(b.model.coefficients()))
+                            row["kappa"] = float(getattr(b, "condition_number", np.nan))
+                            row.update(_openloop_stability(b, data[eval_y], horizons))
+                        except Exception as exc:  # noqa: BLE001
+                            row["error"] = f"{type(exc).__name__}: {str(exc)[:80]}"
+                        rows.append(row)
+                        R._write(rows, path)
+                        R._log(f"seed {s} holdout {cond} fit{fit_y}->eval{eval_y} "
+                               f"rmse={row.get('rollout_rmse_t_in', float('nan')):.3f} "
+                               f"div={row.get('diverged_frac', float('nan')):.3f}")
+    R._write(rows, path)
+    return 0

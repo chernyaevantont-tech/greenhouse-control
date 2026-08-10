@@ -590,6 +590,7 @@ def main() -> int:
         "faults",       # E7  six fault modes x supervisor
         "design",       # E6  horizon / threshold / coefficient perturbation
         "draws",        # bootstrap draw as a measured variance axis (ensemble recipes)
+        "holdout",      # B-3: same open-loop selection, metrics on a HELD-OUT train year
     ])
     ap.add_argument("--blocks", default="", help="mechanism/parity sub-blocks (default: all)")
     ap.add_argument("--seeds")
@@ -650,6 +651,7 @@ def main() -> int:
     fn = {"main": exp_main, "mechanism": exp_mechanism, "parity": exp_parity,
           "ladder": X.exp_ladder, "adapt": X.exp_adapt, "guard": X.exp_guard,
           "faults": X.exp_faults, "design": X.exp_design,
+          "holdout": X.exp_holdout,
           "draws": __import__("exp_draws").exp_draws}[args.experiment]
     rc = fn(args, seeds, pc, econ, out)
     _log(f"{args.experiment} tag={args.tag} DONE")

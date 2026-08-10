@@ -1,0 +1,4 @@
+block,condition,seed,variant,optimizer,fit_year,eval_year,in_sample,rollout_horizons,regen_id,config_hash,git_sha,image,nonzero,kappa,rollout_rmse_t_in,diverged_frac,one_step_rmse_t_in
+holdout,raw/d1/stlsq/none,0,raw,stlsq,2018,2018,True,"4,20,96",regen-v2,637c6b535a9e,7270b86,local,18,8.445248055818116,2.6755559570993492,0.0,1.8157374709605456
+holdout,raw/d1/ensemble/none,0,raw,ensemble,2018,2018,True,"4,20,96",regen-v2,637c6b535a9e,7270b86,local,18,8.445248055818116,2.667435182019454,0.0,1.8168537508701328
+holdout,physics/d1/stlsq/none,0,physics,stlsq,2018,2018,True,"4,20,96",regen-v2,637c6b535a9e,7270b86,local,33,55.66448884363326,32.1099790802385,0.13333333333333333,1.5854355518420709
