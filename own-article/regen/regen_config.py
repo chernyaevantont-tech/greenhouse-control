@@ -127,6 +127,47 @@ CROSS = {
 
 RECIPES = {"confirmatory": CONFIRMATORY, "dense": DENSE, "lowthr": LOWTHR, "cross": CROSS}
 
+# ── N-7: the recipe the pre-registered criterion actually selects ─────────────
+# The ladder, re-run with the corrected step horizons (2026-08-10), ranks the RAW library
+# first on both pre-registered open-loop metrics and the frozen physics_no_cross recipe far
+# behind, on identical fits (seeds 0/1 agree):
+#
+#     raw/d1/stlsq/none                  rollout RMSE  2.62   diverged 0.0000
+#     physics_no_cross/d1/ensemble/none  rollout RMSE 11.04   diverged 0.0167   <- frozen
+#
+# The frozen recipe DOES pass the divergence gate (0.017 <= 0.05); the earlier claim that it
+# failed its own gate came from the stale pre-fix ladder and is retracted. What survives is
+# the 4.2x rollout gap -- and the manuscript asserts the opposite, that the raw library lost
+# on open-loop metrics (statya_ru.tex:336). No controller in the main table uses `raw`, so
+# the closed-loop consequence has never been measured. That is what these two recipes are for.
+#
+# Threshold is held at CONFIRMATORY's 0.05 so the ONLY thing that changes is the library.
+# `_stlsq` is the ladder's top-ranked entry and is deterministic; `_ens` is the exact
+# one-factor change from the confirmatory recipe and keeps the bootstrap-draw lottery, so the
+# pair also separates "library" from "optimizer".
+RAW_STLSQ = {
+    "feature_variant": "raw",
+    "library_degree": 1,
+    "optimizer": "stlsq",
+    "denoise": "none",
+    "threshold": 0.05,
+}
+RAW_ENS = {
+    "feature_variant": "raw",
+    "library_degree": 1,
+    "optimizer": "ensemble",
+    "denoise": "none",
+    "threshold": 0.05,
+}
+
+# Deliberately NOT in RECIPES/_declared()/config_hash, and the controllers below are NOT in
+# ALL_CONTROLLERS: this ADDS an experiment rather than changing any existing one, and hashing
+# it would invalidate every already-computed wave (the same convention as ENSEMBLE_DRAWS and
+# LADDER_ROLLOUT_HORIZONS_STEPS). The recipe reaches each result row through the usual
+# `fit_sindy_seeded` RNG key, so provenance stays self-contained.
+EXT_RECIPES = {"raw_stlsq": RAW_STLSQ, "raw_ens": RAW_ENS}
+CONTROLLERS_EXT = ["sindy_mpc_raw", "sindy_mpc_raw_ens"]
+
 # ── Controllers ──────────────────────────────────────────────────────────────
 # `sindy_mpc_lowthr` replaces the old `grey_box_mpc` label (same computation, honest name).
 CONTROLLERS_CHEAP = ["rule_based", "sindy_mpc_conf", "sindy_mpc_dense",
@@ -138,9 +179,11 @@ ALL_CONTROLLERS = (CONTROLLERS_CHEAP + CONTROLLERS_DAGGER
                    + CONTROLLERS_RL + CONTROLLERS_ORACLE)
 
 NEEDS_TRAIN = {"sindy_mpc_conf", "sindy_mpc_dense", "sindy_mpc_lowthr", "nn_mpc",
-               "sindy_mpc_conf_dagger", "sindy_mpc_dense_dagger"}
+               "sindy_mpc_conf_dagger", "sindy_mpc_dense_dagger",
+               "sindy_mpc_raw", "sindy_mpc_raw_ens"}          # N-7 ext, see EXT_RECIPES
 SOLVER_BASED = {"sindy_mpc_conf", "sindy_mpc_dense", "sindy_mpc_lowthr", "nn_mpc",
-                "sindy_mpc_conf_dagger", "sindy_mpc_dense_dagger", "oracle_mpc"}
+                "sindy_mpc_conf_dagger", "sindy_mpc_dense_dagger", "oracle_mpc",
+                "sindy_mpc_raw", "sindy_mpc_raw_ens"}         # N-7 ext, see EXT_RECIPES
 
 EXPECTED_MAIN_ROWS = len(ALL_CONTROLLERS) * len(TEST_YEARS) * len(SEEDS)   # 10*4*20 = 800
 
@@ -278,9 +321,11 @@ def write_manifest(out_dir: Path) -> Path:
 
 def load_recipe(name: str) -> dict:
     """Fail-loud recipe access (D2). No fallback, no implicit threshold, no surprises."""
-    if name not in RECIPES:
-        raise KeyError(f"unknown recipe {name!r}; known: {sorted(RECIPES)}")
-    rec = dict(RECIPES[name])
+    table = RECIPES if name in RECIPES else EXT_RECIPES
+    if name not in table:
+        raise KeyError(f"unknown recipe {name!r}; "
+                       f"known: {sorted(RECIPES)} + ext {sorted(EXT_RECIPES)}")
+    rec = dict(table[name])
     if "threshold" not in rec:
         raise ValueError(f"recipe {name!r} has no explicit threshold -- refusing to run (D1)")
     return rec
