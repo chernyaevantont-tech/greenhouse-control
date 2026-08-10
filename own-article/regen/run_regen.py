@@ -492,8 +492,15 @@ def merge(out: Path) -> int:
                        ("mechanism", ["block", "condition", "seed", "test_year"]),
                        ("parity", ["block", "condition", "seed", "test_year"]),
                        ("ladder", ["condition", "seed"]),
-                       ("adapt", ["block", "condition", "seed", "test_year"]),
-                       ("guard", ["block", "condition", "seed", "test_year"]),
+                       # `draw` belongs in the key: exp_adapt/exp_guard sweep the bootstrap
+                       # draw, so (block, condition, seed, test_year) alone is NOT unique and
+                       # drop_duplicates would keep ONE realisation per cell -- silently
+                       # discarding nine tenths of a --draws 10 run and reinstating exactly
+                       # the single-draw point estimate the sweep exists to replace. Runs
+                       # predating the axis have no `draw` column and are unaffected: the
+                       # filter below drops keys that are absent.
+                       ("adapt", ["block", "condition", "seed", "draw", "test_year"]),
+                       ("guard", ["block", "condition", "seed", "draw", "test_year"]),
                        ("faults", ["block", "condition", "seed", "test_year"]),
                        ("design", ["block", "condition", "seed", "test_year"]),
                        ("draws", ["method", "draw", "seed", "test_year"])):
