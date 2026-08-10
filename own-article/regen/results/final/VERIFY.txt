@@ -1,0 +1,35 @@
+verifying results\final
+config_hash=637c6b535a9e git=67a80f7
+
+[PASS] G0 manifest matches current config: manifest=637c6b535a9e current=637c6b535a9e
+[PASS] G0 main single config: 1 distinct hash(es): ['637c6b535a9e']
+[PASS] G0 mechanism single config: 1 distinct hash(es): ['637c6b535a9e']
+[PASS] G0 parity single config: 1 distinct hash(es): ['637c6b535a9e']
+[PASS] G1 no duplicate (method,year,seed): 0 duplicates
+[PASS] G1 grid complete: 800/800 cells; missing e.g. []
+[FAIL] G2 no solver aborts: 20 solver aborts {'oracle_mpc': 20}
+[PASS] G2 simulator-terminated seasons (kept, reported): 42 kept as outcomes {'nn_mpc': 31, 'sindy_mpc_dense': 2, 'sindy_mpc_dense_dagger': 7, 'sindy_mpc_lowthr': 2}
+[PASS] G3 uniform horizon: values=[np.int64(20)]
+[PASS] G3 uniform max_solver_failures: values=[np.int64(100)]
+[PASS] G4 xi_uboil recorded for SINDy rows: 0 NaN
+[WARN] G5 rule_based variance: rule_based EPI std == 0 in every year -> the vs-baseline test is one-sample, not paired; the Methods wording must say so
+[WARN] G6 ranking stable across years: per-year winners: {2020: 'rule_based', 2021: 'ppo', 2022: 'ppo', 2023: 'sindy_mpc_conf_dagger'}
+[PASS] G7 lambda sweep resolves xi==0 region: 9 grid point(s) with xi_uboil==0
+[PASS] G7 lambda dispersion reported: per-lambda std present (the paper's table omitted it)
+[WARN] G7 EPI monotone in boiler presence: mean EPI with xi==0 is 2.57; worst EPI with xi!=0 is -6.33 -> 'EPI is monotone in the presence of the boiler coefficient' is false as written and must be replaced by the knock-in result
+[PASS] G8 knock block complete: 0 seed(s) missing a condition
+[PASS] G8 knock-in effect: mean +2.521 EUR/m2, improved 17/20 seeds
+[PASS] G9 uBoil/cross interaction: ko_both - ko_uboil = -0.355 (positive in 9/20 seeds -> the heating pathway is not one-dimensional)
+[PASS] G10 oracle horizon sweep: horizons=[np.float64(12.0), np.float64(20.0), np.float64(48.0), np.float64(96.0)]
+[PASS] G10 sweep seed subset complete: 5/5 of the declared sweep seeds present
+[PASS] G10 oracle at surrogate horizon: oracle evaluated at h=20 (parity with the surrogate MPC)
+[FAIL] G10 oracle: no solver aborts: 10 solver-aborted oracle runs
+
+3 warning(s) -- these change what the TEXT may claim:
+  - G5 rule_based variance: rule_based EPI std == 0 in every year -> the vs-baseline test is one-sample, not paired; the Methods wording must say so
+  - G6 ranking stable across years: per-year winners: {2020: 'rule_based', 2021: 'ppo', 2022: 'ppo', 2023: 'sindy_mpc_conf_dagger'}
+  - G7 EPI monotone in boiler presence: mean EPI with xi==0 is 2.57; worst EPI with xi!=0 is -6.33 -> 'EPI is monotone in the presence of the boiler coefficient' is false as written and must be replaced by the knock-in result
+
+2 BLOCKING failure(s) -- do not publish these numbers:
+  - G2 no solver aborts: 20 solver aborts {'oracle_mpc': 20}
+  - G10 oracle: no solver aborts: 10 solver-aborted oracle runs
