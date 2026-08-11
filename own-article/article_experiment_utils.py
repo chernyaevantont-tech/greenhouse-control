@@ -1823,6 +1823,7 @@ def rollout_mpc_nn(
     start_date: str | None = None,
     horizon: int = 20,
     max_solver_failures: int = 10,
+    objective_mode: str = "full",
 ) -> pd.DataFrame:
     """Shooting MPC using the MLP surrogate with PyTorch autograd gradients."""
     import torch
@@ -1916,7 +1917,13 @@ def rollout_mpc_nn(
                 band_T = torch.clamp(T_lo - t_next, min=0.0) + torch.clamp(t_next - T_hi, min=0.0)
                 low_co2 = torch.clamp(co2_floor - co2_next, min=0.0)
                 hi_rh = torch.clamp(rh_next - 85.0, min=0.0)
-                cost_e  = 20.0 * uBoil_k + 10.0 * uLamp_k + 2.0 * uCO2_k
+                # N-3: те же перевёрнутые веса, что и в build_mpc_controller. Правятся
+                # здесь тоже, иначе нейросетевое УПМ осталось бы единственным
+                # регулятором с заведомо худшей целевой функцией -- ровно та
+                # асимметрия, которую работа вменяет литературе.
+                cost_e  = ((7.22 * uBoil_k + 21.44 * uLamp_k + 3.33 * uCO2_k)
+                           if objective_mode == "priced" else
+                           (20.0 * uBoil_k + 10.0 * uLamp_k + 2.0 * uCO2_k))
                 total_cost = total_cost + (
                     30.0 * band_T**2 + 3e-4 * low_co2**2 + 8.0 * hi_rh**2 + cost_e
                 )

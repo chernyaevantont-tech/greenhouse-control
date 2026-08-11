@@ -209,6 +209,7 @@ def rollout(ctrl: str, model, pc, year: int, seed: int, fast: bool,
                              max_solver_failures=_budget())
     if ctrl == "nn_mpc":
         return U.rollout_mpc_nn(model, cfg, n_days=N, start_date=start, horizon=h,
+                                objective_mode=_OBJECTIVE,   # N-3: те же веса, что у SINDy
                                 max_solver_failures=_budget())
     if ctrl in ("ppo", "sac"):
         return U.rollout_rl(model, cfg, n_days=N, start_date=start, label=ctrl)
