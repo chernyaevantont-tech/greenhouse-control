@@ -951,7 +951,23 @@ def build_mpc_controller(
         low_co2 = ca.fmax(0.0, co2_floor - co2)
         hi_rh = ca.fmax(0.0, rh - 85.0)
         cost_climate = 30.0 * band_T**2 + 3e-4 * low_co2**2 + 8.0 * hi_rh**2
-        cost_energy = 20.0 * uBoil + 10.0 * uLamp + 2.0 * uCO2
+        if objective == "priced":
+            # N-3. The default weights below (20 / 10 / 2) are ad hoc and do not follow the
+            # prices the criterion J is actually computed with. Measured marginal cost per
+            # unit of accumulated control, from regen/results/final/main.csv:
+            #
+            #     boiler 0.00293   lamp 0.00870   CO2 0.00135  EUR/unit
+            #     ratio       1 :       2.97 :       0.46
+            #
+            # while the default ratio is 1 : 0.5 : 0.1 -- the objective penalises the boiler
+            # TWICE as hard as the lamp, though the lamp costs THREE times more. The relative
+            # weighting is off by roughly 6x between the two.
+            #
+            # Scaled so the total at u=(1,1,1) matches the default 32.0, isolating the
+            # RATIOS as the single factor under test rather than the energy/climate balance.
+            cost_energy = 7.22 * uBoil + 21.44 * uLamp + 3.33 * uCO2
+        else:
+            cost_energy = 20.0 * uBoil + 10.0 * uLamp + 2.0 * uCO2
         lterm = cost_energy + cost_climate
         mterm = cost_climate
 

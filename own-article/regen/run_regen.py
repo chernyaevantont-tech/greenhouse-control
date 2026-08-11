@@ -180,6 +180,11 @@ def build_model(ctrl: str, pc, train_s, seed: int, fast: bool, draw: int = 0):
 # `max_solver_failures` column, which is where provenance for it belongs.
 _BUDGET_OVERRIDE: int | None = None
 
+# N-3: which stage cost the surrogate MPC optimises. "full" is the default corridor +
+# ad-hoc energy objective; "priced" keeps the corridor term but re-weights the energy term
+# by the ACTUAL marginal euro cost of each actuator. Recorded per row as `objective`.
+_OBJECTIVE = "full"
+
 
 def _budget() -> int:
     return C.MAX_SOLVER_FAILURES if _BUDGET_OVERRIDE is None else _BUDGET_OVERRIDE
@@ -200,7 +205,7 @@ def rollout(ctrl: str, model, pc, year: int, seed: int, fast: bool,
     if ctrl in ("sindy_mpc_conf", "sindy_mpc_dense", "sindy_mpc_lowthr",
                 "sindy_mpc_conf_dagger", "sindy_mpc_dense_dagger",
                 "sindy_mpc_raw", "sindy_mpc_raw_ens"):        # N-7 ext
-        return U.rollout_mpc(model, cfg, n_days=N, start_date=start, objective="full",
+        return U.rollout_mpc(model, cfg, n_days=N, start_date=start, objective=_OBJECTIVE,
                              max_solver_failures=_budget())
     if ctrl == "nn_mpc":
         return U.rollout_mpc_nn(model, cfg, n_days=N, start_date=start, horizon=h,
@@ -292,6 +297,7 @@ def exp_main(args, seeds, pc, econ, out: Path) -> int:
                               "xi_uboil": xi, "rng_seed": _rng_of(model),
                               "horizon": pc.horizon,
                               "max_solver_failures": _budget(),
+                              "objective": _OBJECTIVE,
                               "secs": round(time.time() - t0, 1), **C.stamp()})
                     rows.append(m)
                     _write(rows, path)
@@ -620,6 +626,8 @@ def main() -> int:
     # therefore config_hash are untouched, and the value used is recorded per row.
     ap.add_argument("--max-solver-failures", type=int, default=None,
                     help="override the solver-failure budget for this run (diagnostic)")
+    ap.add_argument("--objective", default=None, choices=["full", "priced"],
+                    help="N-3: stage cost for the surrogate MPC (default: full)")
     args = ap.parse_args()
 
     out = Path(args.out) if args.out else (HERE / "results")
@@ -637,6 +645,10 @@ def main() -> int:
     pc = C.protocol(args.fast)
     if args.horizon is not None:                      # E-C, see --horizon
         pc = dataclasses.replace(pc, horizon=int(args.horizon))
+    if args.objective is not None:                    # N-3, см. --objective
+        global _OBJECTIVE
+        _OBJECTIVE = str(args.objective)
+        _log(f"целевая функция УПМ: {_OBJECTIVE}")
     if args.max_solver_failures is not None:          # диагностика, см. --max-solver-failures
         global _BUDGET_OVERRIDE
         _BUDGET_OVERRIDE = int(args.max_solver_failures)
