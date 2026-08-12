@@ -251,8 +251,12 @@ SENS_FRUIT_PRICE = (0.8, 1.6, 3.2)          # EUR/kg, around the nominal 1.6
 SENS_ENERGY_SCALE = (0.5, 1.0, 2.0)         # multiplier on heat/elec/CO2 prices
 SENS_HORIZONS = (8, 12, 20, 30)
 SENS_THRESHOLDS = (0.01, 0.05, 0.1, 0.2)
-SENS_COEF_PERTURB = (0.1, 0.2, 0.3)
-SENS_PERTURB_REPS = 2
+# E-E: прежняя сетка (0.1, 0.2, 0.3) при 2 повторах дала немонотонный и огромный
+# разброс -- 0.2 -> -13.41 при СКО 20.4, а 0.3 -> -4.77. Это признак слишком малого
+# числа реализаций шума, а не свойства модели. Сетка мельче, повторов больше.
+# Вне _declared()/config_hash: меняет только объём эксперимента E6.
+SENS_COEF_PERTURB = (0.02, 0.05, 0.10, 0.15, 0.20)
+SENS_PERTURB_REPS = 4
 
 # Bootstrap draws per seed for the ensemble recipes (experiment `draws`).
 # Deliberately NOT in _declared()/config_hash: it adds a new experiment rather than changing
