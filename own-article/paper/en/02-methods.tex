@@ -1,0 +1,475 @@
+%% ===========================================================================
+%% Materials and Methods
+%% PROVENANCE. Every numeric value in this section is traceable to one of:
+%%   (a) a results file under own-article/regen/results/  -- prices (derived from
+%%       final/main.csv), tuning outcome (n2_tune/tune_rb_n2.csv), row counts,
+%%       gate pass counts (ladder_rerun/), cross-environment divergence;
+%%   (b) the frozen configuration own-article/regen/regen_config.py and
+%%       own-article/regen/results/final/regen_manifest.json -- seeds, horizon,
+%%       season, budgets, recipes, grid sizes, RL/NN/CEM settings;
+%%   (c) the identification, MPC and harness code -- article_experiment_utils.py
+%%       (feature libraries 11/14/18, stage-cost weights, IPOPT/do-mpc setup, the
+%%       L-BFGS-B shooting loop of nn_mpc, the solver-failure fallback action),
+%%       regen/experiments_support.py (objective="full" hard-coded in every
+%%       supporting block; RB_TUNE_TRIALS=16 plus trial 0), e3_dagger_compare.py:61
+%%       (aggregation episodes rolled under the default objective),
+%%       regen/make_tables.py:318 (the 0.05 divergence threshold),
+%%       regen/repro.py (the seven/nine self-test digests and their coverage);
+%%   (d) the simulator's own configuration and reward (GreenLight-Gym) -- the
+%%       productive corridor bounds 300-1600 ppm / 15-34 C / 50-85 %, and
+%%       components/rewards.py:200-225, where reward = scaled profit - scaled
+%%       violation penalties while EPI is the unscaled `profit` field alone;
+%%   (e) the pre-registration own-article/EXPERIMENT_PROTOCOL.md (E2) -- which two
+%%       gates were declared, as against which two were applied.
+%% No number in this section is asserted without one of these sources.
+%% VERIFIED 2026-08-13 against the CSVs: prices 0.09/0.30/0.30 and the actuator
+%% marginal costs 0.002925/0.008700/0.001350 are exact on all 800 main rows;
+%% 780 retained / 20 excluded (all oracle_mpc 2022); 42 env-terminated; priced pool
+%% 615 -> 600; ladder 1440 rows, 72 labels, 36 embeddable (all degree 1), 32 pass,
+%% sign_pass NaN in 1440/1440; holdout 240; constrained == sr3 on all 360 cells;
+%% tuning 17 trials, trial 0 ranked 3rd, gain +3.4878, violations 2813 -> 4338.5;
+%% dense vs lowthr p = 0.0120 for a gap of 0.0066 EUR/m2.
+%% ===========================================================================
+\section{Materials and Methods}
+\label{sec:methods}
+
+\subsection{Simulator, site, weather and season}
+\label{sec:sim}
+
+All experiments were run in simulation with the GreenLight tomato greenhouse model
+\cite{katzin2020,katzin2021} through the GreenLight-Gym interface \cite{vanlaatum2025}.
+The simulated house is at Rostov-on-Don ($47.24^{\circ}$~N, $39.71^{\circ}$~E). Weather
+forcing came from the ERA5/ERA5-Land reanalysis \cite{hersbach2020} via Open-Meteo
+\cite{openmeteo2023}; sky temperature was derived from the retrieved dew point and cloud
+cover, and the deep-soil boundary condition was refitted as a single annual harmonic to
+ERA5-Land soil temperature at this site, replacing the simulator's Dutch default.
+%% WEATHER PROVENANCE (verified 2026-08-13 against own-article/weather_data_methodology.md
+%% and own-article/make_weather.py, since the run manifests record only the location):
+%% Open-Meteo Historical archive API over ERA5/ERA5-Land, hourly temperature_2m,
+%% relative_humidity_2m, dew_point_2m, wind_speed_10m, shortwave_radiation and cloud_cover,
+%% linearly resampled to the 5-min grid the simulator reads; sky temperature derived by
+%% Brunt clear-sky emissivity from the dew point, blended by cloud fraction. Deep-soil
+%% boundary: own-article/rostov_soil.py. This is NOT the GreenLight-Gym stock weather
+%% pipeline; do not attribute the weather to katzin2020 or vanlaatum2025.
+Outdoor CO$_2$ was held at 400~ppm, a limitation of the model. Each season spans
+60~days from 1~March at a 15-min control step ($T_s=900$~s), i.e.\ 5760 control steps
+per season; that count is the truncation gate used throughout.
+
+Years were separated to prevent leakage (Figure~\ref{fig:design}): identification and
+every selection decision used 2018--2019 only, closed-loop evaluation used 2020--2023 (2020 in-distribution,
+2021--2023 out-of-distribution), and a further block of four seasons, 2014--2017, was
+generated after all recipes had been frozen and entered no stage of training, selection
+or tuning. Training trajectories were collected by the rule-based controller with a
+pseudo-random binary excitation of amplitude 0.3 on its actions plus an additive
+perturbation of scale 0.1; the condition number of the regression matrix was recorded
+for every fit \cite{cortiella2021}. Evaluation rollouts carry no excitation.
+
+\subsection{Economic criterion}
+\label{sec:epi}
+
+Controllers are scored by the profit term of the simulator's own reward function; no
+tracking-error proxy is used. At step $k$ that term is a marginal income $\pi_k$, and the
+seasonal economic performance indicator (EPI), written $J$ throughout, is
+%
+\begin{equation}
+J=\sum_{k}\pi_k=\sum_{k}\bigl(g_k-c_k\bigr),
+\label{eq:epi}
+\end{equation}
+%
+where $g_k$ is income from modelled fruit dry-matter growth, converted to fresh mass
+with a dry-to-fresh ratio of 0.065 and valued at 1.60~EUR/kg, and $c_k$ are the
+variable costs of heating (0.09~EUR/(kW$\cdot$h)), supplementary lighting
+(0.30~EUR/(kW$\cdot$h)) and CO$_2$ enrichment (0.30~EUR/kg). Dividing the logged cost
+columns by the logged energy and CO$_2$ columns of
+\texttt{regen/results/final/main.csv} returns exactly these three prices across all 780
+retained runs. $J$ is \emph{not} the scalar the environment returns as its reward: that
+scalar rescales the profit and subtracts normalised corridor-violation penalties. The
+distinction matters, because the two reinforcement-learning controllers are trained on the
+penalised reward while every controller is scored on the unpenalised $J$ --- their position
+on the violation axis partly reflects optimising a different objective from the one
+reported.
+
+What $J$ excludes matters for every result that follows. It omits planting material,
+labour, water, fertiliser, depreciation and fixed costs; it uses modelled dry-matter
+growth rather than realised marketable yield; and, critically, it does not value the
+biomass standing in the house at the end of the 60-day window. The surrogates of
+Section~\ref{sec:sindy} carry a three-component climate state and no crop state, so
+terminal biomass cannot be priced inside the optimisation even in principle. That is why
+the MPC stage cost (Section~\ref{sec:mpc}) is a proxy rather than a discretisation of
+Equation~\eqref{eq:epi}, and why $J$ is reported as a \emph{margin} and not as a farm
+profit: a controller that harvests within the window is rewarded over one that builds a
+crop for a later window, and no result here separates the two.
+
+$J$ carries no penalty for leaving the productive range, so margin can be bought with
+violations. The simulator's productive band is CO$_2\in[300,1600]$~ppm, air temperature
+$[15,34]\,^\circ$C and relative humidity $[50,85]\,\%$. Controllers are therefore
+compared by Pareto dominance in two axes --- $J$ and the seasonal count of steps in
+violation --- and no scalarised ``margin-minus-penalty'' criterion is introduced,
+because the simulator does not express violations in money. This corridor is also not the
+one the predictive controllers minimise against: their stage cost (Section~\ref{sec:mpc})
+penalises humidity only \emph{above} 85\,\% and CO$_2$ only \emph{below} a floor, so the
+lower humidity and upper CO$_2$ bounds are unweighted in the optimisation yet counted on
+the violation axis.
+
+\subsection{Controllers compared}
+\label{sec:controllers}
+
+Thirteen controllers were compared (Table~\ref{tab:controllers}). Two naming corrections
+apply relative to earlier reports of this work, and both are stated in the text because
+each was previously used to support a claim it does not support. First, the
+\emph{low-threshold} SINDy variant is not a reduced first-principles grey box: it is the
+same sparse estimator on the same feature library at a threshold of $10^{-6}$, i.e.\ the
+least sparse member of the family. Second, the aggregation loop applied to two SINDy
+controllers rolls the learner's own MPC in closed loop on the training seasons, appends
+the visited states to the identification set and re-estimates the model (3~iterations of
+5-day episodes). The rule-based controller is \emph{never queried} in that loop: this is
+on-policy re-identification, not DAgger and not imitation learning, and the rule-based
+controller is not an expert in it. One asymmetry inside that loop survives into the
+headline comparison and is disclosed here: its episodes are rolled under the default stage
+cost, so under the priced objective these two controllers aggregate their training states
+under one cost function and are evaluated under another.
+
+\begin{table}[htbp]
+\centering
+\caption{Controllers compared. Identification recipes are read from the frozen
+configuration \texttt{regen/regen\_config.py}; ``library'' refers to
+Section~\ref{sec:sindy}. All predictive controllers share one horizon ($N=20$) and one
+solver-failure budget (100).}
+\label{tab:controllers}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}llp{6.4cm}@{}}
+\toprule
+Label & Family & Definition \\
+\midrule
+\texttt{rule\_based} & heuristic & agronomic setpoint heuristic, hard-coded setpoints; deterministic \\
+\texttt{rule\_based\_tuned} & heuristic & the same heuristic after a 16-trial setpoint search (Section~\ref{sec:rbtune}) \\
+\texttt{sindy\_mpc\_raw} & SINDy-MPC & raw library, STLSQ, $\lambda=0.05$ \\
+\texttt{sindy\_mpc\_raw\_ens} & SINDy-MPC & raw library, ensemble, $\lambda=0.05$ \\
+\texttt{sindy\_mpc\_conf} & SINDy-MPC & frozen recipe: \texttt{physics\_no\_cross}, ensemble, $\lambda=0.05$ \\
+\texttt{sindy\_mpc\_dense} & SINDy-MPC & \texttt{physics\_no\_cross}, STLSQ, $\lambda=10^{-3}$ \\
+\texttt{sindy\_mpc\_lowthr} & SINDy-MPC & \texttt{physics\_no\_cross}, STLSQ, $\lambda=10^{-6}$ (not a grey box) \\
+\texttt{sindy\_mpc\_conf\_dagger} & SINDy-MPC & \texttt{conf} plus on-policy re-identification \\
+\texttt{sindy\_mpc\_dense\_dagger} & SINDy-MPC & \texttt{dense} plus on-policy re-identification \\
+\texttt{nn\_mpc} & neural MPC & $64{\times}64$ MLP surrogate on the \texttt{physics} library, 300 epochs; same horizon and stage cost, but the network is not embeddable in the NLP, so its MPC is a shooting formulation solved by L-BFGS-B on autograd gradients (25 iterations per step) \\
+\texttt{ppo}, \texttt{sac} & reinforcement learning & PPO \cite{schulman2017} and SAC \cite{haarnoja2018} from Stable-Baselines3 \cite{raffin2021}, $2\cdot10^{5}$ environment steps \\
+\texttt{oracle\_mpc} & idealised & cross-entropy planning directly on the simulator integrator: 48~candidate sequences, 2~refinement iterations, elite fraction 0.2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The 16-trial budget given to the rule-based reference (Section~\ref{sec:rbtune}) matches
+the budget the reinforcement-learning controllers are recorded as having received in the
+earlier pipeline, so the reference is not an unsearched baseline. That match is a stated
+budget, not a measured one: here the agents are trained once per seed at stock
+Stable-Baselines3 defaults and the neural surrogate at a fixed architecture, and no
+hyper-parameter search artefact for either exists in the results tree. The prediction
+horizon was \emph{not} tuned for any predictive controller either; that asymmetry runs
+against the MPC family and is disclosed in the Discussion.
+
+\subsection{Feature libraries and sparse identification}
+\label{sec:sindy}
+
+Sparse regression \cite{brunton2016,brunton2016c,kaiser2018} recovers an explicit
+discrete one-step map
+%
+\begin{equation}
+x_{k+1}=\Xi\,\Theta(x_k,u_k,d_k),
+\label{eq:sindy}
+\end{equation}
+%
+with state $x_k=(T_{\mathrm{in}},c,\varphi)^{\top}$ (air temperature, CO$_2$, relative
+humidity), six controls $u_k$ (boiler, CO$_2$ injection, thermal screen, ventilation,
+lamps, blackout screen) normalised to $[0,1]$, and disturbances $d_k$ (outdoor
+temperature, global radiation, outdoor CO$_2$, two diurnal harmonics). Three feature
+libraries were compared, differing only in $\Theta$:
+
+\begin{itemize}
+\item \texttt{raw} --- 11 features: the five disturbance channels and the six controls,
+      with no state transform whatsoever;
+\item \texttt{physics\_no\_cross} --- those 11 plus three physically motivated transforms
+      of state, radiation and screen position (14 features): saturation vapour pressure
+      $e_s(T_{\mathrm{in}})=0.6108\exp\bigl(17.27\,T_{\mathrm{in}}/(T_{\mathrm{in}}+237.3)\bigr)$
+      by the Magnus--Tetens relation, vapour-pressure deficit $D=(1-\varphi/100)\,e_s$,
+      and screen-attenuated radiation $S_{\mathrm{eff}}=I\,(1-u_{\mathrm{thscr}})$;
+\item \texttt{physics} --- those 14 plus four bilinear state\,$\times$\,control cross
+      terms ($T_{\mathrm{in}}S_{\mathrm{eff}}$, $\varphi u_{\mathrm{vent}}$,
+      $(c-c_{\mathrm{out}})u_{\mathrm{vent}}$, $T_{\mathrm{in}}u_{\mathrm{boil}}$),
+      18 features.
+\end{itemize}
+
+The three physical functions are nonlinear transforms of variables already in the raw
+library: they add no new measurement, only near-collinear columns. States and features
+are standardised before thresholding, so the threshold acts on dimensionless quantities,
+and the coefficients are transformed back to physical units. Four estimators were
+available: STLSQ, SR3, a constrained variant, and an ensemble optimiser with 20 bagged
+bootstrap replicates \cite{fasel2022}. Because the ensemble re-draws its bootstrap, a
+single fit is one realisation of a lottery; the draw is therefore carried as an explicit
+design axis, and the number of draws is recorded per row rather than assumed --- 10 per
+seed in the canonical wave, 6 per seed in the later wave that added the raw-library
+controller.
+
+\subsection{Identification ladder and pre-registered open-loop criteria}
+\label{sec:ladder}
+
+The identification recipe was selected in an open-loop ladder computed on the training
+years alone: 3 libraries $\times$ 2 polynomial degrees $\times$ 4 estimators $\times$
+3 denoisers $=72$ configuration labels, each fitted on 20 seeds, for 1440 fits
+(\texttt{regen/results/ladder\_rerun/}). No closed-loop quantity enters it. Each fit
+records the one-step RMSE, the multi-step rollout RMSE and divergence fraction at
+horizons of 4, 20 and 96 steps (1~h, 5~h, 24~h; the reported value is always the 24-h
+figure), the number of non-zero terms, the regression condition number, and whether the
+map can be embedded analytically in the MPC. The pre-registration declared two gates,
+MPC-embeddability and a sign-and-dimension transparency check, and specified multi-step
+stability only qualitatively, as a divergence fraction near zero. What was applied differs
+on both counts and is reported as applied: the divergence criterion was operationalised as
+a fixed threshold of 0.05 in the table generator, and the transparency column is empty in
+all 1440 rows, so that gate was never evaluated and is not claimed here. Under
+embeddability and the 0.05 threshold, 32 of the 72 labels pass.
+Figure~\ref{fig:ladder} shows the grid in the plane of the two prediction criteria.
+
+Four properties of this grid bound what it can support. (i)~The rollout metrics are
+computed on the same 2018--2019 data the model was fitted to and are therefore
+in-sample; a separate held-out block (240 fits: 10 seeds $\times$ 3 libraries $\times$
+2 estimators $\times$ 4 fit-year~$\rightarrow$~eval-year directions,
+\texttt{regen/results/holdout/}) splits the two training years to test whether the
+library ordering survives. (ii)~The \texttt{constrained} and \texttt{sr3} estimators
+produce bit-identical fits in all 360 seed-cells, so the ladder holds 54 distinct
+configurations under 72 labels and pooled per-library averages double-weight that
+estimator. (iii)~Every degree-2 configuration is non-embeddable, so the embeddability
+gate is exactly the degree-1 filter here and carries no independent information.
+(iv)~An earlier harness passed the rollout horizons in days rather than steps, inflating
+the divergence fraction of divergence-prone configurations; only the recomputed ladder is
+used here.
+
+\subsection{MPC formulation and stage cost}
+\label{sec:mpc}
+
+The explicit form of Equation~\eqref{eq:sindy} allows it to be embedded analytically in a
+finite-horizon optimal control problem \cite{mayne2000}:
+%
+\begin{equation}
+\min_{u_{0},\dots,u_{N-1}}\ \sum_{k=0}^{N-1}\bigl[\ell_{\mathrm{res}}(u_k)
++\ell_{\mathrm{corr}}(x_k)\bigr]+\ell_{\mathrm{corr}}(x_N)
+\quad\text{s.t.}\quad x_{k+1}=\Xi\,\Theta(x_k,u_k,d_k),
+\label{eq:mpc}
+\end{equation}
+%
+with $N=20$ steps (5~h). The corridor term is
+$\ell_{\mathrm{corr}}=30\,b_T^2+3\cdot10^{-4}b_{c}^2+8\,b_{\varphi}^2$, where $b_T$,
+$b_c$ and $b_\varphi$ are excursions from a diurnally varying productive band:
+temperature in $[15+3w,\,19+5w]\,^\circ$C, CO$_2$ above $400+300w$~ppm and relative
+humidity below 85\,\%, with $w\in[0,1]$ a smooth day weight. Violations are penalised
+softly so the problem stays feasible; temperature is hard-bounded to
+$[12,35]\,^\circ$C, ventilation to $[0,0.4]$ and the other controls to $[0,1]$, and a
+move-suppression term penalises control increments. The problem is solved by an
+interior-point method (IPOPT \cite{wachter2006} through do-mpc \cite{fiedler2023}), whose
+initial guess is set once from the measured initial state and carried forward by the
+solver itself; no controller-specific warm start is supplied. The budget is 100 solver
+failures, shared by every solver-based
+controller. When a solve fails the step falls back to a fixed action (boiler 0.3, thermal
+screen closed, all else zero) and the failure counts against that budget; a run that
+exhausts it is excluded (Section~\ref{sec:stats}).
+
+The resource term $\ell_{\mathrm{res}}$ of Equation~\eqref{eq:mpc} required correction,
+and this is a methodological change rather than a tuning choice. Its default weights,
+$20u_{\mathrm{boil}}+10u_{\mathrm{lamp}}+2u_{\mathrm{CO}_2}$, penalise the boiler twice as
+hard as the lamps. Dividing the logged cost columns by the logged actuator sums in
+\texttt{regen/results/final/main.csv} gives a marginal cost per unit of accumulated
+normalised control of 0.00293, 0.00870 and 0.00135~EUR respectively --- ratios
+$1:2.97:0.46$ against the default $1:0.5:0.1$, so the most expensive actuator was the
+least penalised. A \texttt{priced} variant restores the measured ratios,
+$7.22u_{\mathrm{boil}}+21.44u_{\mathrm{lamp}}+3.33u_{\mathrm{CO}_2}$, scaled so the total
+at $u=(1,1,1)$ is 31.99 against the default 32.0. The corridor term is untouched, so the
+\emph{only} factor that changes is the relative weighting of the actuators, not the
+energy/corridor balance. The correction is bounded by the harness, and the bound is stated
+rather than left to be inferred: the objective switch reaches only the main closed-loop
+comparison and the mechanism block. Every supporting block --- unseen seasons, the
+shortened horizon, the bootstrap-draw axis, the design and sensitivity sweeps, adaptation,
+the safety guard, fault injection --- calls its rollouts with the default stage cost
+hard-coded, so those results are default-objective whatever directory they were written to,
+and the coefficient- and threshold-sensitivity analyses have never been measured under the
+priced weights.
+
+\subsection{Rule-based reference and its tuning}
+\label{sec:rbtune}
+
+Reporting a reference as ``tuned'' when it was not is exactly the weak-baseline defect
+this paper criticises in the literature, so the heuristic was given a 16-trial search
+budget (Table~\ref{tab:rbtune}). Sixteen configurations were drawn i.i.d.\ uniformly from
+a fixed generator (\texttt{default\_rng(20260810)}) and scored alongside the hard-coded
+configuration, which enters the search as trial~0, giving 17 evaluated configurations.
+Selection used the mean of $J$ over the training seasons 2018--2019 only; the test seasons
+play no part in it. The heuristic is deterministic, so one run per configuration and season
+suffices and there is no run-to-run dispersion.
+
+\begin{table}[htbp]
+\centering
+\caption{Rule-based setpoint search. Ranges, hard-coded values and the selected
+configuration. Source: \texttt{regen/results/n2\_tune/tune\_rb\_n2.csv}.}
+\label{tab:rbtune}
+\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Setpoint & Range searched & Hard-coded & Selected \\
+\midrule
+\texttt{temp\_setpoint\_day} ($^\circ$C)  & 17.0--23.0 & 19.5 & 22.92 \\
+\texttt{temp\_setpoint\_night} ($^\circ$C)& 14.0--20.0 & 16.5 & 14.38 \\
+\texttt{co2\_day} (ppm)                   & 400--1200  & 800  & 828.26 \\
+\texttt{lamp\_rad\_sum\_limit}            & 5.0--25.0  & 10   & 7.62 \\
+\midrule
+Training $J$ (mean 2018--2019, EUR/m$^2$) & --- & $-1.937$ & $+0.920$ \\
+Test $J$ (mean 2020--2023, EUR/m$^2$)     & --- & $-1.226$ & $+2.261$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Tuning is worth $+3.49$~EUR/m$^2$ over the four test seasons, concentrated in the two
+adverse ones, and moves the heuristic towards a wider diurnal swing (warmer by day,
+cooler by night) with a lower lamp threshold; it is bought with constraint pressure, the
+seasonal violation count rising from 2813 to 4339 steps. Only 2 of the 16 draws beat the
+hard-coded setpoints, placing the stock configuration near the 88th percentile of the
+searched space: it was not arbitrary, merely unsearched.
+
+\subsection{Statistical treatment}
+\label{sec:stats}
+
+Dispersion is generated by re-collecting the identification data in every repeat, so each
+seed identifies a different surrogate; for the reinforcement-learning controllers the seed
+also re-runs training. In the main closed-loop comparison twenty seeds were run for every
+surrogate-based and learned controller; the supporting blocks use fewer, and their $n$ is
+stated with each. Two exceptions are quoted wherever they appear: the neural MPC has 20
+seeds under the default objective but only 10 under the priced one, and the idealised
+controller loses one whole season to the exclusion rule below. The heuristic is
+deterministic: the stock version was nevertheless repeated on all 20 seeds in the main wave,
+returning 20 identical values per season, while the tuning wave ran the stock and tuned
+versions once per season, so the tuned reference has $n=4$ and no seed axis at all.
+
+Three accounting rules precede any average. First, several waves were resumed after
+interruptions and their files overlap, so rows are deduplicated on
+(method, seed, test\_year) --- or on the block-specific factor key --- before
+aggregation; the deduplicated priced pool contains 600 rows. Second, a run is excluded
+when it was truncated \emph{and} exhausted the solver-failure budget, which removes 20 of
+the 800 rows of the canonical main table, all \texttt{oracle\_mpc} in 2022. Third,
+seasons terminated by the simulator rather than the solver are retained as outcomes
+(42~such seasons in the canonical table), and every headline figure is recomputed three
+ways --- as-is, over complete seasons only, and normalised by the realised season
+fraction --- with any rank change reported.
+
+Paired comparisons use the Wilcoxon signed-rank test \cite{wilcoxon1945} with Holm
+correction \cite{holm1979}. Because Holm's adjustment depends on the family, the family
+size is stated with every adjusted $p$-value, and adjusted values from different families
+are not comparable. One departure is fundamental rather than presentational: because both
+rule-based references are deterministic, comparisons against either are \textbf{one-sample
+signed-rank tests of the differences against a constant}, not genuinely paired tests, and
+the reference carries no sampling uncertainty. The same limit binds any
+test that treats a deterministic controller as the sample: at $n=4$ the minimum attainable
+two-sided $p$ is 0.125, so such a comparison can never reach significance whatever the
+effect size, and its point estimate is reported without a significance claim. An
+across-season spread quoted for a deterministic controller is labelled as such and is not
+an error bar.
+
+Effect sizes accompany every $p$-value, with medians preferred to means wherever the
+distribution is skewed, and bootstrap confidence intervals \cite{efron1994,demsar2006}
+for aggregate quantities. This is deliberate: the data contain a contrast significant at
+$p=0.012$ for a difference of 0.0066~EUR/m$^2$, and another whose mean is nine times its
+median.
+
+\subsection{Reproducibility, provenance and its limits}
+\label{sec:repro}
+
+Random number generation is pinned per run coordinate: one helper derives the key from
+(experiment, controller, seed) and seeds Python, NumPy and torch through a single
+implementation, BLAS thread counts are fixed, and the 20 seeds are declared in the frozen
+configuration rather than passed on the command line. Every result row carries a
+\texttt{config\_hash} (\texttt{637c6b535a9e} for all waves reported here) and a
+\texttt{git\_sha}. The hash is identical across the default- and priced-objective waves and
+so cannot by itself discriminate between them, and the per-row variant fields only partly
+can: \texttt{horizon} and \texttt{max\_solver\_failures} are written by the main runner but
+by none of the supporting blocks, and \texttt{objective} only by waves generated after that
+flag was added --- it is absent from the canonical main table, which is default-objective by
+construction. The identifying key is therefore the results tree and block together with
+these fields where present; \texttt{git\_sha} is \texttt{unknown} in a few early resumed
+files.
+
+A self-test runs the pipeline twice under identical seeds and compares SHA-256 digests of
+the training states and actions, the ensemble coefficients, the STLSQ coefficients, the
+neural-network weights and the closed-loop trajectory, together with the closed-loop $J$ to
+twelve decimal places: all seven digests were identical on the pinned stack, and all nine
+with the reinforcement-learning policies added. Its coverage is narrower than the study:
+the closed-loop leg is a single surrogate-MPC rollout of one recipe on one season under the
+default objective, and no supporting block, neither the identification ladder nor the
+replay block, is exercised.
+
+One caveat qualifies every reproducibility statement here. Closed-loop results do
+\textbf{not} reproduce across operating environments.
+[UNSOURCED: in a controlled comparison of one
+wave between a Linux cluster and a Windows workstation, with identical
+\texttt{config\_hash} and the self-test passing on both machines, closed-loop $J$ matched
+in \textbf{0 of 180 cells}, mean $|\Delta|$ 1.33~EUR/m$^2$, maximum 11.6, while open-loop
+quantities did match --- the Mahalanobis detector threshold was bit-identical at 2.8595
+and its AUC agreed to $0.6625$ versus $0.6621$. The second machine's run is not under
+\texttt{regen/results}, so these figures cannot be recomputed; restore that wave or cut
+the sentence before submission. The same marker stands in
+Section~\ref{sec:disc-limitations}, and one decision settles both.]
+The cause is chaotic amplification of
+platform-level floating-point differences through a 5760-step nonlinear loop, and it is
+visible in the present data --- which \emph{are} in the results tree --- even for a
+deterministic controller: the hard-coded heuristic
+returns a four-season mean of $-1.2061$~EUR/m$^2$ in one harness and $-1.2264$ in
+another at identical \texttt{config\_hash}. The rule adopted here is that a whole wave is
+regenerated in one environment and that environment is named; environments are never
+mixed cell-by-cell for closed-loop numbers. Three environment fingerprints are on record
+across the reported waves, so no single environment hash is quoted as ``the'' pinned
+stack, and the reproducibility claim must not be read as cross-platform.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.86\textwidth]{figures/fig-methods-design.pdf}
+% PLOT: schematic of the experimental design, no CSV source (design diagram).
+% Left-to-right flow: (1) ERA5 weather 2018-2019 -> rule-based controller + PRBS 0.3
+% -> identification dataset; (2) identification ladder, 72 labels x 20 seeds, open-loop
+% gates only (embeddable AND diverged_frac <= 0.05) -> frozen recipe; (3) closed loop on
+% 2020-2023 (20 seeds x 4 seasons) under the priced stage cost; (4) never-seen seasons
+% 2014-2017. Mark clearly which arrows are forbidden: no closed-loop quantity feeds
+% back into stage (2), and test seasons never enter stage (2) or the rule-based tuning.
+\caption{Experimental design and the information barriers between its stages.
+Identification and every selection decision use 2018--2019 only; closed-loop evaluation
+uses 2020--2023; the 2014--2017 block was generated after all recipes were frozen.}
+\label{fig:design}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.80\textwidth]{figures/fig-ladder-scatter.pdf}
+% SOURCE CSV: regen/results/ladder_rerun/ladder_rerun.csv + ladder_rerun2.csv
+% (1440 rows; filter degree == 1 and denoise == "none"; group by variant).
+% PLOT: scatter of one-step RMSE of t_in (x, linear) against 24-h rollout RMSE of t_in
+% (y, log scale), one marker per (variant, optimizer) cell, coloured by feature library
+% (raw / physics_no_cross / physics). Overlay the median and IQR per library. Draw the
+% divergence gate at diverged_frac = 0.05 as marker fill (open = fails the gate).
+% The point of the panel is the opposing orientation of the two axes across libraries.
+\caption{The two open-loop selection metrics order the feature libraries in opposite
+directions. Data from the 20-seed identification ladder; the divergence gate
+($\le 0.05$) is encoded by marker fill.}
+\label{fig:ladder}
+\end{figure}
+
+%% ===========================================================================
+%% NEW REFERENCES NEEDED (not present in statya_ru.tex's bibliography)
+%%
+%%   hersbach2020  -- Hersbach, H. et al. "The ERA5 global reanalysis."
+%%                    Q. J. R. Meteorol. Soc. 146(730), 1999-2049, 2020.
+%%   openmeteo2023 -- Zippenfenig, P. "Open-Meteo.com Weather API." 2023.
+%%                    (software/data service citation)
+%%   wachter2006   -- Wachter, A.; Biegler, L. T. "On the implementation of an
+%%                    interior-point filter line-search algorithm for large-scale
+%%                    nonlinear programming." Math. Program. 106(1), 25-57, 2006.
+%%   fiedler2023   -- Fiedler, F. et al. "do-mpc: Towards FAIR nonlinear and robust
+%%                    model predictive control." Control Eng. Pract. 140, 105676, 2023.
+%%
+%% Optional, only if the cross-entropy oracle is discussed in more depth than here:
+%%   rubinstein1999 -- Rubinstein, R. Y. "The cross-entropy method for combinatorial
+%%                     and continuous optimization." Methodol. Comput. Appl. Probab.
+%%                     1(2), 127-190, 1999.
+%% ===========================================================================

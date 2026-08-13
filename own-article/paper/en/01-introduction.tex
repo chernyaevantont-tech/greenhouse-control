@@ -1,0 +1,358 @@
+%% ============================================================================
+%% 01-introduction.tex — Introduction
+%% Every number in this file is traceable to a CSV under regen/results/.
+%% Provenance comments are given inline at each quantitative claim.
+%% ============================================================================
+
+\section{Introduction}
+\label{sec:intro}
+
+Greenhouse vegetable production is energy-intensive, and its economic result depends
+directly on the quality of climate control. Heating, CO$_2$ enrichment and supplementary
+lighting dominate variable cost, and each has to be weighed against the revenue from the
+additional yield it buys \cite{katzin2020,katzin2021}. This is the natural setting for
+model predictive control (MPC): an economic criterion is optimised over a finite horizon
+subject to the temperature, humidity and CO$_2$ bounds that define a productive
+microclimate \cite{vanhenten1994,mayne2000,rawlings2012,lin2021}. MPC, however, requires
+a process model, and building and calibrating a detailed physical greenhouse model is
+laborious, which motivates surrogate models identified from data. Sparse identification
+of nonlinear dynamics (SINDy) is one such route: the dynamics are recovered explicitly as
+a sparse combination of library functions
+\cite{brunton2016,brunton2016c,kaiser2018,fasel2022}.
+Unlike a neural surrogate, a SINDy model is a white box: its equations can be written out,
+checked for physical and dimensional consistency, and embedded analytically in the MPC
+solver --- which matters when a controller is to be trusted with a crop.
+
+Whether an interpretable surrogate costs anything in control quality is an empirical
+question, and answering it objectively is obstructed by three defects that recur in the
+greenhouse-control and data-driven-control literature. First, learned controllers are
+often compared against a weak heuristic, whereas well-tuned agronomic rules are a strong
+reference \cite{morcego2023,mallick2024,vanlaatum2025}. Second, the reported performance
+index is frequently a setpoint-tracking error rather than economic margin
+\cite{lin2021,morcego2023}, although the two need not be monotonically related. Third ---
+and least obvious --- the hyper-parameters of the surrogate are selected on open-loop
+prediction accuracy \cite{kaiser2018,yonezawa2025}, tacitly assuming that a more accurate
+model yields better control. Table~\ref{tab:defects} states each defect, the remedy
+adopted here, and what we measured the defect to be worth. We emphasise that the first two
+defects were present in our \emph{own} earlier analysis of this dataset --- an untuned
+reference, and an MPC stage cost whose actuator weights contradicted the prices the
+economic criterion itself uses --- and that correcting them removed about two thirds of the
+effect we had originally reported.
+
+The third assumption is exactly what the identification-for-control literature warns
+against: a model should be judged by the behaviour of the loop it closes, not by the
+quality of its open-loop fit \cite{ljung1991,gevers1993,vandenhof1995}. The same
+phenomenon reappears for learned models under the name \emph{objective mismatch}: one-step
+predictive accuracy is a poor proxy for control performance
+\cite{lambert2020,jackson2022,farahmand2017}, and recent surveys confirm that the point
+is live for modern data-driven surrogates \cite{wei2023,controlorientedsurvey2025}. That
+literature is largely diagnostic, and its prescription --- evaluate candidates in closed
+loop --- costs a simulator, a solver and a full season per candidate. The practical
+question is therefore narrower and, to our knowledge,
+unanswered for economic greenhouse MPC: \emph{if} a surrogate must be selected open-loop,
+\emph{which} open-loop criterion tracks closed-loop economics?
+
+A second, related gap concerns the content of the feature library. Physically motivated
+basis functions --- saturation vapour pressure, vapour-pressure deficit,
+screen-attenuated radiation --- are adopted almost by default in physics-informed
+surrogate modelling \cite{raissi2019,karniadakis2021}, on the reasonable presumption that
+encoding known physics can only help. They are rarely tested for harm. Yet such features
+are nonlinear transforms of the same measured states, hence near-collinear with them, and
+collinearity is known to degrade sparse regression \cite{cortiella2021,balanceguided2026}.
+Whether that presumption survives a closed-loop economic criterion is the second question
+we address.
+
+\begin{table}[htbp]
+\centering
+\caption{The three benchmarking defects addressed in this study, and the measured cost of
+leaving each in place. All figures are seasonal margin in EUR~m$^{-2}$ unless stated
+otherwise.}
+\label{tab:defects}
+\begin{tabular}{p{0.20\textwidth}p{0.30\textwidth}p{0.38\textwidth}}
+\toprule
+\textbf{Defect} & \textbf{Remedy adopted here} & \textbf{Measured consequence of the
+defect} \\
+\midrule
+Weak reference: learned controllers compared with a hard-coded heuristic &
+The agronomic rule-based reference is tuned on the training seasons only, by a 16-trial
+random search --- the same trial budget the reinforcement-learning agents receive &
+Tuning lifts the heuristic from $-1.23$ to $+2.26$ (gain $+3.49$), so every advantage
+measured against the untuned reference is overstated by that amount. The tuned heuristic
+buys the gain with constraint pressure (2813 to 4339 violation steps) and is itself off
+the Pareto front \\
+\addlinespace
+Proxy objective: tracking error reported instead of margin, and an MPC stage cost whose
+actuator weights contradict the prices the criterion uses &
+Every controller is scored by the simulator's own profit function, jointly with
+constraint violations under Pareto dominance; the MPC stage cost is re-weighted to match
+the price vector &
+Re-weighting improves both axes for all eight MPC controllers: $+1.54$ to $+2.74$ for the
+five physics-library variants and $+1.57$ for the neural surrogate, against $+0.21$ to
+$+0.25$ for the two raw-library ones, cutting the apparent library effect from $+3.66$ to
+$+1.23$ \\
+\addlinespace
+Open-loop selection: identification configuration chosen by one-step prediction accuracy &
+Candidates are scored by multi-step rollout stability and regression conditioning, fixed
+before and independently of any closed-loop evaluation &
+Among the candidates that are embeddable in the solver, the best one-step configuration
+comes from the library with condition number $53.4$ rather than the one with $8.2$, and
+with median 24-h rollout RMSE $24.27$~$^\circ$C rather than $2.67$~$^\circ$C \\
+\bottomrule
+\end{tabular}
+\end{table}
+%% Sources — row 1: regen/results/n2_tune/tune_rb_n2.csv, blocks tuned_test vs stock_test
+%% (four-season means +2.2613 and -1.2264, gain +3.4878; violation_steps_total 2813.0 stock
+%% vs 4338.5 tuned). "Off the Pareto front": tuned (+2.2613, 4338.5) is dominated on both
+%% axes by sindy_mpc_dense (+3.0822, 3686.3) — recomputed front = {raw_ens, lowthr, dense,
+%% dense_dagger, ppo}.
+%% Row 1 budget: `regen/experiments_support.py:537` — RB_TUNE_TRIALS = 16, commented "exactly
+%% the budget of the RL controllers". It is NOT matched to the MPC controllers, which received
+%% no hyper-parameter search at all; the h=8 sweep (regen/results/ec_h8/main_ec_h8.csv) shows
+%% every MPC improves at a shorter horizon, so the asymmetry runs AGAINST the MPCs. Do not
+%% write "the same budget the learned controllers receive". Search is i.i.d. uniform over
+%% four setpoints, selection on 2018-2019 only; only 2 of the 16 draws beat the stock
+%% setpoints, so the stock configuration was un-searched rather than arbitrary.
+%% Row 2: regen/results/priced_main/*.csv and priced_dagger/*.csv vs regen/results/final/main.csv
+%% and regen/results/n7/main_n7.csv (seed- and season-matched deltas; gap 4.0718-0.4132=3.6586
+%% default vs 4.3173-3.0888=1.2285 priced). The eight controllers are 5 physics_no_cross
+%% variants (delta +1.5384 conf ... +2.7383 dense), 2 raw variants (+0.2143, +0.2455) and
+%% nn_mpc (+1.5654, 10 seeds / 40 runs only). All eight also cut violation steps.
+%% Row 3: regen/results/ladder_rerun/ladder_rerun.csv + ladder_rerun2.csv, degree 1, denoise
+%% none, sparse estimators (STLSQ + ensemble), n = 40 fits per library.
+%% SCOPE WARNING (checked, do not widen): the "one-step prefers physics" statement is
+%% scope-dependent. Pooled over ALL 72 configurations the RAW library has the best mean
+%% one-step RMSE (2.7035 vs 2.9750 physics_no_cross vs 3.4544 physics), so the claim is
+%% FALSE at whole-grid scope. It holds (a) at configuration level — the best one-step config
+%% of all 72 is physics/d2/stlsq/none (0.9581), and the best embeddable one is
+%% physics/d1/ensemble/none (1.6750); and (b) at library level within degree 1
+%% (physics 2.7285 < raw 2.7657 < physics_no_cross 2.7791) and within degree-1/denoise-none
+%% (physics 2.0216 best; n=80) and its sparse subset (physics 1.6753; n=40).
+%% kappa also depends on the denoiser: physics is 53.43 undenoised but 41.24 (kalman) /
+%% 43.20 (savgol), so 53.4 vs 8.2 is a denoise=="none" figure.
+
+We address both questions on a validated GreenLight tomato model
+\cite{katzin2020,vanlaatum2025}, driven by recorded weather for a single location and
+simulated at a 15-min control step. Candidate surrogates were identified on two training
+seasons, and thirteen controllers were evaluated --- seven SINDy-MPC variants, a
+neural-network MPC, two deep reinforcement-learning agents
+\cite{schulman2017,haarnoja2018,raffin2021},
+a full-simulator-model MPC and the rule-based heuristic in both
+its stock and tuned configurations --- over four held-out test seasons. A \emph{season}
+here is the 60-day window from 1 March, and margin is profit per square metre of floor
+area. Each learned controller was run at 20 identification replicates per season (10 for
+the neural-network MPC); the heuristic is deterministic and was run once per season, and
+the full-simulator-model MPC returned only three of the four seasons, its 2022 runs having
+exhausted the solver-failure budget. Comparisons use non-parametric signed-rank tests with
+Holm correction \cite{wilcoxon1945,holm1979,demsar2006}; against the deterministic
+heuristic the test is one-sample against a constant rather than genuinely paired. The
+contributions are three.
+
+\textbf{(i) One-step accuracy and multi-step stability rank candidate libraries in
+opposite orders, and the closed-loop ordering follows the multi-step one.} The
+identification ladder evaluated 72 labelled configurations, covering 54 distinct fits ---
+two of the optimizer labels turn out to be bit-identical. Within its degree-1 block ---
+the degree-2 candidates are all non-embeddable in the MPC solver --- the library with the
+best one-step accuracy is the worst on every multi-step metric. Taking the undenoised
+cells under the two sparse estimators ($n = 40$ fits per library), adding physically
+motivated features improves
+one-step RMSE from $1.86$ to $1.68$~$^\circ$C while degrading the median 24-h rollout RMSE
+from $2.67$ to $24.27$~$^\circ$C, raising the regression condition number from $8.2$ to
+$53.4$ and the divergence rate from $0.000$ to $0.076$ (Figure~\ref{fig:reversal});
+withholding only the bilinear cross terms recovers part of the loss but not the ordering
+(rollout $10.58$~$^\circ$C, $\kappa = 24.5$). In closed loop, a raw, physics-free library
+--- also the sparsest and the best conditioned of the three --- attains the best
+four-season mean margin of the thirteen controllers, $+4.32$~EUR~m$^{-2}$ against $+3.09$
+for the best physics-informed variant, ahead in 62 of 80 season~$\times$~replicate pairs
+($p_{\mathrm{Holm}} = 7.7 \times 10^{-4}$). The gap is small against the run-to-run
+spread --- standard deviations $4.08$ and $2.71$ for a difference of $1.23$ --- and it
+reverses in one of the four seasons ($-1.56$ against $+0.27$ in 2021). The library
+ordering holds again on four seasons never used at any stage of model or controller
+development (four controllers, eight replicates, default objective). Only the two
+better-conditioned libraries reached closed loop, so this evidence separates the raw
+library from physics-without-cross-terms, not from full physics. Physical motivation of a
+basis function is therefore not evidence that it belongs in the library.
+
+\textbf{(ii) A benchmark whose comparison defects have been measured rather than
+assumed.} Against the properly tuned heuristic the raw-library controller is better by
+$+2.06$~EUR~m$^{-2}$, ahead in 75 of 80 season~$\times$~replicate comparisons
+($p_{\mathrm{Holm}} = 6.9 \times 10^{-11}$, Holm correction over a family of 13, which we
+declare wherever a corrected level is quoted). Three further SINDy-MPC variants also clear
+the tuned heuristic, by smaller margins: the raw library is first, not alone. Against the
+untuned reference the same
+advantage would read $+5.54$ --- the failure mode this literature is criticised for,
+reproduced and quantified on our own data. Likewise, two thirds of what initially
+looked like a feature-library effect was in fact a defective MPC stage cost
+(Table~\ref{tab:defects}, row 2).
+
+\textbf{(iii) A candidate mechanism put to controlled ablation, and found too small to
+carry the effect.} Near-collinear physics features inflate the condition number, and at
+the frozen recipe's sparsity threshold the regression deletes the boiler actuator
+coefficient in 17 of 20 identification replicates. Knocking that single coefficient back
+in is statistically significant but small once the objective is corrected --- median
+$+0.21$~EUR~m$^{-2}$, $p_{\mathrm{Holm}} = 1.2 \times 10^{-3}$, 20 replicates in a single
+season --- and the complementary knock-out is null. Three further observations rule the
+coefficient out as the carrying explanation: the same threshold deletes the term in 9 of
+20 replicates of the \emph{raw} library as well; the best physics-informed controller
+retains it in all 20 and still trails the raw library by $1.23$~EUR~m$^{-2}$; and
+raw-library runs that lost the term still average $+3.48$~EUR~m$^{-2}$, above every
+physics-library cell including those that kept it ($+2.36$). We therefore report the
+conditioning and multi-step stability of the basis, not any single coefficient, as the
+explanation the evidence supports.
+
+We are explicit about what this does not show. The advantage is not Pareto-dominant: the
+front holds five points, and the PPO agent attains far fewer constraint violations
+($1330$ against $4130$ steps per season) at a lower margin. The surrogate carries no crop
+state, so the MPC objective is necessarily a proxy and terminal biomass cannot be priced.
+The mechanism experiments are single-season and replication is unequal across controllers.
+All results are simulation-only, for one location and one planting date, and closed-loop
+margins reproduce within a computing environment but not across environments. The
+remainder of
+the paper is organised as follows. Section~\ref{sec:methods} describes the controlled
+object, the economic criterion, the data, the controllers and the identification
+protocol; Section~\ref{sec:results} reports the model-selection ladder, the four-season
+economic comparison and the mechanism experiments; Section~\ref{sec:discussion} discusses
+the implications and the limits; Section~\ref{sec:conclusions} concludes.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/fig01_selection_reversal.pdf}
+\caption{The selection criterion decides the answer. The three candidate feature libraries
+rank in opposite orders under one-step prediction accuracy (\textbf{a}) and under 24-h
+rollout stability with regression conditioning (\textbf{b}); of the two libraries carried
+into closed loop, the one preferred by the second ordering earns the higher seasonal
+margin (\textbf{c}). Panels (\textbf{a}) and (\textbf{b}): degree-1 undenoised fits under
+the two sparse estimators, $n = 40$ per library. Panel (\textbf{c}): four-season mean
+margin under the priced objective, $n = 80$ runs per controller, whiskers are run-level
+standard deviations; the full-physics library has no closed-loop controller and is not
+shown.}
+\label{fig:reversal}
+\end{figure}
+%% FIGURE 1 — what to plot (no image file exists yet; path is a placeholder).
+%% Panel (a): bar chart of one-step RMSE of t_in per library — raw 1.8616, physics_no_cross
+%%   1.7281, physics 1.6753 °C. Annotate that LOWER is better, so `physics` "wins".
+%% Panel (b): paired bars, median 24-h rollout RMSE (log scale: raw 2.668, physics_no_cross
+%%   10.576, physics 24.268 °C) and condition number kappa (8.207 / 24.517 / 53.425);
+%%   overlay divergence fraction (0.0000 / 0.0204 / 0.0758) as point markers.
+%%   Source for (a) and (b): regen/results/ladder_rerun/ladder_rerun.csv +
+%%   ladder_rerun2.csv, filtered to degree == 1, denoise == "none",
+%%   optimizer in {stlsq, ensemble}; n = 40 fits per library; dedup on
+%%   (variant, degree, optimizer, denoise, seed).
+%% Panel (c): four-season mean closed-loop EPI with SD whiskers for the two libraries that
+%%   were carried into closed loop — raw (sindy_mpc_raw_ens +4.3173) and physics_no_cross
+%%   (best variant sindy_mpc_lowthr +3.0888). Source: regen/results/priced_main/*.csv +
+%%   regen/results/priced_dagger/*.csv, deduped on (method, seed, test_year), n = 80 runs
+%%   per controller. NOTE: the `physics` library with cross terms has NO closed-loop
+%%   controller in the main comparison — mark its bar in panel (c) as "not evaluated in
+%%   closed loop", do not impute a value.
+
+%% ============================================================================
+%% PROVENANCE OF NUMBERS QUOTED IN THE CONTRIBUTIONS
+%% ----------------------------------------------------------------------------
+%% (i)  one-step 1.8616 / 1.7281 / 1.6753 °C; rollout median 2.668 / 10.576 / 24.268 °C;
+%%      kappa 8.207 / 24.517 / 53.425; diverged 0.0000 / 0.0204 / 0.0758; 72 configurations
+%%      -> regen/results/ladder_rerun/ladder_rerun.csv + ladder_rerun2.csv
+%%         (degree 1, denoise none, optimizer in {stlsq, ensemble}, n = 40 per library).
+%%      SCOPE: the "worst on every multi-step metric" claim is stated for the DEGREE-1 block
+%%      and is true there (degree 1, all denoisers, 240 rows/library: one-step physics 2.7285
+%%      < raw 2.7657 < physics_no_cross 2.7791; rollout mean 456.19 / 5.00 / 6.53; rollout
+%%      median 6.3146 / 5.4253 / 5.8191; diverged 0.0433 / 0.0000 / 0.0037). It is NOT true
+%%      pooled over all 72 labels, where RAW has the best mean one-step RMSE (2.7035 vs
+%%      2.9750 vs 3.4544). Do not restate this claim at whole-grid scope.
+%%      "only degree-1 is embeddable": 36/36 degree-1 embeddable, 0/36 degree-2 (verified).
+%%      54 distinct fits: `constrained` and `sr3` are bit-identical in all 360 seed-cells on
+%%      nonzero, kappa, rollout, diverged and one-step (verified by array comparison).
+%%      +4.3173 (sindy_mpc_raw_ens, SD 4.0756) and +3.0888 (sindy_mpc_lowthr, SD 2.7069)
+%%      -> regen/results/priced_main/*.csv + priced_dagger/*.csv, dedup on
+%%         (method, seed, test_year), n = 80 runs / 20 seeds each. Paired on
+%%         (seed, test_year): delta mean +1.2285, median +1.5769, 62/80 wins,
+%%         p_raw 1.832e-4, p_Holm 7.708e-4 over the family of 13.
+%%      2021 REVERSAL (must stay in the text): per-season means raw_ens -1.5563 vs
+%%         lowthr +0.2654. The raw-library controller is NOT first in all four seasons —
+%%         "first in all four seasons" is a RETRACTED claim (REVISION_LOG G6), do not
+%%         reintroduce it by writing "best in every season" or "best seasonal margin".
+%%      Unseen seasons 2014-2017 -> regen/results/n5_years/main_n5.csv (8 seeds, 4 controllers
+%%         only: raw_ens +6.4219, conf +2.3754, dense +1.0710, rule_based -0.3271;
+%%         objective column = "full", i.e. DEFAULT objective — hence the parenthetical).
+%%      Season definition (60 days from 03-01, period 900 s, 5760 steps) and the 2018-2019
+%%         training years -> regen/results/priced_main/regen_manifest.json
+%%         (season_days 60, season_start_md "03-01", period 900, location Rostov-on-Don).
+%%      WEATHER (RESOLVED 2026-08-13, an earlier note here guessed wrong and is retracted):
+%%         the manifest records only the location, but own-article/weather_data_methodology.md
+%%         and own-article/make_weather.py pin the source exactly — Open-Meteo Historical
+%%         (ERA5 / ERA5-Land), endpoint archive-api.open-meteo.com/v1/archive, hourly
+%%         temperature_2m / relative_humidity_2m / dew_point_2m / wind_speed_10m /
+%%         shortwave_radiation / cloud_cover, LINEARLY resampled to the 5-min grid the
+%%         simulator loads, with sky temperature DERIVED (Brunt clear-sky emissivity from the
+%%         dew point, blended by cloud cover) rather than retrieved. It is NOT the
+%%         GreenLight-Gym stock pipeline and NOT NASA POWER. 02-methods.tex Sec. 2.1 states
+%%         this correctly and cites hersbach2020 + openmeteo2023, not the model references.
+%% (ii) +2.0560 = 4.3173 - 2.2613 (tuned_test); +5.5437 = 4.3173 - (-1.2264) (stock_test);
+%%      the two differ by exactly the tuning gain 3.4878. Both heuristic values are taken
+%%      from regen/results/n2_tune/tune_rb_n2.csv so that the pair is internally consistent.
+%%      Do NOT substitute the `rule_based` value from final/main.csv (-1.2061): the same
+%%      deterministic controller differs between the two harnesses (see Discussion,
+%%      cross-environment drift). p_Holm = 6.949e-11, 75/80 wins, family of 13 controllers.
+%%      The family size MUST be stated wherever this p-value appears — a family of 6 gives
+%%      4.2e-11 for the same contrast.
+%%      CAVEAT, now stated in the prose and not only here: the tuned heuristic is
+%%      deterministic with n = 1 per season, so this is a one-sample signed-rank test against
+%%      a constant, not a genuinely paired test; the reference carries no sampling
+%%      uncertainty (canonical gate G5 records the same for the stock heuristic).
+%%      "Three further SINDy-MPC variants also clear the tuned heuristic" -> sindy_mpc_raw
+%%      (+1.5720, 68/80, p_Holm 5.04e-7), sindy_mpc_lowthr (+0.8275, 51/80, 4.70e-4) and
+%%      sindy_mpc_dense (+0.8209, 51/80, 4.70e-4). This sentence is deliberate: the claim
+%%      "only the raw library beats the tuned heuristic" is RETRACTED (REVISION_LOG,
+%%      2026-08-11) and the text must not read as if it were still true.
+%%      Objective re-weighting deltas +1.5384...+2.7383 (physics-library variants),
+%%      +1.5654 (nn_mpc) and +0.2143 / +0.2455 (raw-library variants); gap 3.6586 -> 1.2285
+%%      (66.4 % reduction)
+%%      -> priced trees vs regen/results/final/main.csv and regen/results/n7/main_n7.csv.
+%% (iii) knock-in median +0.2134, p_Holm 1.171e-3, 16/20 seeds, priced objective
+%%      -> regen/results/priced_mech/mechanism_pricedMech.csv + mechanism_pricedMech2.csv.
+%%      The MEAN is +1.9165, ~9x the median; quoting the mean would restate the retracted
+%%      "+3.05 EUR/m2" claim in disguise. Median only. This block is single-season (2020).
+%%      Knock-out is null: median 0.0000, 1/20, p_Holm 0.285.
+%%      Boiler-term survival (xi_uboil != 0), priced pool, per SEED not per run — survival is
+%%      a property of the fit, identical in all four seasons: sindy_mpc_conf 3/20 (so the
+%%      frozen recipe DELETES it in 17/20), sindy_mpc_raw_ens 11/20 (deletes in 9/20) at the
+%%      SAME threshold 0.05, sindy_mpc_lowthr 20/20, sindy_mpc_dense 20/20,
+%%      sindy_mpc_dense_dagger 20/20, sindy_mpc_conf_dagger 17/20, sindy_mpc_raw 10/20.
+%%      2x2 cells (priced, all seven SINDy controllers pooled): raw & term deleted +3.4831
+%%      (n=76) still beats physics_no_cross & term kept +2.3647 (n=320) — the library
+%%      advantage does NOT run through boiler-term retention. Do not present the deleted
+%%      coefficient as the mechanism.
+%% Limits: Pareto front of 5 points (raw_ens, lowthr, dense, dense_dagger, ppo — recomputed);
+%%      ppo 1329.91 violation steps (final/main.csv) vs sindy_mpc_raw_ens 4129.76 (priced
+%%      pool). Cross-environment caveat: the SENTENCE in the limits paragraph is carried by
+%%      in-tree evidence (the deterministic heuristic drifting by up to 0.038 EUR/m2 between
+%%      two harnesses at identical config_hash, verified per season). The stronger figures
+%%      (0 of 180 cells matched, mean |delta| 1.33, max 11.6) live only in REVISION_LOG and a
+%%      session memory note, NOT under regen/results; they are marked [UNSOURCED] in
+%%      02-methods.tex Sec. 2.9 and must never be quoted here without restoring that wave.
+%% Thirteen controllers = 7 SINDy-MPC variants + nn_mpc + ppo + sac + oracle_mpc +
+%%      rule_based stock + rule_based tuned. NB the main table carries 14 LABELS because the
+%%      stock heuristic appears in two harnesses (final/main.csv -1.2061 and
+%%      n2_tune/tune_rb_n2.csv -1.2264); those are one controller, not two. 03-results.tex
+%%      and 05-conclusions-abstract.tex both say "thirteen"; verified 2026-08-13 during the
+%%      assembly consistency pass, no occurrence of "twelve" survives in any section.
+%% ============================================================================
+%%
+%% NEW REFERENCES NEEDED (keys used above that are absent from statya_ru.tex)
+%% ----------------------------------------------------------------------------
+%% vanhenten1994    Van Henten, E.J. Greenhouse Climate Management: An Optimal Control
+%%                  Approach. PhD thesis, Wageningen Agricultural University, 1994.
+%% rawlings2012     Rawlings, J.B.; Angeli, D.; Bates, C.N. Fundamentals of economic model
+%%                  predictive control. In Proc. 51st IEEE Conf. on Decision and Control
+%%                  (CDC), 2012, pp. 3851-3861.
+%% raissi2019       Raissi, M.; Perdikaris, P.; Karniadakis, G.E. Physics-informed neural
+%%                  networks: a deep learning framework for solving forward and inverse
+%%                  problems involving nonlinear partial differential equations. J. Comput.
+%%                  Phys. 2019, 378, 686-707.
+%% karniadakis2021  Karniadakis, G.E.; Kevrekidis, I.G.; Lu, L.; Perdikaris, P.; Wang, S.;
+%%                  Yang, L. Physics-informed machine learning. Nat. Rev. Phys. 2021, 3,
+%%                  422-440.
+%%
+%% ALSO: \cite{ljung1991} points at the Russian translation of Ljung's "System
+%% Identification: Theory for the User". For the English manuscript, replace the
+%% bibliography entry with the English 2nd edition (Prentice Hall, 1999); the key may be
+%% kept or renamed to ljung1999.

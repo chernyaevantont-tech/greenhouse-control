@@ -18,6 +18,13 @@ dependency one-way at import time.
 """
 from __future__ import annotations
 
+# ВНИМАНИЕ (2026-08-13). Блоки ниже жёстко задавали objective="full" и потому МОЛЧА
+# игнорировали ключ --objective драйвера. Прогон E-E, запущенный с --objective priced,
+# на деле считался на зашитых весах: подтверждено эмпирически -- EPI при h=20 равен 3.86
+# против канонических 3.63 (разница в пределах выборки seed), тогда как блок mechanism,
+# идущий через rollout(), дал рост 3.68 -> 6.58. Теперь все блоки читают R._OBJECTIVE.
+# Следствие: результаты adapt/guard/faults/design в дереве получены на ЗАШИТЫХ весах.
+
 import time
 from pathlib import Path
 
@@ -187,11 +194,11 @@ def _adapt_rollouts(R, rows, path, static, dagger, pc, econ, s, dr, years, args)
                 try:
                     if mode == "static":
                         df = U.rollout_mpc(static, cfg, n_days=pc_y.n_days_test,
-                                           start_date=sc["start_date"], objective="full",
+                                           start_date=sc["start_date"], objective=R._OBJECTIVE,
                                            max_solver_failures=C.MAX_SOLVER_FAILURES)
                     elif mode == "dagger":
                         df = U.rollout_mpc(dagger, cfg, n_days=pc_y.n_days_test,
-                                           start_date=sc["start_date"], objective="full",
+                                           start_date=sc["start_date"], objective=R._OBJECTIVE,
                                            max_solver_failures=C.MAX_SOLVER_FAILURES)
                     else:
                         R.pin_rng(C.REGEN_ID, "ekf", s, y, dr)
@@ -283,7 +290,7 @@ def _guard_rollouts(R, rows, path, b, maha, ens, thr, pc, econ, s, dr, years, ar
                     t0 = time.time()
                     if mode == "plain":
                         df = U.rollout_mpc(b, cfg, n_days=pc_y.n_days_test,
-                                           start_date=sc["start_date"], objective="full",
+                                           start_date=sc["start_date"], objective=R._OBJECTIVE,
                                            max_solver_failures=C.MAX_SOLVER_FAILURES)
                     else:
                         df = U.rollout_mpc_guarded(b, maha, thr, cfg,
@@ -336,7 +343,7 @@ def exp_faults(args, seeds, pc, econ, out: Path) -> int:
         cfg = pc.cfg_for(sc, seed=s)
         try:
             df0 = U.rollout_mpc(b, cfg, n_days=pc.n_days_test, start_date=sc["start_date"],
-                                objective="full", max_solver_failures=C.MAX_SOLVER_FAILURES)
+                                objective=R._OBJECTIVE, max_solver_failures=C.MAX_SOLVER_FAILURES)
             m0 = R.score(df0, econ, pc)
             m0.update({"block": "faults", "condition": "nofault", "fault": "none",
                        "supervisor": False, "seed": s, "test_year": year, **C.stamp()})
@@ -409,7 +416,7 @@ def exp_design(args, seeds, pc, econ, out: Path) -> int:
                 cfg_h = U.ExperimentConfig(**{**vars(cfg0), "horizon": int(h)})
                 add("mpc_horizon", h, U.rollout_mpc(
                     base, cfg_h, pc.n_days_test, start_date=sc["start_date"],
-                    objective="full", max_solver_failures=C.MAX_SOLVER_FAILURES))
+                    objective=R._OBJECTIVE, max_solver_failures=C.MAX_SOLVER_FAILURES))
             except Exception as exc:  # noqa: BLE001
                 R._log(f"seed {s} horizon {h} FAILED {type(exc).__name__}")
 
@@ -418,7 +425,7 @@ def exp_design(args, seeds, pc, econ, out: Path) -> int:
                 rec = {**C.load_recipe("dense"), "threshold": float(thr)}
                 bt = R.fit_sindy_seeded(train, pc, seed=s, label=f"thr{thr}", recipe=rec)
                 add("stlsq_threshold", thr, U.rollout_mpc(
-                    bt, cfg0, pc.n_days_test, start_date=sc["start_date"], objective="full",
+                    bt, cfg0, pc.n_days_test, start_date=sc["start_date"], objective=R._OBJECTIVE,
                     max_solver_failures=C.MAX_SOLVER_FAILURES),
                     nonzero=int(np.count_nonzero(bt.model.coefficients())),
                     xi_uboil=R._uboil(bt))
@@ -437,7 +444,7 @@ def exp_design(args, seeds, pc, econ, out: Path) -> int:
                     bp = K_variant(base, edits, f"pert{pert}_{rep}")
                     add("coef_perturb", pert, U.rollout_mpc(
                         bp, cfg0, pc.n_days_test, start_date=sc["start_date"],
-                        objective="full", max_solver_failures=C.MAX_SOLVER_FAILURES),
+                        objective=R._OBJECTIVE, max_solver_failures=C.MAX_SOLVER_FAILURES),
                         rep=rep)
                 except Exception as exc:  # noqa: BLE001
                     R._log(f"seed {s} perturb {pert}/{rep} FAILED {type(exc).__name__}")
