@@ -50,6 +50,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _plotstyle as ps  # noqa: E402
 
 STEM = "fig5"
+STEM_SPEC = "fig5_corrections_waterfall"   # the name 04-discussion.tex cites
 JITTER = 0.085
 BAR_W = 0.60
 RNG_SEED = 11
@@ -259,7 +260,12 @@ def main() -> int:
              ha="center", va="top", fontsize=6.2, color="#444444")
 
     fig.tight_layout()
-    paths = ps.finish(fig, STEM)
+    # Two stems, as in make_fig1.py / make_fig6.py: the manuscript cites the
+    # descriptive SPEC.md name, while the short name keeps the slot ordering
+    # legible on disk. Both are written so 04-discussion.tex resolves.
+    paths = []
+    for stem in (STEM, STEM_SPEC):
+        paths += ps.finish(fig, stem)
     plt.close(fig)
 
     verify(fig_paths=paths, out_a=out_a, out_b=out_b, A=A, B=B)

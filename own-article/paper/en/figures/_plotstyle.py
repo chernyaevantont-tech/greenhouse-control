@@ -95,6 +95,12 @@ PALETTE = [OKABE_ITO[k] for k in
            ("blue", "vermilion", "green", "orange", "purple", "skyblue", "yellow", "black")]
 
 #: Feature libraries, in the order the ladder ranks them by conditioning.
+#:
+#: That order is a fact about the FEATURE MATRIX, not about closed-loop economics.
+#: Conditioning orders the open-loop rollout cleanly and the closed-loop EPI
+#: WRONGLY: the worst-conditioned library (``physics``, kappa 53.4) beats the
+#: middle one (``physics_no_cross``, kappa 24.5) roughly tenfold in closed loop.
+#: See :func:`library_one_factor`.  Never plot kappa as if it ranked controllers.
 LIB_ORDER = ("raw", "physics_no_cross", "physics")
 LIB_COLOR = {
     "raw":              OKABE_ITO["blue"],
@@ -119,12 +125,31 @@ METHOD_LIBRARY = {
     "sindy_mpc_dense":        "physics_no_cross",
     "sindy_mpc_dense_dagger": "physics_no_cross",
     "sindy_mpc_lowthr":       "physics_no_cross",
+    "sindy_mpc_phys":         "physics",
+    "sindy_mpc_phys_ens":     "physics",
     "nn_mpc":                 None,
     "oracle_mpc":             None,
     "ppo":                    None,
     "sac":                    None,
     "rule_based":             None,
     "rule_based_tuned":       None,
+}
+
+#: The ONE-FACTOR library comparison.  Every controller below is
+#: ``library_degree = 1``, ``denoise = "none"``, ``threshold = 0.05``; the only
+#: thing that differs across a row is ``feature_variant``.  Recipes:
+#: ``regen_config.CONFIRMATORY`` (l. 93), ``RAW_ENS`` (l. 155), ``PHYS_ENS``
+#: (l. 173), ``RAW_STLSQ`` (l. 148), ``PHYS_STLSQ`` (l. 180).
+#:
+#: There is NO ``physics_no_cross`` controller at STLSQ/0.05 -- ``dense`` is
+#: threshold 1e-3 and ``lowthr`` 1e-6, so neither completes the STLSQ row.  Say
+#: "two of three" rather than implying a full replicate.
+LIBRARY_ONE_FACTOR = {
+    "ensemble": {"raw":              "sindy_mpc_raw_ens",
+                 "physics_no_cross": "sindy_mpc_conf",
+                 "physics":          "sindy_mpc_phys_ens"},
+    "stlsq":    {"raw":              "sindy_mpc_raw",
+                 "physics":          "sindy_mpc_phys"},
 }
 
 #: Display names.  ``*_dagger`` is a RUN LABEL from the CSVs, never an
@@ -138,6 +163,8 @@ METHOD_LABEL = {
     "sindy_mpc_dense":        "SINDy-MPC, dense",
     "sindy_mpc_dense_dagger": "SINDy-MPC, dense + re-ident.",
     "sindy_mpc_lowthr":       "SINDy-MPC, low threshold",
+    "sindy_mpc_phys":         "SINDy-MPC, physics",
+    "sindy_mpc_phys_ens":     "SINDy-MPC, physics (ensemble)",
     "nn_mpc":                 "NN-MPC",
     "oracle_mpc":             "oracle MPC",
     "ppo":                    "PPO",
@@ -338,6 +365,228 @@ def load_raw_library_default() -> pd.DataFrame:
     d = load_runs("n7/main_n7.csv")
     d.attrs["objective"] = "default"
     return d
+
+
+def load_physlib_pool() -> pd.DataFrame:
+    """Closed-loop runs on the FULL ``physics`` library (``phys_lib/``).
+
+    ``sindy_mpc_phys`` (STLSQ) and ``sindy_mpc_phys_ens`` (ensemble), both at
+    threshold 0.05, 20 seeds x 4 seasons = 160 rows, priced objective, zero
+    truncated runs and zero solver aborts.  Measured 2026-08-13, after the
+    English draft was written.
+
+    ``phys_lib/main_physchk.csv`` is deliberately NOT loaded: it is a 288-step
+    smoke check at horizon 8 (a season is 5760 steps at horizon 20) and pooling
+    it would mix two experiments.  The glob ``main_physlib*.csv`` excludes it.
+
+    PROVENANCE.  Same ``config_hash`` (637c6b535a9e), objective and horizon as
+    :func:`load_priced_pool`, but a later ``git_sha`` (97b66f9).  The two pools
+    are comparable by configuration; the commit difference is worth a caption
+    line, not a caveat.
+
+    WHAT THIS POOL KILLED.  It closes the conditioning series, and the closed-loop
+    EPI turns out to be NON-MONOTONE in kappa (+4.32 / +0.28 / +2.75 for
+    kappa 8.2 / 24.5 / 53.4).  Any figure that presents conditioning as the
+    closed-loop mechanism is wrong (REVISION_LOG 2026-08-13).
+    """
+    d = load_runs(["phys_lib/main_physlib*.csv"])
+    d.attrs["objective"] = "priced"
+    return d
+
+
+def load_library_pool() -> pd.DataFrame:
+    """:func:`load_priced_pool` and :func:`load_physlib_pool`, concatenated.
+
+    Adds ``library`` (from :data:`METHOD_LIBRARY`) and ``boiler_alive``
+    (``xi_uboil != 0``).  Both halves are the priced objective, horizon 20,
+    config 637c6b535a9e; the schemas are identical column for column.
+    """
+    a, b = load_priced_pool(), load_physlib_pool()
+    d = pd.concat([a, b], ignore_index=True)
+    d["library"] = d["method"].map(METHOD_LIBRARY)
+    d["boiler_alive"] = (d["xi_uboil"].fillna(0.0).abs() > 0).astype(float)
+    d.attrs["source_files"] = list(a.attrs["source_files"]) + list(b.attrs["source_files"])
+    d.attrs["rows_before_dedup"] = a.attrs["rows_before_dedup"] + b.attrs["rows_before_dedup"]
+    d.attrs["rows_after_dedup"] = a.attrs["rows_after_dedup"] + b.attrs["rows_after_dedup"]
+    d.attrs["objective"] = "priced"
+    return d
+
+
+def library_one_factor(optimizer: str = "ensemble") -> pd.DataFrame:
+    """The one-factor library comparison: only ``feature_variant`` changes.
+
+    One row per library, in :data:`LIB_ORDER`.  ``epi_se_seed`` is the standard
+    error over SEED MEANS, not over runs: the identified model -- and therefore
+    ``xi_uboil`` -- is a property of the seed, and the four seasons of one seed
+    are not independent replicates of it.  Quote the seed-level error.
+
+    ``survival`` is the fraction of the 20 SEEDS whose fit kept the direct
+    boiler coefficient, with a Wilson 95% interval (:func:`wilson`).
+
+    CAVEAT THAT MUST TRAVEL WITH THIS TABLE.  Survival orders these three
+    libraries because they differ in nothing else.  It is NOT a general
+    predictor across the wider controller pool: ``sindy_mpc_conf_dagger``
+    survives at 0.85 and scores +1.66, below ``sindy_mpc_raw_ens`` at 0.55.
+    """
+    pool = load_library_pool()
+    mapping = LIBRARY_ONE_FACTOR[optimizer]
+    rows = []
+    for lib in LIB_ORDER:
+        method = mapping.get(lib)
+        if method is None:
+            continue
+        g = pool[pool["method"] == method]
+        seed_mean = g.groupby("seed")["epi"].mean()
+        seed_alive = g.groupby("seed")["boiler_alive"].first()
+        k = int(seed_alive.sum())
+        lo, hi = wilson(k, len(seed_alive))
+        rows.append({
+            "library": lib, "method": method, "optimizer": optimizer,
+            "n_runs": int(len(g)), "n_seeds": int(len(seed_mean)),
+            "n_years": int(g["test_year"].nunique()),
+            "epi": float(g["epi"].mean()), "epi_sd": float(g["epi"].std()),
+            "epi_median": float(g["epi"].median()),
+            "epi_se_seed": float(seed_mean.std(ddof=1) / np.sqrt(len(seed_mean))),
+            "survival": float(seed_alive.mean()),
+            "survival_k": k, "survival_lo": lo, "survival_hi": hi,
+            "heat_kwh_m2": float(g["energy_heat_kwh_m2"].mean()),
+            "truncated": int(np.asarray(g["truncated"], bool).sum()),
+        })
+    t = pd.DataFrame(rows)
+    t.attrs["objective"] = "priced"
+    t.attrs["source_files"] = pool.attrs["source_files"]
+    return t
+
+
+def boiler_coefficients(optimizer: str = "ensemble") -> pd.DataFrame:
+    """Per-seed identified boiler coefficient for the one-factor library set.
+
+    One row per (library, seed): ``xi_uboil`` as written by the fit, and
+    ``alive`` = it survived the 0.05 threshold.
+
+    ONLY SURVIVORS ARE OBSERVABLE.  A coefficient the threshold cut is recorded
+    as exactly 0.0, so the pre-threshold magnitude of a cut term does not exist
+    in these files.  A panel drawn from this table may show how far the
+    SURVIVING coefficients sit above the cut; it may not claim anything about
+    how far the cut ones sat below it.
+    """
+    pool = load_library_pool()
+    mapping = LIBRARY_ONE_FACTOR[optimizer]
+    rows = []
+    for lib in LIB_ORDER:
+        method = mapping.get(lib)
+        if method is None:
+            continue
+        g = pool[pool["method"] == method]
+        per_seed = g.groupby("seed").agg(xi_uboil=("xi_uboil", "first"),
+                                         n_runs=("epi", "size"),
+                                         epi=("epi", "mean"))
+        # the model is fitted once per seed: guard the assumption rather than trust it
+        spread = g.groupby("seed")["xi_uboil"].nunique().max()
+        if spread > 1:                                       # pragma: no cover
+            raise AssertionError(f"{method}: xi_uboil varies within a seed")
+        per_seed = per_seed.reset_index()
+        per_seed["library"], per_seed["method"] = lib, method
+        rows.append(per_seed)
+    t = pd.concat(rows, ignore_index=True)
+    t["abs_xi"] = t["xi_uboil"].abs()
+    t["alive"] = (t["abs_xi"] > 0).astype(bool)
+    return t
+
+
+def library_feature_names() -> dict[str, list[str]]:
+    """Feature-name list of each library, parsed out of the experiment module.
+
+    This is the one STRUCTURAL fact the figures need that is not in a results
+    CSV: which library contains the bilinear ``t_uBoil`` term.  Rather than
+    retyping it, the three module-level constants of
+    ``own-article/article_experiment_utils.py`` are read with :mod:`ast` and
+    resolved, so the figure cannot drift from the code that built the fits.
+
+    ``compute_feature_matrix`` (l. 516) maps
+    ``raw -> RAW_FEATURE_NAMES``, ``physics -> PHYSICS_FEATURE_NAMES``,
+    ``physics_no_cross -> PHYSICS_NO_CROSS_NAMES``; the CasADi mirror used
+    inside the MPC (l. 840) builds the same three vectors.
+    """
+    import ast
+
+    src = REPO / "own-article" / "article_experiment_utils.py"
+    tree = ast.parse(src.read_text(encoding="utf-8"))
+    env: dict[str, list[str]] = {}
+
+    def ev(node):
+        if isinstance(node, ast.List):
+            vals = [n.value for n in node.elts
+                    if isinstance(n, ast.Constant) and isinstance(n.value, str)]
+            return vals if len(vals) == len(node.elts) else None
+        if isinstance(node, ast.Name):
+            return list(env[node.id]) if node.id in env else None
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+            a, b = ev(node.left), ev(node.right)
+            return None if a is None or b is None else a + b
+        return None
+
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 \
+                and isinstance(node.targets[0], ast.Name):
+            v = ev(node.value)
+            if v is not None:
+                env[node.targets[0].id] = v
+
+    out = {"raw": env["RAW_FEATURE_NAMES"],
+           "physics_no_cross": env["PHYSICS_NO_CROSS_NAMES"],
+           "physics": env["PHYSICS_FEATURE_NAMES"]}
+    for lib, names in out.items():
+        if not names:                                        # pragma: no cover
+            raise AssertionError(f"could not resolve feature names for {lib}")
+    return out
+
+
+#: Name of the bilinear temperature x boiler term inside the ``physics``
+#: library.  ``run_regen.CROSS_TERM`` (l. 469) -- it is ``t_uBoil``, NOT
+#: ``t_in*uBoil``.
+CROSS_TERM = "t_uBoil"
+#: Name of the direct boiler feature; ``xi_uboil`` in every results CSV is its
+#: identified coefficient.
+DIRECT_TERM = "uBoil"
+
+
+def library_structure() -> pd.DataFrame:
+    """Per-library structure: size, direct boiler term, bilinear detour."""
+    names = library_feature_names()
+    return pd.DataFrame([{
+        "library": lib,
+        "n_features": len(names[lib]),
+        "has_direct": DIRECT_TERM in names[lib],
+        "has_cross": CROSS_TERM in names[lib],
+        "features": names[lib],
+    } for lib in LIB_ORDER])
+
+
+def wilson(k: int, n: int, z: float = 1.959963984540054) -> tuple[float, float]:
+    """Wilson score interval for a proportion.  Correct at k = 0 and k = n."""
+    if n == 0:
+        return (float("nan"), float("nan"))
+    p = k / n
+    d = 1.0 + z * z / n
+    c = (p + z * z / (2 * n)) / d
+    h = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
+    return (float(max(0.0, c - h)), float(min(1.0, c + h)))
+
+
+def holm(pvalues: dict) -> dict:
+    """Holm-Bonferroni step-down adjustment over a NAMED family of tests.
+
+    The family must be stated wherever the adjusted values are quoted: the same
+    raw p becomes 6.4e-4 in a family of two and 1.3e-3 in a family of four.
+    """
+    items = sorted(pvalues.items(), key=lambda kv: kv[1])
+    m, out, prev = len(items), {}, 0.0
+    for i, (key, p) in enumerate(items):
+        adj = min(1.0, max(prev, (m - i) * float(p)))
+        prev = adj
+        out[key] = adj
+    return out
 
 
 def load_ladder(degree: int | None = 1, denoise: str | None = "none",

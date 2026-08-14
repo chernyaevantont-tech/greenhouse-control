@@ -3,7 +3,8 @@
 %% PROVENANCE. Every numeric value in this section is traceable to one of:
 %%   (a) a results file under own-article/regen/results/  -- prices (derived from
 %%       final/main.csv), tuning outcome (n2_tune/tune_rb_n2.csv), row counts,
-%%       gate pass counts (ladder_rerun/), cross-environment divergence;
+%%       gate pass counts (ladder_rerun/), the two-harness drift of the deterministic
+%%       heuristic (final/main.csv vs n2_tune/tune_rb_n2.csv);
 %%   (b) the frozen configuration own-article/regen/regen_config.py and
 %%       own-article/regen/results/final/regen_manifest.json -- seeds, horizon,
 %%       season, budgets, recipes, grid sizes, RL/NN/CEM settings;
@@ -55,7 +56,7 @@ Outdoor CO$_2$ was held at 400~ppm, a limitation of the model. Each season spans
 60~days from 1~March at a 15-min control step ($T_s=900$~s), i.e.\ 5760 control steps
 per season; that count is the truncation gate used throughout.
 
-Years were separated to prevent leakage (Figure~\ref{fig:design}): identification and
+Years were separated to prevent leakage: identification and
 every selection decision used 2018--2019 only, closed-loop evaluation used 2020--2023 (2020 in-distribution,
 2021--2023 out-of-distribution), and a further block of four seasons, 2014--2017, was
 generated after all recipes had been frozen and entered no stage of training, selection
@@ -114,7 +115,7 @@ the violation axis.
 \subsection{Controllers compared}
 \label{sec:controllers}
 
-Thirteen controllers were compared (Table~\ref{tab:controllers}). Two naming corrections
+Fifteen controllers were compared (Table~\ref{tab:controllers}). Two naming corrections
 apply relative to earlier reports of this work, and both are stated in the text because
 each was previously used to support a claim it does not support. First, the
 \emph{low-threshold} SINDy variant is not a reduced first-principles grey box: it is the
@@ -147,6 +148,8 @@ Label & Family & Definition \\
 \texttt{sindy\_mpc\_raw} & SINDy-MPC & raw library, STLSQ, $\lambda=0.05$ \\
 \texttt{sindy\_mpc\_raw\_ens} & SINDy-MPC & raw library, ensemble, $\lambda=0.05$ \\
 \texttt{sindy\_mpc\_conf} & SINDy-MPC & frozen recipe: \texttt{physics\_no\_cross}, ensemble, $\lambda=0.05$ \\
+\texttt{sindy\_mpc\_phys} & SINDy-MPC & \texttt{physics} (full, with cross terms), STLSQ, $\lambda=0.05$ \\
+\texttt{sindy\_mpc\_phys\_ens} & SINDy-MPC & \texttt{physics} (full, with cross terms), ensemble, $\lambda=0.05$ \\
 \texttt{sindy\_mpc\_dense} & SINDy-MPC & \texttt{physics\_no\_cross}, STLSQ, $\lambda=10^{-3}$ \\
 \texttt{sindy\_mpc\_lowthr} & SINDy-MPC & \texttt{physics\_no\_cross}, STLSQ, $\lambda=10^{-6}$ (not a grey box) \\
 \texttt{sindy\_mpc\_conf\_dagger} & SINDy-MPC & \texttt{conf} plus on-policy re-identification \\
@@ -157,6 +160,23 @@ Label & Family & Definition \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+Four of the SINDy-MPC labels form a deliberate one-factor design over the feature
+library, and the mechanism analysis of Section~\ref{sec:res-mech} rests on it. Holding
+the polynomial degree (1), the denoiser (none), the estimator and the sparsity threshold
+($0.05$) at the frozen recipe's values, and changing \emph{only} $\Theta$, gives
+\texttt{sindy\_mpc\_raw\_ens} (\texttt{raw}), \texttt{sindy\_mpc\_conf}
+(\texttt{physics\_no\_cross}) and \texttt{sindy\_mpc\_phys\_ens} (\texttt{physics}) under
+the ensemble estimator, and \texttt{sindy\_mpc\_raw} and \texttt{sindy\_mpc\_phys} under
+STLSQ. The ensemble arm is a complete three-point series; the STLSQ arm has only the two
+endpoints, because the two \texttt{physics\_no\_cross} STLSQ controllers were frozen at
+thresholds $10^{-3}$ and $10^{-6}$ rather than $0.05$. Any statement about how the
+library ordering behaves \emph{between} the endpoints therefore rests on the ensemble arm
+alone, and is scoped that way throughout.
+%% One-factor mapping read from regen/regen_config.py: CONFIRMATORY / RAW_ENS / PHYS_ENS
+%% differ only in feature_variant; RAW_STLSQ / PHYS_STLSQ likewise. DENSE (1e-3) and
+%% LOWTHR (1e-6) are physics_no_cross but at other thresholds, so they are NOT part of the
+%% one-factor series and must not be substituted into it.
 
 The 16-trial budget given to the rule-based reference (Section~\ref{sec:rbtune}) matches
 the budget the reinforcement-learning controllers are recorded as having received in the
@@ -226,7 +246,8 @@ on both counts and is reported as applied: the divergence criterion was operatio
 a fixed threshold of 0.05 in the table generator, and the transparency column is empty in
 all 1440 rows, so that gate was never evaluated and is not claimed here. Under
 embeddability and the 0.05 threshold, 32 of the 72 labels pass.
-Figure~\ref{fig:ladder} shows the grid in the plane of the two prediction criteria.
+Figure~\ref{fig:kappa}a shows the degree-1 undenoised block of this grid in the plane of
+the two prediction criteria, with the 0.05 gate encoded by marker fill.
 
 Four properties of this grid bound what it can support. (i)~The rollout metrics are
 computed on the same 2018--2019 data the model was fitted to and are therefore
@@ -401,59 +422,59 @@ the closed-loop leg is a single surrogate-MPC rollout of one recipe on one seaso
 default objective, and no supporting block, neither the identification ladder nor the
 replay block, is exercised.
 
-One caveat qualifies every reproducibility statement here. Closed-loop results do
-\textbf{not} reproduce across operating environments.
-[UNSOURCED: in a controlled comparison of one
-wave between a Linux cluster and a Windows workstation, with identical
-\texttt{config\_hash} and the self-test passing on both machines, closed-loop $J$ matched
-in \textbf{0 of 180 cells}, mean $|\Delta|$ 1.33~EUR/m$^2$, maximum 11.6, while open-loop
-quantities did match --- the Mahalanobis detector threshold was bit-identical at 2.8595
-and its AUC agreed to $0.6625$ versus $0.6621$. The second machine's run is not under
-\texttt{regen/results}, so these figures cannot be recomputed; restore that wave or cut
-the sentence before submission. The same marker stands in
-Section~\ref{sec:disc-limitations}, and one decision settles both.]
-The cause is chaotic amplification of
-platform-level floating-point differences through a 5760-step nonlinear loop, and it is
-visible in the present data --- which \emph{are} in the results tree --- even for a
-deterministic controller: the hard-coded heuristic
-returns a four-season mean of $-1.2061$~EUR/m$^2$ in one harness and $-1.2264$ in
-another at identical \texttt{config\_hash}. The rule adopted here is that a whole wave is
-regenerated in one environment and that environment is named; environments are never
-mixed cell-by-cell for closed-loop numbers. Three environment fingerprints are on record
-across the reported waves, so no single environment hash is quoted as ``the'' pinned
-stack, and the reproducibility claim must not be read as cross-platform.
+One caveat qualifies every reproducibility statement here, and it is a limit on what was
+measured rather than a measurement. The self-test establishes bit-identity \emph{within}
+one environment. Nothing in the results tree establishes it \emph{across} environments,
+and no such claim is made: the study was executed in a single environment, so the
+cross-environment comparison was never run and its magnitude is unknown.
+%% NOT SOURCEABLE: earlier drafts quoted a Linux-cluster/Windows-workstation comparison
+%% (0 of 180 cells matching, mean |delta| 1.33 EUR/m2). That wave is not under
+%% regen/results and no second machine exists, so the magnitudes were removed rather
+%% than carried unsourced. What replaces them below is in the tree and recomputable.
+The provenance record makes the gap explicit rather than hiding it: although
+\texttt{repro.py} can emit an environment fingerprint (\texttt{--fingerprint}), the field
+is absent from all twenty run manifests under \texttt{regen/results} and the generated
+provenance map prints \texttt{env\_hash:\ n/a}. Waves are separated only by
+\texttt{git\_sha} --- eleven distinct values across those twenty manifests at one common
+\texttt{config\_hash} --- which identifies the code but not the machine it ran on.
 
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.86\textwidth]{figures/fig-methods-design.pdf}
-% PLOT: schematic of the experimental design, no CSV source (design diagram).
-% Left-to-right flow: (1) ERA5 weather 2018-2019 -> rule-based controller + PRBS 0.3
-% -> identification dataset; (2) identification ladder, 72 labels x 20 seeds, open-loop
-% gates only (embeddable AND diverged_frac <= 0.05) -> frozen recipe; (3) closed loop on
-% 2020-2023 (20 seeds x 4 seasons) under the priced stage cost; (4) never-seen seasons
-% 2014-2017. Mark clearly which arrows are forbidden: no closed-loop quantity feeds
-% back into stage (2), and test seasons never enter stage (2) or the rule-based tuning.
-\caption{Experimental design and the information barriers between its stages.
-Identification and every selection decision use 2018--2019 only; closed-loop evaluation
-uses 2020--2023; the 2014--2017 block was generated after all recipes were frozen.}
-\label{fig:design}
-\end{figure}
+What the tree does show is that closed-loop margins move at a magnitude the identifying
+fields do not capture, even for a controller with no stochastic element. The hard-coded
+heuristic returns a four-season mean of $-1.2061$~EUR/m$^2$ in the main harness and
+$-1.2264$ in the tuning harness at identical \texttt{config\_hash}, the per-season
+discrepancy growing monotonically over the four seasons ($0.003$, $0.013$, $0.027$,
+$0.038$~EUR/m$^2$ for 2020--2023). A deterministic controller re-run on the same season
+should return the same number; that it does not is chaotic amplification of last-bit
+floating-point differences through a 5760-step nonlinear loop, which is the same
+mechanism that makes agreement across operating environments implausible \emph{a priori}.
+The rule adopted here is therefore that a whole wave is regenerated in one environment
+and is never mixed cell-by-cell with another for closed-loop numbers. That the
+environment itself is not recorded in the manifests is a defect of this provenance
+scheme, stated here so that it is not mistaken for a cross-platform guarantee: the
+reproducibility claim is within-environment only.
 
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.80\textwidth]{figures/fig-ladder-scatter.pdf}
-% SOURCE CSV: regen/results/ladder_rerun/ladder_rerun.csv + ladder_rerun2.csv
-% (1440 rows; filter degree == 1 and denoise == "none"; group by variant).
-% PLOT: scatter of one-step RMSE of t_in (x, linear) against 24-h rollout RMSE of t_in
-% (y, log scale), one marker per (variant, optimizer) cell, coloured by feature library
-% (raw / physics_no_cross / physics). Overlay the median and IQR per library. Draw the
-% divergence gate at diverged_frac = 0.05 as marker fill (open = fails the gate).
-% The point of the panel is the opposing orientation of the two axes across libraries.
-\caption{The two open-loop selection metrics order the feature libraries in opposite
-directions. Data from the 20-seed identification ladder; the divergence gate
-($\le 0.05$) is encoded by marker fill.}
-\label{fig:ladder}
-\end{figure}
+%% ============================================================================
+%% TWO FIGURES REMOVED 2026-08-14 (figure consolidation, ten floats -> six).
+%%
+%% (1) `fig-methods-design` / label `fig:design` -- schematic of the experimental
+%%     design and its information barriers.
+%%     Why: it fails the "information the text does not carry" test. Each of its four
+%%     declared barriers is already an explicit sentence -- year separation and the
+%%     post-freeze 2014-2017 block in Sec. 2.1 above; "No closed-loop quantity enters
+%%     it" in Sec. 2.5; and the heuristic tuned "on the training seasons 2018-2019
+%%     only, the test seasons taking no part in selection" in Sec. 3.2. A diagram that
+%%     restates four sentences is a fifth statement of them (figures/SPEC.md).
+%%     Its content lives in the prose; the Sec. 2.1 citation of it was deleted.
+%%     THIS IS THE ONE DROPPED FIGURE THAT COULD BE RESTORED AT ZERO COST TO THE
+%%     ARGUMENT if a reviewer asks for a design overview.
+%%
+%% (2) `fig-ladder-scatter` / label `fig:ladder` -- one-step RMSE against 24-h rollout
+%%     RMSE over the ladder, gate encoded by marker fill.
+%%     Why: same 240 rows and same two axes as the Sec. 3.1 float. Its content is now
+%%     panel (a) of Figure~\ref{fig:kappa} (`fig1_selection_and_conditioning`), which
+%%     keeps the marker-fill encoding of the 0.05 divergence gate. The Sec. 2.5
+%%     citation was repointed to `fig:kappa`a.
+%% ============================================================================
 
 %% ===========================================================================
 %% NEW REFERENCES NEEDED (not present in statya_ru.tex's bibliography)

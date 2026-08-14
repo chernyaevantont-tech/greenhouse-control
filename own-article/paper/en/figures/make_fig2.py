@@ -46,6 +46,8 @@ SHORT = {
     "sindy_mpc_dense_dagger": "dense + re-ident.",
     "sindy_mpc_conf_dagger":  "frozen + re-ident.",
     "sindy_mpc_conf":         "frozen",
+    "sindy_mpc_phys_ens":     "physics (ens.)",
+    "sindy_mpc_phys":         "physics",
     "nn_mpc":                 "NN-MPC",
     "ppo":                    "PPO",
     "sac":                    "SAC",
@@ -71,13 +73,18 @@ OFFSET = {
     "sindy_mpc_lowthr":       (-8.0,  1.0, "right", "center"),   # joint label
     "sindy_mpc_dense_dagger": (0.0,  -7.0, "center", "top"),
     "sindy_mpc_conf_dagger":  (-6.0,  4.0, "right", "bottom"),
-    "sindy_mpc_conf":         (6.0,   0.0, "left",  "center"),
+    "sindy_mpc_conf":         (0.0,  -7.0, "center", "top"),
+    # The two full-`physics` controllers entered the comparison on 2026-08-14
+    # (regen/results/phys_lib/). They sit ~20 violation steps apart at +2.75 and
+    # +2.48, so they are labelled on opposite sides to keep both readable.
+    "sindy_mpc_phys_ens":     (8.0,   4.0, "left",  "bottom"),
+    "sindy_mpc_phys":         (-8.0, -4.0, "right", "top"),
     "ppo":                    (0.0,   7.0, "center", "bottom"),
     "sac":                    (0.0,  -7.0, "center", "top"),
     "nn_mpc":                 (0.0,  -7.0, "center", "top"),
     "oracle_mpc":             (7.0,  -1.0, "left",  "center"),
     "rule_based":             (-7.0,  0.0, "right", "center"),
-    "rule_based_tuned":       (6.0,  -1.0, "left",  "top"),
+    "rule_based_tuned":       (9.0,  -7.0, "left",  "top"),
 }
 
 LABEL_BBOX = dict(facecolor="white", alpha=0.72, edgecolor="none",
@@ -116,7 +123,7 @@ def _replication(pool: pd.DataFrame) -> dict:
 
 def assemble() -> pd.DataFrame:
     """Build the 13-controller comparison table from the three harnesses."""
-    priced = ps.load_priced_pool()
+    priced = ps.load_library_pool()
     default = ps.load_default_main()
     tune = ps.load_heuristic_tuning()
 
@@ -144,7 +151,12 @@ def assemble() -> pd.DataFrame:
     tab["on_front"] = ps.pareto_front(tab).values
     tab["library"] = tab["method"].map(ps.METHOD_LIBRARY)
     tab["label"] = tab["method"].map(lambda m: ps.METHOD_LABEL.get(m, m))
-    tab["short"] = tab["method"].map(lambda m: SHORT.get(m, m))
+    missing = sorted(set(tab["method"]) - set(SHORT))
+    if missing:
+        raise KeyError(
+            f"no short label for {missing}. Falling back to the raw method name "
+            f"puts an underscore-laden identifier on the plot -- add the label.")
+    tab["short"] = tab["method"].map(SHORT)
     tab = tab.sort_values("epi", ascending=False).reset_index(drop=True)
 
     # dominance count for the tuned heuristic, computed rather than asserted
@@ -164,7 +176,7 @@ def dagger_truncation_caveat() -> dict:
     Its position on the front owes part of itself to runs that stopped early.
     Recomputed over completed runs only, the lead over ``dense`` shrinks.
     """
-    p = ps.load_priced_pool()
+    p = ps.load_library_pool()
     dd = p[p["method"] == "sindy_mpc_dense_dagger"]
     de = p[p["method"] == "sindy_mpc_dense"]
     ddc = dd[~np.asarray(dd["truncated"], bool)]
@@ -247,6 +259,11 @@ def build():
     for row in tab.itertuples():
         if row.method == "sindy_mpc_dense":
             continue                            # labelled jointly with lowthr
+        if row.method not in OFFSET:
+            raise KeyError(
+                f"no label placement for {row.method!r}. A controller entered "
+                f"the pool without being placed -- add it to OFFSET rather than "
+                f"letting it land on a default and silently overlap.")
         dx, dy, ha, va = OFFSET[row.method]
         txt = row.short
         size = 6.0
@@ -326,7 +343,7 @@ def verify(fig, ax, tab) -> None:
         if off.shape[0] == 1:
             drawn[(round(off[0, 0], 6), round(off[0, 1], 6))] = True
 
-    priced = ps.load_priced_pool()
+    priced = ps.load_library_pool()
     default = ps.load_default_main()
     tune = ps.load_heuristic_tuning()
     tuned = tune[tune["block"] == "tuned_test"]
