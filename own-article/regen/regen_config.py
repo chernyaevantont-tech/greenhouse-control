@@ -165,8 +165,30 @@ RAW_ENS = {
 # it would invalidate every already-computed wave (the same convention as ENSEMBLE_DRAWS and
 # LADDER_ROLLOUT_HORIZONS_STEPS). The recipe reaches each result row through the usual
 # `fit_sindy_seeded` RNG key, so provenance stays self-contained.
-EXT_RECIPES = {"raw_stlsq": RAW_STLSQ, "raw_ens": RAW_ENS}
-CONTROLLERS_EXT = ["sindy_mpc_raw", "sindy_mpc_raw_ens"]
+# Замыкает ряд по обусловленности. Ладдер даёт kappa 8.2 (raw) -> 24.5 (physics_no_cross)
+# -> 53.4 (physics), но замкнутый регулятор был только у первых двух, поэтому крайняя точка
+# ряда -- худшая по обусловленности библиотека -- в замкнутом контуре не измерялась вовсе.
+# Рецензент спросит об этом первым. Оба варианта -- одношаговое изменение относительно
+# уже измеренных: порог и степень те же, меняется только библиотека.
+PHYS_ENS = {
+    "feature_variant": "physics",
+    "library_degree": 1,
+    "optimizer": "ensemble",
+    "denoise": "none",
+    "threshold": 0.05,
+}
+PHYS_STLSQ = {
+    "feature_variant": "physics",
+    "library_degree": 1,
+    "optimizer": "stlsq",
+    "denoise": "none",
+    "threshold": 0.05,
+}
+
+EXT_RECIPES = {"raw_stlsq": RAW_STLSQ, "raw_ens": RAW_ENS,
+               "phys_ens": PHYS_ENS, "phys_stlsq": PHYS_STLSQ}
+CONTROLLERS_EXT = ["sindy_mpc_raw", "sindy_mpc_raw_ens",
+                   "sindy_mpc_phys", "sindy_mpc_phys_ens"]
 
 # ── Controllers ──────────────────────────────────────────────────────────────
 # `sindy_mpc_lowthr` replaces the old `grey_box_mpc` label (same computation, honest name).
@@ -180,10 +202,12 @@ ALL_CONTROLLERS = (CONTROLLERS_CHEAP + CONTROLLERS_DAGGER
 
 NEEDS_TRAIN = {"sindy_mpc_conf", "sindy_mpc_dense", "sindy_mpc_lowthr", "nn_mpc",
                "sindy_mpc_conf_dagger", "sindy_mpc_dense_dagger",
-               "sindy_mpc_raw", "sindy_mpc_raw_ens"}          # N-7 ext, see EXT_RECIPES
+               "sindy_mpc_raw", "sindy_mpc_raw_ens",
+               "sindy_mpc_phys", "sindy_mpc_phys_ens"}   # ext, see EXT_RECIPES
 SOLVER_BASED = {"sindy_mpc_conf", "sindy_mpc_dense", "sindy_mpc_lowthr", "nn_mpc",
                 "sindy_mpc_conf_dagger", "sindy_mpc_dense_dagger", "oracle_mpc",
-                "sindy_mpc_raw", "sindy_mpc_raw_ens"}         # N-7 ext, see EXT_RECIPES
+                "sindy_mpc_raw", "sindy_mpc_raw_ens",
+                "sindy_mpc_phys", "sindy_mpc_phys_ens"}  # ext, see EXT_RECIPES
 
 EXPECTED_MAIN_ROWS = len(ALL_CONTROLLERS) * len(TEST_YEARS) * len(SEEDS)   # 10*4*20 = 800
 

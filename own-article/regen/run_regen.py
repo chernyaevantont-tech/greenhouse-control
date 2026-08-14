@@ -145,7 +145,9 @@ def build_model(ctrl: str, pc, train_s, seed: int, fast: bool, draw: int = 0):
                  "sindy_mpc_lowthr": "lowthr",
                  # N-7: the raw library, which the corrected ladder ranks first on both
                  # pre-registered open-loop metrics. See regen_config.EXT_RECIPES.
-                 "sindy_mpc_raw": "raw_stlsq", "sindy_mpc_raw_ens": "raw_ens"}
+                 "sindy_mpc_raw": "raw_stlsq", "sindy_mpc_raw_ens": "raw_ens",
+                 # крайняя точка ряда по обусловленности (kappa 53.4)
+                 "sindy_mpc_phys": "phys_stlsq", "sindy_mpc_phys_ens": "phys_ens"}
     if ctrl in recipe_of:
         return fit_sindy_seeded(train_s, pc, seed=seed, label=ctrl, draw=draw,
                                 recipe=C.load_recipe(recipe_of[ctrl]))
@@ -204,7 +206,8 @@ def rollout(ctrl: str, model, pc, year: int, seed: int, fast: bool,
         return U.rollout_rule_based(cfg, n_days=N, start_date=start, noise_scale=0.0, seed=seed)
     if ctrl in ("sindy_mpc_conf", "sindy_mpc_dense", "sindy_mpc_lowthr",
                 "sindy_mpc_conf_dagger", "sindy_mpc_dense_dagger",
-                "sindy_mpc_raw", "sindy_mpc_raw_ens"):        # N-7 ext
+                "sindy_mpc_raw", "sindy_mpc_raw_ens",
+                "sindy_mpc_phys", "sindy_mpc_phys_ens"):    # ext
         return U.rollout_mpc(model, cfg, n_days=N, start_date=start, objective=_OBJECTIVE,
                              max_solver_failures=_budget())
     if ctrl == "nn_mpc":
