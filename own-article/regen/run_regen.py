@@ -147,7 +147,10 @@ def build_model(ctrl: str, pc, train_s, seed: int, fast: bool, draw: int = 0):
                  # pre-registered open-loop metrics. See regen_config.EXT_RECIPES.
                  "sindy_mpc_raw": "raw_stlsq", "sindy_mpc_raw_ens": "raw_ens",
                  # крайняя точка ряда по обусловленности (kappa 53.4)
-                 "sindy_mpc_phys": "phys_stlsq", "sindy_mpc_phys_ens": "phys_ens"}
+                 "sindy_mpc_phys": "phys_stlsq", "sindy_mpc_phys_ens": "phys_ens",
+                 # 17 признаков: physics минус t_in*uBoil -- проверка обходного пути
+                 "sindy_mpc_notuboil": "notuboil_stlsq",
+                 "sindy_mpc_notuboil_ens": "notuboil_ens"}
     if ctrl in recipe_of:
         return fit_sindy_seeded(train_s, pc, seed=seed, label=ctrl, draw=draw,
                                 recipe=C.load_recipe(recipe_of[ctrl]))
@@ -207,7 +210,8 @@ def rollout(ctrl: str, model, pc, year: int, seed: int, fast: bool,
     if ctrl in ("sindy_mpc_conf", "sindy_mpc_dense", "sindy_mpc_lowthr",
                 "sindy_mpc_conf_dagger", "sindy_mpc_dense_dagger",
                 "sindy_mpc_raw", "sindy_mpc_raw_ens",
-                "sindy_mpc_phys", "sindy_mpc_phys_ens"):    # ext
+                "sindy_mpc_phys", "sindy_mpc_phys_ens",
+                "sindy_mpc_notuboil", "sindy_mpc_notuboil_ens"):   # ext
         return U.rollout_mpc(model, cfg, n_days=N, start_date=start, objective=_OBJECTIVE,
                              max_solver_failures=_budget())
     if ctrl == "nn_mpc":

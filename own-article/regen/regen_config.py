@@ -185,10 +185,31 @@ PHYS_STLSQ = {
     "threshold": 0.05,
 }
 
+# The 17-feature library: `physics` minus the single bilinear term t_in*uBoil. This is the
+# falsifiable test of the detour reading -- see compute_feature_matrix("physics_no_tuboil").
+# PREDICTION if the reading is right: survival and EPI collapse onto physics_no_cross
+# (~15%, ~+0.3), NOT onto physics (~55%, ~+2.75), despite 16 of 18 features being identical.
+NOTUBOIL_ENS = {
+    "feature_variant": "physics_no_tuboil",
+    "library_degree": 1,
+    "optimizer": "ensemble",
+    "denoise": "none",
+    "threshold": 0.05,
+}
+NOTUBOIL_STLSQ = {
+    "feature_variant": "physics_no_tuboil",
+    "library_degree": 1,
+    "optimizer": "stlsq",
+    "denoise": "none",
+    "threshold": 0.05,
+}
+
 EXT_RECIPES = {"raw_stlsq": RAW_STLSQ, "raw_ens": RAW_ENS,
-               "phys_ens": PHYS_ENS, "phys_stlsq": PHYS_STLSQ}
+               "phys_ens": PHYS_ENS, "phys_stlsq": PHYS_STLSQ,
+               "notuboil_ens": NOTUBOIL_ENS, "notuboil_stlsq": NOTUBOIL_STLSQ}
 CONTROLLERS_EXT = ["sindy_mpc_raw", "sindy_mpc_raw_ens",
-                   "sindy_mpc_phys", "sindy_mpc_phys_ens"]
+                   "sindy_mpc_phys", "sindy_mpc_phys_ens",
+                   "sindy_mpc_notuboil", "sindy_mpc_notuboil_ens"]
 
 # ── Controllers ──────────────────────────────────────────────────────────────
 # `sindy_mpc_lowthr` replaces the old `grey_box_mpc` label (same computation, honest name).
@@ -203,11 +224,13 @@ ALL_CONTROLLERS = (CONTROLLERS_CHEAP + CONTROLLERS_DAGGER
 NEEDS_TRAIN = {"sindy_mpc_conf", "sindy_mpc_dense", "sindy_mpc_lowthr", "nn_mpc",
                "sindy_mpc_conf_dagger", "sindy_mpc_dense_dagger",
                "sindy_mpc_raw", "sindy_mpc_raw_ens",
-               "sindy_mpc_phys", "sindy_mpc_phys_ens"}   # ext, see EXT_RECIPES
+               "sindy_mpc_phys", "sindy_mpc_phys_ens",
+               "sindy_mpc_notuboil", "sindy_mpc_notuboil_ens"}  # ext
 SOLVER_BASED = {"sindy_mpc_conf", "sindy_mpc_dense", "sindy_mpc_lowthr", "nn_mpc",
                 "sindy_mpc_conf_dagger", "sindy_mpc_dense_dagger", "oracle_mpc",
                 "sindy_mpc_raw", "sindy_mpc_raw_ens",
-                "sindy_mpc_phys", "sindy_mpc_phys_ens"}  # ext, see EXT_RECIPES
+                "sindy_mpc_phys", "sindy_mpc_phys_ens",
+                "sindy_mpc_notuboil", "sindy_mpc_notuboil_ens"}  # ext
 
 EXPECTED_MAIN_ROWS = len(ALL_CONTROLLERS) * len(TEST_YEARS) * len(SEEDS)   # 10*4*20 = 800
 

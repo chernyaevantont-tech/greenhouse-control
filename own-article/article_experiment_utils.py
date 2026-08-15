@@ -522,6 +522,27 @@ def compute_feature_matrix(data: TrajectoryData, variant: str) -> tuple[np.ndarr
         full = compute_physics_features(data.states, data.weather, data.time_enc, data.actions)
         idx = list(range(14))
         return full[:, idx], PHYSICS_NO_CROSS_NAMES.copy()
+    if variant == "physics_no_tuboil":
+        # The full physics library MINUS the single bilinear term t_in*uBoil (index 17).
+        #
+        # This is the one-factor test of the detour reading. Closed-loop EPI tracks whether
+        # the boiler pathway survives thresholding, and the three measured libraries are
+        # NON-monotone in conditioning:
+        #
+        #   raw (11 feat, kappa  8.2)  EPI +4.32  boiler term kept 55%
+        #   physics_no_cross (14, 24.5)    +0.28                   15%
+        #   physics (18, 53.4)             +2.75                   55%
+        #
+        # The reading is that the worst-conditioned library survives BECAUSE t_in*uBoil can
+        # carry the heating pathway once the threshold cuts the direct term, which
+        # physics_no_cross has no way to do. If that is right, deleting exactly that one
+        # term from `physics` should collapse it onto physics_no_cross -- low survival, low
+        # EPI -- even though 16 of its 18 features, and nearly all of its collinearity,
+        # are unchanged. If instead it still behaves like `physics`, the reading is wrong
+        # and the non-monotonicity needs a different explanation.
+        full = compute_physics_features(data.states, data.weather, data.time_enc, data.actions)
+        idx = [i for i in range(18) if i != 17]
+        return full[:, idx], [n for i, n in enumerate(PHYSICS_FEATURE_NAMES) if i != 17]
     raise ValueError(f"Unknown feature variant: {variant}")
 
 
@@ -864,6 +885,20 @@ def _casadi_feature_vector(feature_variant: str, x_vars: dict, u_vars: dict, tvp
     S_eff = rad * (1.0 - uThScr)
     if feature_variant == "physics_no_cross":
         return ca.vertcat(*raw, psat, vpd, S_eff)
+    if feature_variant == "physics_no_tuboil":
+        # `physics` minus the single bilinear t_in*uBoil term. Must mirror
+        # compute_feature_matrix("physics_no_tuboil") EXACTLY, in the same order: the
+        # coefficient matrix is indexed positionally, so a mismatch here would silently
+        # attach every coefficient to the wrong feature.
+        return ca.vertcat(
+            *raw,
+            psat,
+            vpd,
+            S_eff,
+            t_in * S_eff,
+            rh * uVent,
+            (co2 - co2_out) * uVent,
+        )
     if feature_variant == "physics":
         return ca.vertcat(
             *raw,
