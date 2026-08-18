@@ -361,22 +361,27 @@ complementary knock-out is null. We are explicit about the limits of this accoun
 Survival \emph{gates} the outcome but does not \emph{order} it: among the two libraries
 that keep the term the raw one still wins by $+1.56$~EUR~m$^{-2}$, and raw-library runs
 that lost the term still average $+3.48$, above physics-library runs that kept it
-($+2.36$). Our reading of why the middle library is the worst --- that it carries enough
-collinearity for the threshold to destabilise the direct boiler term but, unlike full
-physics, has no bilinear $T_{\mathrm{in}}u_{\mathrm{Boil}}$ term to carry the heating
-pathway once the direct one is cut --- is consistent with the structure of the three
-libraries and with the survival data, but it is a reading and not a measured result; the
-experiment that would test it is named in Section~\ref{sec:discussion}.
+($+2.36$). The obvious structural account of why the middle library is the worst ---
+that it carries enough collinearity for the threshold to destabilise the direct boiler
+term but, unlike full physics, has no bilinear $T_{\mathrm{in}}u_{\mathrm{Boil}}$ term to
+carry the heating pathway once the direct one is cut --- has been tested and rejected:
+deleting exactly that one feature from the full library leaves conditioning
+($\kappa = 52.3$), open-loop instability and closed-loop margin ($+2.11$~EUR~m$^{-2}$,
+$p_{\mathrm{Holm}} = 4.4 \times 10^{-6}$ above the middle library) at the full library's
+level, with survival at $40\,\%$ --- nowhere near the collapse a bilinear bypass predicts
+(Sections~\ref{sec:res-mech} and~\ref{sec:discussion}). Why one library loses the term is
+thus unresolved; that survival gates the outcome is not.
 
 What this does not show is equally explicit. The advantage is not Pareto-dominant: the
 front holds five points, and the PPO agent attains far fewer constraint violations
 ($1330$ against $4130$ steps per season) at a lower margin. The surrogate carries no crop
 state, so the MPC objective is necessarily a proxy and terminal biomass cannot be priced.
 The mechanism experiments are single-season and replication is unequal across controllers.
-The non-monotonicity rests on a three-point library comparison, which is few, and survival
-is measured rather than manipulated at library level --- the ablation is the only
-randomised contrast anywhere in the mechanism, so a fourth library could disturb the
-pattern as the third disturbed the one before it.
+The non-monotonicity rests on the middle library, which reaches closed loop under one
+estimator only, and survival is measured rather than manipulated at library level --- the
+ablation is the only randomised contrast anywhere in the mechanism, and the term-deletion
+test that removed the detour explanation is, like the library comparison itself, a
+controlled structural comparison rather than a randomised one.
 All results are simulation-only, for one location and one planting date, and
 reproducibility is established within one computing environment only --- the
 cross-environment case was never measured, and the closed-loop loop is chaotic enough
@@ -450,9 +455,14 @@ the implications and the limits; Section~\ref{sec:conclusions} concludes.
 %%         across the four seasons of a replicate: 0 of 100 method-seed cells vary).
 %%         "Survival gates but does not order": raw_ens - phys_ens = +1.56 among the two
 %%         survivors; 2x2 cells raw-without-term +3.4831 vs physics_no_cross-with-term
-%%         +2.3647. The bilinear detour is FLAGGED AS A READING, not a result: the cross
-%%         knock-out block sits at threshold 1e-6 where baseline survival is 1.00 in all
-%%         20 replicates, so it cannot test severance of the pathway.
+%%         +2.3647. The bilinear detour was TESTED AND FALSIFIED 2026-08-18: the
+%%         17-feature physics_no_tuboil library (regen/results/notuboil/, 160 runs)
+%%         keeps kappa 52.3, rollout 24.2, EPI +2.11/+2.28 and survival 0.40 -- no
+%%         collapse onto physics_no_cross (predicted ~+0.3 / ~0.15). Analysis:
+%%         regen/results/notuboil/analysis_notuboil.md. The cross knock-out block sits
+%%         at threshold 1e-6 where baseline survival is 1.00 in all 20 replicates, so it
+%%         could never test severance of the pathway -- which is why the deletion wave
+%%         had to be run.
 %%      2021 REVERSAL (must stay in the text): per-season means raw_ens -1.5563 vs
 %%         lowthr +0.2654. The raw-library controller is NOT first in all four seasons —
 %%         "first in all four seasons" is a RETRACTED claim (REVISION_LOG G6), do not
@@ -1248,18 +1258,21 @@ regression: as physically motivated features are added, $\kappa$ rises from $8.2
 $53.4$, the one-step error falls and the median 24-h rollout error rises by an order of
 magnitude, so the two \emph{open-loop} criteria order the three libraries in opposite
 directions. (\textbf{c})~The same three libraries in closed loop, changed one factor at a
-time (ensemble estimator, threshold $0.05$): four-season mean margin with run-level
-standard deviations under the priced objective, each bar annotated with the fraction of
-seeds in which the boiler-input coefficient survives thresholding. The closed-loop series
+time (ensemble estimator, threshold $0.05$), plus the 17-feature probe that deletes the
+single bilinear boiler term from the full physics set: four-season mean margin under the
+priced objective against the fraction of seeds in which the boiler-input coefficient
+survives thresholding. The closed-loop series
 is \emph{not} monotone in $\kappa$ --- the worst-conditioned library outscores the middle
-one tenfold --- and it follows the survival annotation instead
+one tenfold, and the probe, whose conditioning stays at the full library's level
+($\kappa = 52.3$), does not collapse onto the middle library but lands between, in
+survival order --- and the margin follows the survival axis instead
 (Section~\ref{sec:res-mech}). \textbf{Scope:} the reversal in (\textbf{a},\textbf{b})
 holds in the degree-1, undenoised block under the two sparse estimators --- 2 of 72
 configurations per library, $n = 40$ fits per library. Pooled over all 72 labels the
 \emph{raw} library has the best mean one-step RMSE ($2.70$ against $2.98$ and $3.45$) and
 there is no reversal. Data: \texttt{regen/results/ladder\_rerun/} for
-(\textbf{a},\textbf{b}); \texttt{priced\_main/}, \texttt{priced\_dagger/} and
-\texttt{phys\_lib/} ($n = 80$ per controller) for (\textbf{c}).}
+(\textbf{a},\textbf{b}); \texttt{priced\_main/}, \texttt{priced\_dagger/},
+\texttt{phys\_lib/} and \texttt{notuboil/} ($n = 80$ per controller) for (\textbf{c}).}
 \label{fig:kappa}
 \end{figure}
 
@@ -1648,26 +1661,42 @@ season. Reading across harnesses is what the environment caveat of the section p
 warns about, so this is offered as a consistency check on the shape and not as a fourth
 measurement.
 
-Why the middle library is worse than either neighbour has a candidate explanation, and it
-should be read as \emph{consistent with} the data rather than as independently tested.
-The three libraries are nested: \texttt{raw} is the 11 measured signals;
-\texttt{physics\_no\_cross} adds saturation vapour pressure, vapour-pressure deficit and
-screen-attenuated radiation, which are nonlinear transforms of measured states and
-therefore near-collinear with them; \texttt{physics} adds four bilinear
-state\,$\times$\,input terms on top, among them $T_{\text{in}}u_{\mathrm{boil}}$. The
-middle library thus carries enough collinearity for the threshold to destabilise the
-\emph{direct} boiler term, but --- unlike the full library --- it holds no bilinear term
-able to carry the heating pathway once the direct one is cut. The worst-conditioned basis
-has a detour; the middle one has neither stability nor a detour. Two observations in the
-data are consistent with this and neither establishes it. First, the composition of the
-libraries is a structural fact of the code, not an inference: only \texttt{physics}
-contains $T_{\text{in}}u_{\mathrm{boil}}$. Second, boiler survival carries a strong
-economic signal inside \texttt{physics\_no\_cross} ($+2.36$ against $+0.02$, $p = 0.0015$
-between seeds) and none at all inside \texttt{physics} ($+2.52$ against $+2.74$,
-$p = 0.18$, the point estimate pointing the wrong way), which is what a working detour
-would look like. What is missing is the direct test: the cross-term coefficient was never
-recorded in the closed-loop rows of either physics controller, so the detour is inferred
-from the library definition and from the absence of a survival effect, not measured.
+Why the middle library is worse than either neighbour had one candidate explanation, and
+it has now been tested directly and rejected. The three libraries are nested:
+\texttt{raw} is the 11 measured signals; \texttt{physics\_no\_cross} adds saturation
+vapour pressure, vapour-pressure deficit and screen-attenuated radiation, which are
+nonlinear transforms of measured states and therefore near-collinear with them;
+\texttt{physics} adds four bilinear state\,$\times$\,input terms on top, among them
+$T_{\text{in}}u_{\mathrm{boil}}$. The candidate explanation held that the middle library
+carries enough collinearity for the threshold to destabilise the \emph{direct} boiler
+term, while the full library --- worse conditioned still --- keeps the bilinear term as a
+detour able to carry the heating pathway once the direct one is cut. That account makes a
+sharp, falsifiable prediction: deleting exactly the bilinear feature from the 18-feature
+full library --- sixteen of eighteen features, and essentially all of the collinearity,
+unchanged --- should collapse the truncated library onto the middle one, with boiler
+survival near $0.15$ and margin near $+0.28$ EUR\,m$^{-2}$, not leave it near
+$+2.75$ and $0.55$.
+
+The prediction fails (Table~\ref{tab:survival3}, fourth row pair). The 17-feature library
+(\texttt{physics\_no\_tuboil}), refit at both sparse estimators at threshold $0.05$ and
+simulated over the same four seasons $\times$ 20 seeds with zero truncated runs, keeps the
+full library's conditioning ($\kappa = 52.3$ against $53.4$, mean over 20 refits), its
+open-loop instability (median rollout $24.2$~$^\circ$C, divergence $0.084$) and ---
+decisively --- its closed-loop level: $+2.11$ EUR\,m$^{-2}$ under the ensemble estimator
+and $+2.28$ under STLSQ. That is significantly above the middle library (mean paired
+difference $+1.83$, 62 of 80 pairs, $p_{\text{Holm}} = 4.4\times10^{-6}$ over the four
+contrasts of this block) and at most slightly below the full library (median $-0.18$,
+$p_{\text{Holm}} = 6.4\times10^{-3}$ under the ensemble estimator; the STLSQ arm is not
+separable, $p = 0.089$). Boiler-term survival moves only part of the way down, to $0.40$
+(8 of 20 replicates; exact McNemar test against the full library $p = 0.55$), and nowhere
+near the predicted $0.15$. The small significant cost of the deletion under one estimator
+suggests the bilinear term shares the threshold's pressure with the direct term rather
+than substituting for it. With the detour ruled out, the margin ordering across the four
+libraries continues to track survival --- $0.15 \rightarrow +0.28$, $0.40 \rightarrow
++2.11$, $0.55 \rightarrow +2.75$ and $+4.32$ EUR\,m$^{-2}$ --- while \emph{which} feature
+or correlation pattern makes the threshold sever the direct term in
+\texttt{physics\_no\_cross} becomes an open question, stated as such in
+Section~\ref{sec:discussion}.
 
 The controlled evidence for the mechanism is the single-coefficient ablation, and it is
 the only randomised element in this section. On the frozen recipe, paired over 20 seeds
@@ -1729,9 +1758,10 @@ Four limits qualify the whole of this subsection. The randomised ablation is
 single-season (2020) and single-recipe, so the causal estimate is not measured under the
 seasonal variation that the rest of the results report. The knock and cross blocks are
 anchored on different baselines (survival $0.15$ against $1.00$) and on different
-libraries, so their deltas are not one ablation family. The three-library comparison is
-randomised in the seed but not in the library --- libraries are not assigned, they are
-chosen --- so it is a controlled comparison rather than an experiment on the mechanism.
+libraries, so their deltas are not one ablation family. The library comparisons ---
+including the term deletion, which is a structural edit and not an assigned factor ---
+are randomised in the seed but not in the library: libraries are not assigned, they are
+chosen, so these are controlled comparisons rather than experiments on the mechanism.
 And survival is measured on one coefficient of one actuator; whether the same account
 holds for the lamp and CO$_2$ pathways was not tested.
 
@@ -1739,9 +1769,13 @@ holds for the lamp and CO$_2$ pathways was not tested.
 %%   denoise=='none', split by optimizer (n = 20 fits per cell); closed-loop columns from
 %%   regen/results/priced_main/ + priced_dagger/ (raw_ens, conf, raw) and
 %%   regen/results/phys_lib/main_physlib.csv (phys_ens, phys), n = 80 runs per controller.
+%%   The p_ntb rows: open loop from regen/results/notuboil/ladder_notuboil.csv (20 seeds x
+%%   2 optimizers; kappa varies 49.4-57.3 across seeds, mean 52.28 quoted), closed loop
+%%   from regen/results/notuboil/main_notuboil.csv (160 rows, zero truncated/aborted).
 %%   kappa is a property of the library alone (identical across optimizers to 3 d.p.).
 %%   Survival = fraction of the 80 runs with xi_uboil != 0; it is constant within a seed,
-%%   so it is 11/20 seeds for the three 0.55 cells and 3/20 for the 0.15 cell.
+%%   so it is 11/20 seeds for the three 0.55 cells, 3/20 for the 0.15 cell and 8/20 for
+%%   the 0.40 cells.
 %% THE POINT OF THIS TABLE: columns 2-4 are monotone in the library, columns 5-6 are NOT.
 %%   Do not reorder the rows to make the last column monotone.
 \begin{table}[t]
@@ -1751,8 +1785,12 @@ are held at the frozen recipe's values; only the feature library changes. Open-l
 columns are degree-1 undenoised ladder fits at the matching optimizer ($n=20$); closed-loop
 columns are four test seasons $\times$ 20 seeds under the priced objective ($n=80$, no
 truncated runs). $\xi$ survival is the fraction of runs retaining the boiler-input
-coefficient. Sources: \texttt{regen/results/ladder\_rerun/}, \texttt{priced\_main/},
-\texttt{priced\_dagger/}, \texttt{phys\_lib/}.}
+coefficient. The \texttt{p\_ntb} rows are the 17-feature term-deletion library that tests
+the bilinear-detour reading (Section text): deleting the one cross term that touches the
+boiler leaves $\kappa$, rollout and divergence at the full library's level, and the
+predicted collapse onto the \texttt{p\_nc} row does not occur. Sources:
+\texttt{regen/results/ladder\_rerun/}, \texttt{priced\_main/},
+\texttt{priced\_dagger/}, \texttt{phys\_lib/}, \texttt{notuboil/}.}
 \label{tab:survival3}
 \small
 \begin{tabular}{@{}llccccc@{}}
@@ -1764,22 +1802,27 @@ Library & Controller & $\kappa$ & Rollout & Diverged & $\xi$ & EPI \\
 \texttt{raw}      & \texttt{sindy\_mpc\_raw\_ens} & 8.21  & \textbf{2.67}  & \textbf{0.0000} & 0.55 & $\mathbf{+4.32\pm4.08}$ \\
 \texttt{p\_nc}    & \texttt{sindy\_mpc\_conf}     & 24.52 & 10.99 & 0.0208 & 0.15 & $+0.28\pm4.11$ \\
 \texttt{phys}     & \texttt{sindy\_mpc\_phys\_ens}& 53.43 & 24.27 & 0.0767 & 0.55 & $+2.75\pm3.47$ \\
+\texttt{p\_ntb}   & \texttt{sindy\_mpc\_notuboil\_ens} & 52.28 & 24.17 & 0.0842 & 0.40 & $+2.11\pm3.51$ \\
 \addlinespace
 \multicolumn{7}{@{}l}{\emph{STLSQ estimator}} \\
 \texttt{raw}      & \texttt{sindy\_mpc\_raw}      & 8.21  & 2.67  & 0.0000 & 0.50 & $+3.83\pm4.23$ \\
 \texttt{p\_nc}    & --- (not run)                 & 24.52 & 10.45 & 0.0200 & ---  & --- \\
 \texttt{phys}     & \texttt{sindy\_mpc\_phys}     & 53.43 & 24.49 & 0.0750 & 0.55 & $+2.48\pm3.62$ \\
+\texttt{p\_ntb}   & \texttt{sindy\_mpc\_notuboil} & 52.28 & 23.58 & 0.0783 & 0.40 & $+2.28\pm3.55$ \\
 \bottomrule
 \end{tabular}
 
 \vspace{2pt}
 \begin{minipage}{\linewidth}\footnotesize
-The first three columns are monotone in the library and the last two are not: the
-worst-conditioned library outscores the middle one by a factor of ten in closed loop, and
-the economic ranking follows $\xi$ survival rather than $\kappa$. No four-season controller
-exists for \texttt{physics\_no\_cross} under STLSQ at threshold $0.05$; the $\lambda=0.05$
+The first three columns are monotone across the three nested libraries and the last two
+are not: the worst-conditioned library outscores the middle one by a factor of ten in
+closed loop, and the economic ranking follows $\xi$ survival rather than $\kappa$; the
+\texttt{p\_ntb} row sits between the two physics rows by construction and is excluded from
+that statement. No four-season controller exists for \texttt{physics\_no\_cross} under
+STLSQ at threshold $0.05$; the $\lambda=0.05$
 level of Table~\ref{tab:lambda} is that configuration on season 2020 and gives survival
-$0.10$ at $+4.04$ EUR\,m$^{-2}$, against $+8.40$ and $+5.82$ for the two STLSQ rows above
+$0.10$ at $+4.04$ EUR\,m$^{-2}$, against $+8.40$ and $+5.82$ for the \texttt{raw} and
+\texttt{phys} STLSQ rows above
 on the same season. That is a cross-harness comparison and is quoted as a consistency
 check only.
 \end{minipage}
@@ -2330,14 +2373,14 @@ That split is observational---survival is a property of each fit, not a randomis
 factor, and it is confounded with recipe---so the conservative reading is that
 survival marks which fits collapse rather than measuring the whole library effect.
 
-Why the middle library should be worse than \emph{both} of its neighbours has an
-explanation consistent with everything measured here, and it is a reading, not a
-result. The physics library without cross terms carries enough collinearity for
+Why the middle library should be worse than \emph{both} of its neighbours had one
+candidate explanation, and the experiment that decides it has now been run. The
+explanation was that the library without cross terms carries enough collinearity for
 the threshold to destabilise the direct boiler term, but---unlike the full
 library---holds no bilinear $T_{\text{in}}u_{\text{Boil}}$ term able to carry the
-heating pathway once the direct term is cut. On that account the worse-conditioned
-library has a detour and the middle one has neither stability nor a detour. Two
-observational figures are consistent with it, and neither is significant: inside
+heating pathway once the direct term is cut: the worse-conditioned library has a
+detour, the middle one has neither stability nor a detour. Two
+observational figures were consistent with it, and neither is significant: inside
 the full physics library, replicates that lose the direct term score no worse than
 those that keep it ($+3.10$ against $+2.48$~EUR\,m$^{-2}$, 9 and 11 replicates,
 $p=0.25$), whereas inside the library without cross terms losing it costs
@@ -2347,19 +2390,34 @@ $+2.26$ ($+2.20$ against $-0.06$, 3 and 17 replicates, $p=0.18$).
 %% replicate.  Computed 2026-08-14.  Both cells are small, neither test is
 %% significant and neither factor is randomised.  Do not upgrade to evidence.
 
-\textbf{The experiment that would decide it was not run.} It is a one-factor
-change of exactly the kind already reported three times: delete the single
-bilinear $T_{\text{in}}u_{\text{Boil}}$ feature---the only one of the four cross
-terms that touches the boiler---from the full physics candidate set, giving a
-17-feature library; refit at the same optimiser and threshold; and simulate four
-seasons $\times$ 20 replicates in closed loop. If the cross term is the detour,
-that library should fall back towards the $+0.28$ of the library without cross
-terms while remaining nearly as ill-conditioned as full physics; if it does not,
-the explanation is wrong. The cross-term block already present in the mechanism
-experiment cannot substitute for it: that block edits coefficients on a
-$\lambda=10^{-6}$ fit in which the direct boiler term survives in all 20
-replicates, so the pathway is never severed by sparsification there, and none of
-its contrasts reaches significance under either objective.
+\textbf{The term-deletion test rejects the detour.} Deleting exactly the bilinear
+$T_{\text{in}}u_{\text{Boil}}$ feature---the only one of the four cross terms that
+touches the boiler---from the full physics candidate set gives a 17-feature library
+that keeps sixteen of eighteen features and essentially all of the conditioning
+($\kappa = 52.3$ against $53.4$, mean over the 20 refits). Refit at the same
+optimiser and threshold and simulated over four seasons $\times$ 20 replicates in
+closed loop, it does not fall back towards the $+0.28$~EUR\,m$^{-2}$ and $0.15$
+survival of the library without cross terms, which is what a bilinear detour
+predicts. It scores $+2.11$~EUR\,m$^{-2}$ under the ensemble estimator and $+2.28$
+under STLSQ, with survival $0.40$ (8 of 20 replicates, Wilson interval
+$[0.22,\,0.61]$; exact McNemar test against the full library $p = 0.55$):
+significantly above the middle library (mean paired difference $+1.83$, 62 of 80
+pairs, $p_{\text{Holm}} = 4.4\times10^{-6}$, Holm correction over the four
+contrasts of this block) and at most slightly below the full library (median
+$-0.18$, $p_{\text{Holm}} = 6.4\times10^{-3}$ under the ensemble estimator; not
+separable under STLSQ, $p = 0.089$). The small significant cost of the deletion in
+one estimator arm suggests the bilinear term shares the threshold's pressure with
+the direct term rather than replacing it. Which feature, or which correlation
+pattern, makes the threshold sever the direct term in the library without cross
+terms is therefore open; what the mechanism claims is untouched, and is in fact
+sharpened by the fourth point: across four libraries the margin continues to track
+survival---$0.15 \rightarrow +0.28$, $0.40 \rightarrow +2.11$,
+$0.55 \rightarrow +2.75$ and $+4.32$~EUR\,m$^{-2}$---while neither conditioning,
+one-step accuracy nor library size orders them. The cross-term block already
+present in the mechanism experiment could not have substituted for this wave: that
+block edits coefficients on a $\lambda=10^{-6}$ fit in which the direct boiler term
+survives in all 20 replicates, so the pathway is never severed by sparsification
+there, and none of its contrasts reaches significance under either objective.
 %% Cross block: priced_mech/*.csv and final/mechanism*.csv, block == 'cross';
 %% recipe `cross` = physics library, degree 1, stlsq, threshold 1e-6
 %% (regen_config.py:120--126).  Baseline boiler-term survival in that block is
@@ -2367,11 +2425,15 @@ its contrasts reaches significance under either objective.
 %% cannot test a hypothesis about what happens when the term is thresholded out.
 %% Paired Wilcoxon, baseline minus knockout: priced p = 0.48 (ko_cross), 0.33
 %% (ko_uboil), 0.93 (ko_both); original p = 0.62, 0.09, 0.73.
-%% The 17-feature library is NOT one of the three that were run: raw = 11
-%% features, physics_no_cross = 14, physics = 18
-%% (article_experiment_utils.py:21--36); the four cross terms are t_S_eff,
-%% h_uVent, dc_uVent and t_uBoil, and t_uBoil = t_in*uBoil
-%% (article_experiment_utils.py:487--490).
+%% TERM-DELETION WAVE (2026-08-15, analysed 2026-08-18): the 17-feature
+%% physics_no_tuboil library (raw = 11 features, physics_no_cross = 14,
+%% physics = 18, notuboil = 17; article_experiment_utils.py:21--36; the four cross
+%% terms are t_S_eff, h_uVent, dc_uVent and t_uBoil = t_in*uBoil,
+%% article_experiment_utils.py:487--490).  Closed loop:
+%% regen/results/notuboil/main_notuboil.csv (160 rows, zero truncated/aborted);
+%% open loop: regen/results/notuboil/ladder_notuboil.csv (40 fits); analysis and
+%% the registered prediction: regen/analyze_notuboil.py ->
+%% results/notuboil/analysis_notuboil.md.
 
 \subsection{A cheap open-loop rule for selecting a control-oriented surrogate}
 \label{sec:disc-rule}
@@ -2640,33 +2702,30 @@ axis. Boiler-term survival is \emph{measured, not manipulated}, at library level
 the libraries differ in the basis, and survival is a downstream property of the
 resulting fits. The only randomised manipulation anywhere in this argument is the
 single-coefficient ablation, whose median effect is $+0.21$~EUR\,m$^{-2}$---so the
-mechanism is supported by one controlled contrast of modest size plus a
-three-library pattern, and a fourth library could disturb the pattern as the third
-disturbed the one before it.
-%% STLSQ pair at threshold 0.05: sindy_mpc_raw +3.8333, sindy_mpc_phys +2.4762
-%% (priced pool, n = 80 each).  There is no physics_no_cross controller at
-%% stlsq/0.05 -- the two stlsq physics_no_cross recipes sit at 1e-3 (dense) and
-%% 1e-6 (lowthr), so the middle point of the series is missing on that axis.
+mechanism is supported by one controlled contrast of modest size plus a library
+pattern that is measured rather than manipulated. A fourth library has already been
+added---the term-deletion probe below---and did not disturb the pattern, but the
+pattern remains observational at library level.
 
-\item \textbf{The cross-term explanation is untested.} That the bilinear
-$T_{\text{in}}u_{\text{Boil}}$ term is what rescues the full physics library is a
-reading consistent with the data, not a measurement, and the two observational
-figures offered for it are non-significant at 9--11 and 3--17 replicates. The
-experiment that would decide it---the full physics candidate set minus that single
+\item \textbf{What sets boiler-term survival is unresolved.} The candidate
+structural explanation---that the bilinear $T_{\text{in}}u_{\text{Boil}}$ term is
+what rescues the full physics library---has been tested by deleting exactly that
 feature, same optimiser and threshold, four seasons $\times$ 20 replicates in
-closed loop---was not run, and the existing cross-term block cannot stand in for
-it, because its baseline retains the direct boiler term in all 20 replicates and
-so never severs the pathway that the hypothesis is about
-(Section~\ref{sec:disc-mechanism}). Until that run exists, the non-monotonicity is
-an established fact without an established cause.
+closed loop, and is rejected (Section~\ref{sec:disc-mechanism}): the 17-feature
+library keeps the full library's conditioning, open-loop instability and
+closed-loop level, and its survival ($0.40$) comes nowhere near the middle
+library's $0.15$. The two observational figures once offered for the detour were
+non-significant at 9--11 and 3--17 replicates and now stand only as absence of
+contradiction. The non-monotonicity is an established fact without an established
+cause.
 
 \item \textbf{The mechanism block is single-season.} All 800 mechanism runs are
 for 2020, so neither the $\lambda$ sweep nor the ablation generalises across
 seasons. The knock-in and cross-term blocks rest on different baselines
 (boiler-term survival $0.15$ against $1.00$) and are not mutually comparable;
 the split by term survival is observational and confounded with recipe, and only
-the knock-in contrast is controlled. The three-library comparison, by contrast,
-covers all four test seasons.
+the knock-in contrast is controlled. The library comparison, by contrast,
+covers all four test seasons, including the term-deletion probe.
 
 \item \textbf{The held-out check rests on two training years.} With 2018 and
 2019 alone, year-dependence cannot be separated from chance, and the evaluation
@@ -3053,23 +3112,29 @@ at all \cite{cortiella2021,balanceguided2026,belsley1980}.
 %%   conf     kept n = 12 mean +2.199 vs cut n = 68 mean -0.057, p = 0.053 (n.s.)
 %%   raw_ens  kept n = 44 mean +4.689 vs cut n = 36 mean +3.862, p = 0.44 (n.s.)
 %%   phys_ens kept n = 44 mean +2.475 vs cut n = 36 mean +3.095, p = 0.48 (n.s.)
-%%   The last two nulls are what the detour reading predicts; do not quote them
+%%   The last two nulls were consistent with the detour reading; do not quote them
 %%   as support, only as absence of contradiction.
-%% The detour is an INTERPRETATION.  The cross-term contrasts in priced_mech
-%%   (block == 'cross', physics library at threshold 1e-6, n = 20 paired against
-%%   that block's own baseline) are all non-significant: ko_uboil p = 0.33,
-%%   ko_cross p = 0.48, ko_both p = 0.93.  Consistent with redundancy between the
-%%   direct and bilinear heating terms; it does not establish it.  The bilinear
-%%   term is named `t_uBoil' in the library (run_regen.CROSS_TERM).
+%% The detour reading is FALSIFIED (2026-08-18): the 17-feature physics_no_tuboil
+%%   library (regen/results/notuboil/) keeps kappa 52.3, EPI +2.11/+2.28 and
+%%   survival 0.40 -- the predicted collapse onto physics_no_cross (~+0.3, ~0.15)
+%%   did not occur.  The cross-term contrasts in priced_mech (block == 'cross',
+%%   physics library at threshold 1e-6, n = 20 paired against that block's own
+%%   baseline) are all non-significant: ko_uboil p = 0.33, ko_cross p = 0.48,
+%%   ko_both p = 0.93 -- and they never could test severance, since baseline
+%%   survival there is 1.00.  The bilinear term is named `t_uBoil' in the library
+%%   (run_regen.CROSS_TERM).
 \item \textbf{The closed-loop outcome follows whether the actuator pathway
 survives thresholding.} The direct boiler coefficient survives in $55$, $15$ and
-$55\,\%$ of fits of the three libraries --- the ordering of the margins, which
-conditioning does not reproduce. Reinstating it in the recipe that loses it is
+$55\,\%$ of fits of the three nested libraries --- the ordering of the margins, which
+conditioning does not reproduce --- and in $40\,\%$ of fits of the 17-feature
+deletion library, whose margin ($+2.11$~EUR\,m$^{-2}$) lands between, again in
+survival order. Reinstating it in the recipe that loses it is
 significant but small and right-skewed: median $+0.21$~EUR\,m$^{-2}$, mean
 $+1.92$, 16 of 20 replicates, $p=5.9\times10^{-4}$, one season. Stratifying that
-recipe's own fits by survival agrees, not significantly ($p=0.053$). The full
-library's bilinear temperature--boiler detour is our reading of this, not a
-measured result: the cross-term knockouts are non-significant.
+recipe's own fits by survival agrees, not significantly ($p=0.053$). The bilinear
+temperature--boiler detour once offered as the structural explanation has been
+tested by deleting that single feature and is rejected; why the middle library
+loses the term is open, that survival gates the outcome is not.
 
 %% --- Finding 5 ---------------------------------------------------------
 %% Pareto front recomputed 2026-08-14 over the family of 15 (priced_main/*.csv +
@@ -3223,11 +3288,15 @@ is 20 seeds, not 80 runs.
 %% Panel (b) THE NON-MONOTONICITY AND WHAT TRACKS IT.  Source CSVs:
 %%   regen/results/priced_main/*.csv (sindy_mpc_raw_ens, sindy_mpc_conf) and
 %%   regen/results/phys_lib/main_physlib.csv (sindy_mpc_phys_ens); dedup on
-%%   (method, seed, test_year), n = 80 per library, zero truncated runs.  Three
-%%   libraries on the x axis in kappa order, annotated 8.2 / 24.5 / 53.4.  Left
+%%   (method, seed, test_year), n = 80 per library, zero truncated runs; PLUS the
+%%   term-deletion probe regen/results/notuboil/main_notuboil.csv
+%%   (sindy_mpc_notuboil_ens, n = 80), drawn as the fourth x tick between the
+%%   middle and the full library (kappa 52.3).  Three nested libraries plus the
+%%   probe on the x axis in kappa order, annotated 8.2 / 24.5 / 52.3 / 53.4.  Left
 %%   y axis: mean closed-loop EPI with its dispersion -- this traces a V, NOT a
-%%   trend.  Right y axis (or a second marker series): boiler-term survival
-%%   0.55 / 0.15 / 0.55, which reproduces the shape of the EPI series.  This
+%%   trend (the probe lands between, in survival order).  Right y axis (or a
+%%   second marker series): boiler-term survival 0.55 / 0.15 / 0.40 / 0.55,
+%%   which reproduces the shape of the EPI series.  This
 %%   panel is the paper's central claim and replaces the old kappa-versus-error
 %%   panel.
 %% Panel (c) PARETO FRONT.  Source CSVs: regen/results/priced_main/*.csv,
@@ -3243,8 +3312,10 @@ first-order, undenoised block under sparse estimators: candidate libraries
 ordered by one-step prediction error are ordered inversely by 24~h rollout error
 and by divergence rate. (\textbf{b}) Changing only the feature library, the
 condition number and the open-loop rollout error rise monotonically across the
-three libraries while closed-loop margin does not --- the worst-conditioned
-library outperforms the intermediate one --- and the margin instead follows the
+nested libraries while closed-loop margin does not --- the worst-conditioned
+library outperforms the intermediate one, and the 17-feature probe that deletes
+the single bilinear boiler term stays at the full library's level, rejecting the
+bypass explanation --- and the margin instead follows the
 fraction of fits in which the direct boiler coefficient survives thresholding.
 (\textbf{c}) The two-axis outcome over four test seasons under the priced
 objective: the front holds five of the fifteen controllers, so the economic

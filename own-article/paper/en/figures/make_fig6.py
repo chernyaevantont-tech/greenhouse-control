@@ -42,13 +42,16 @@ TWO DELIBERATE DEPARTURES FROM THE SPEC WORDING, both recorded in the reply:
      and SD whiskers, for the same reason: the rollout distribution is
      heavy-tailed and the reversal must not read as three tidy points.
 
-SCOPE GUARD FOR PANEL (b).  Survival orders these THREE libraries because they
-differ in nothing else -- same estimator, threshold, degree, denoiser and seeds.
-It does NOT rank the wider controller pool: ``sindy_mpc_conf_dagger`` survives
+SCOPE GUARD FOR PANEL (b).  Survival orders these libraries because they differ
+in nothing else -- same estimator, threshold, degree, denoiser and seeds.  It
+does NOT rank the wider controller pool: ``sindy_mpc_conf_dagger`` survives
 at 0.85 and scores +1.66, below ``sindy_mpc_raw_ens`` at 0.55.  The panel says
-so on its face.  The bilinear-detour reading of WHY the middle library is worst
-is deliberately NOT drawn: it is not supported by a measured effect, only by the
-structural fact that ``physics`` alone contains ``t_uBoil``.
+so on its face.  The fourth x tick is the 17-feature term-deletion probe
+(``physics_no_tuboil``): the bilinear-detour reading it tested is FALSIFIED
+(2026-08-18, ``regen/results/notuboil/``) -- the probe keeps physics-level
+kappa, open-loop instability and closed-loop EPI instead of collapsing onto
+``physics_no_cross`` -- and it is drawn precisely so the figure cannot keep
+telling the detour story.
 
 SCOPE GUARD (SPEC.md, Figure 1).  The reversal shown in (a) holds in the
 degree-1, undenoised block under sparse estimators only -- 2 of 72
@@ -84,7 +87,13 @@ GREY = ps.OKABE_ITO["grey"]
 #: 17.5 cm those run into each other, so this is a DISPLAY abbreviation only.
 SHORT_LIB = {"raw": "raw",
              "physics_no_cross": "physics,\nno cross",
+             "physics_no_tuboil": "physics,\n$-$ $t\\,u_{\\mathrm{Boil}}$",
              "physics": "physics,\nfull"}
+
+#: Panel-(b) x order: the nested triple in kappa order, with the 17-feature
+#: term-deletion probe inserted at its measured kappa (52.3, between 24.5 and
+#: 53.4).  This is the ONLY place the deletion library joins the ordinal axis.
+PANEL_B_ORDER = ("raw", "physics_no_cross", "physics_no_tuboil", "physics")
 
 
 # ---------------------------------------------------------------------------
@@ -220,9 +229,9 @@ def draw_nonmonotone(ax, one_factor: pd.DataFrame,
     tick to make the monotone-input / non-monotone-output contrast explicit;
     it is READ FROM the ladder reduction, never hardcoded.
     """
-    t = one_factor.set_index("library").loc[list(ps.LIB_ORDER)].reset_index()
+    t = one_factor.set_index("library").loc[list(PANEL_B_ORDER)].reset_index()
     kappa_by_lib = (per_library.set_index("variant")["kappa"]
-                    .reindex(list(ps.LIB_ORDER)).to_numpy(float))
+                    .reindex(list(PANEL_B_ORDER)).to_numpy(float))
     if not np.all(np.diff(kappa_by_lib) > 0):
         raise AssertionError(
             "panel (b) asserts kappa is monotone across LIB_ORDER; the ladder "
@@ -270,8 +279,9 @@ def draw_nonmonotone(ax, one_factor: pd.DataFrame,
     ps.annotate_n(ax,
                   "one factor: only the library changes. $\\kappa$ rises\n"
                   "monotonically, margin does not. Survival ranks\n"
-                  "these three because nothing else differs; it\n"
-                  "does not rank the wider controller pool.",
+                  "these four because nothing else differs; the 17-term\n"
+                  "probe drops one bilinear term and stays between.\n"
+                  "Survival does not rank the wider controller pool.",
                   loc="lower left")
     ps.panel_label(ax, "b", dx=-0.20)
 
@@ -410,6 +420,23 @@ def main() -> None:
     one_factor = ps.library_one_factor("ensemble")
     t = pareto_table()
 
+    # The 17-feature deletion probe joins panel (b)'s ordinal axis.  Its kappa
+    # comes from its own ladder arm (20 seeds x 2 sparse estimators), reduced
+    # exactly as ladder_summary reduces the nested three.
+    ntb = pd.read_csv(ps.RESULTS / "notuboil" / "ladder_notuboil.csv")
+    per_library = pd.concat([per_library, pd.DataFrame([{
+        "variant": "physics_no_tuboil",
+        "n": int(len(ntb)),
+        "kappa": float(ntb["kappa"].mean()),
+        "kappa_sd": float(ntb["kappa"].std()),
+        "one_step": float(ntb["one_step_rmse_t_in"].mean()),
+        "one_step_sd": float(ntb["one_step_rmse_t_in"].std()),
+        "rollout_median": float(ntb["rollout_rmse_t_in"].median()),
+        "rollout_q25": float(ntb["rollout_rmse_t_in"].quantile(0.25)),
+        "rollout_q75": float(ntb["rollout_rmse_t_in"].quantile(0.75)),
+        "diverged": float(ntb["diverged_frac"].mean()),
+    }])], ignore_index=True)
+
     fig, axes = ps.new_figure(ncols=3, width=ps.W2, height=6.6)
     draw_reversal(axes[0], fits, per_config, per_library)
     draw_nonmonotone(axes[1], one_factor, per_library)
@@ -449,19 +476,24 @@ def main() -> None:
 
     # ---- self-check: the three claims the caption makes ---------------------
     kap = (per_library.set_index("variant")["kappa"]
-           .reindex(list(ps.LIB_ORDER)).to_numpy(float))
+           .reindex(list(PANEL_B_ORDER)).to_numpy(float))
     epi = (one_factor.set_index("library")["epi"]
-           .reindex(list(ps.LIB_ORDER)).to_numpy(float))
+           .reindex(list(PANEL_B_ORDER)).to_numpy(float))
     sur = (one_factor.set_index("library")["survival"]
-           .reindex(list(ps.LIB_ORDER)).to_numpy(float))
+           .reindex(list(PANEL_B_ORDER)).to_numpy(float))
     checks = [
         ("kappa monotone increasing", bool(np.all(np.diff(kap) > 0))),
         ("EPI NOT monotone", not (bool(np.all(np.diff(epi) > 0))
                                   or bool(np.all(np.diff(epi) < 0)))),
-        ("EPI is V-shaped (middle lowest)",
-         bool(epi[1] < epi[0] and epi[1] < epi[2])),
-        ("survival reproduces the V", bool(sur[1] < sur[0] and sur[1] < sur[2])),
-        ("survival ties the two outer libraries", bool(sur[0] == sur[2])),
+        ("EPI is V-shaped (no_cross lowest)",
+         bool(epi[1] < epi[0] and epi[1] < epi[2] and epi[1] < epi[3])),
+        ("survival reproduces the V", bool(sur[1] < sur[0] and sur[1] < sur[2]
+                                           and sur[1] < sur[3])),
+        ("survival ties the two outer libraries", bool(sur[0] == sur[-1])),
+        ("deletion probe lands in survival order (0.15 < 0.40 < 0.55)",
+         bool(sur[1] < sur[2] < sur[3])),
+        ("deletion probe keeps physics-level EPI (above no_cross)",
+         bool(epi[2] > epi[1])),
         ("front has 5 members", int(t["on_front"].sum()) == 5),
     ]
     print("\n-- caption self-check --")

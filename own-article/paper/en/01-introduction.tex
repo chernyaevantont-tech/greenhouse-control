@@ -220,22 +220,27 @@ complementary knock-out is null. We are explicit about the limits of this accoun
 Survival \emph{gates} the outcome but does not \emph{order} it: among the two libraries
 that keep the term the raw one still wins by $+1.56$~EUR~m$^{-2}$, and raw-library runs
 that lost the term still average $+3.48$, above physics-library runs that kept it
-($+2.36$). Our reading of why the middle library is the worst --- that it carries enough
-collinearity for the threshold to destabilise the direct boiler term but, unlike full
-physics, has no bilinear $T_{\mathrm{in}}u_{\mathrm{Boil}}$ term to carry the heating
-pathway once the direct one is cut --- is consistent with the structure of the three
-libraries and with the survival data, but it is a reading and not a measured result; the
-experiment that would test it is named in Section~\ref{sec:discussion}.
+($+2.36$). The obvious structural account of why the middle library is the worst ---
+that it carries enough collinearity for the threshold to destabilise the direct boiler
+term but, unlike full physics, has no bilinear $T_{\mathrm{in}}u_{\mathrm{Boil}}$ term to
+carry the heating pathway once the direct one is cut --- has been tested and rejected:
+deleting exactly that one feature from the full library leaves conditioning
+($\kappa = 52.3$), open-loop instability and closed-loop margin ($+2.11$~EUR~m$^{-2}$,
+$p_{\mathrm{Holm}} = 4.4 \times 10^{-6}$ above the middle library) at the full library's
+level, with survival at $40\,\%$ --- nowhere near the collapse a bilinear bypass predicts
+(Sections~\ref{sec:res-mech} and~\ref{sec:discussion}). Why one library loses the term is
+thus unresolved; that survival gates the outcome is not.
 
 What this does not show is equally explicit. The advantage is not Pareto-dominant: the
 front holds five points, and the PPO agent attains far fewer constraint violations
 ($1330$ against $4130$ steps per season) at a lower margin. The surrogate carries no crop
 state, so the MPC objective is necessarily a proxy and terminal biomass cannot be priced.
 The mechanism experiments are single-season and replication is unequal across controllers.
-The non-monotonicity rests on a three-point library comparison, which is few, and survival
-is measured rather than manipulated at library level --- the ablation is the only
-randomised contrast anywhere in the mechanism, so a fourth library could disturb the
-pattern as the third disturbed the one before it.
+The non-monotonicity rests on the middle library, which reaches closed loop under one
+estimator only, and survival is measured rather than manipulated at library level --- the
+ablation is the only randomised contrast anywhere in the mechanism, and the term-deletion
+test that removed the detour explanation is, like the library comparison itself, a
+controlled structural comparison rather than a randomised one.
 All results are simulation-only, for one location and one planting date, and
 reproducibility is established within one computing environment only --- the
 cross-environment case was never measured, and the closed-loop loop is chaotic enough
@@ -309,9 +314,14 @@ the implications and the limits; Section~\ref{sec:conclusions} concludes.
 %%         across the four seasons of a replicate: 0 of 100 method-seed cells vary).
 %%         "Survival gates but does not order": raw_ens - phys_ens = +1.56 among the two
 %%         survivors; 2x2 cells raw-without-term +3.4831 vs physics_no_cross-with-term
-%%         +2.3647. The bilinear detour is FLAGGED AS A READING, not a result: the cross
-%%         knock-out block sits at threshold 1e-6 where baseline survival is 1.00 in all
-%%         20 replicates, so it cannot test severance of the pathway.
+%%         +2.3647. The bilinear detour was TESTED AND FALSIFIED 2026-08-18: the
+%%         17-feature physics_no_tuboil library (regen/results/notuboil/, 160 runs)
+%%         keeps kappa 52.3, rollout 24.2, EPI +2.11/+2.28 and survival 0.40 -- no
+%%         collapse onto physics_no_cross (predicted ~+0.3 / ~0.15). Analysis:
+%%         regen/results/notuboil/analysis_notuboil.md. The cross knock-out block sits
+%%         at threshold 1e-6 where baseline survival is 1.00 in all 20 replicates, so it
+%%         could never test severance of the pathway -- which is why the deletion wave
+%%         had to be run.
 %%      2021 REVERSAL (must stay in the text): per-season means raw_ens -1.5563 vs
 %%         lowthr +0.2654. The raw-library controller is NOT first in all four seasons —
 %%         "first in all four seasons" is a RETRACTED claim (REVISION_LOG G6), do not

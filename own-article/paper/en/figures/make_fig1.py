@@ -80,22 +80,42 @@ def ladder_block() -> pd.DataFrame:
                           optimizers=("stlsq", "ensemble"))
 
 
+def _notuboil_ladder_stats(opt: str) -> dict:
+    """kappa / rollout / one-step of the 17-feature library from its own ladder
+    arm (``notuboil/ladder_notuboil.csv``, 20 seeds at the matching optimizer).
+
+    The canonical ladder never contained this variant, so the join in
+    :func:`matched_table` cannot source it there; these are the same quantities
+    on the same training data under the same recipe slice.
+    """
+    d = pd.read_csv(ps.RESULTS / "notuboil" / "ladder_notuboil.csv")
+    d = d[d["optimizer"] == opt]
+    return {"kappa": float(d["kappa"].mean()),
+            "rollout_median": float(d["rollout_rmse_t_in"].median()),
+            "one_step": float(d["one_step_rmse_t_in"].mean())}
+
+
 def matched_table() -> pd.DataFrame:
     """One-factor closed-loop comparison, joined to the ladder's kappa/rollout.
 
     The ladder row is the SAME library at the same degree and denoising, under
     the same estimator; the ladder does not vary the threshold, so the join is
     on (library, optimizer) and is exact for everything except the threshold,
-    which the ladder fixes at its own default.  Stated in the caption.
+    which the ladder fixes at its own default.  Stated in the caption.  The
+    17-feature deletion library joins from its own ladder arm instead.
     """
     lad = ps.load_ladder(degree=1, denoise="none", optimizers=(MATCHED_OPT,))
     lsum = ps.ladder_summary(lad).set_index("variant")
     out = {}
     for opt in (MATCHED_OPT, REPLICATE_OPT):
         t = ps.library_one_factor(opt)
-        t["kappa"] = [float(lsum.loc[l, "kappa"]) for l in t["library"]]
-        t["rollout_median"] = [float(lsum.loc[l, "rollout_median"]) for l in t["library"]]
-        t["one_step"] = [float(lsum.loc[l, "one_step"]) for l in t["library"]]
+        ntb = _notuboil_ladder_stats(opt)
+        t["kappa"] = [ntb["kappa"] if l == "physics_no_tuboil"
+                      else float(lsum.loc[l, "kappa"]) for l in t["library"]]
+        t["rollout_median"] = [ntb["rollout_median"] if l == "physics_no_tuboil"
+                               else float(lsum.loc[l, "rollout_median"]) for l in t["library"]]
+        t["one_step"] = [ntb["one_step"] if l == "physics_no_tuboil"
+                         else float(lsum.loc[l, "one_step"]) for l in t["library"]]
         out[opt] = t
     m = out[MATCHED_OPT]
     m.attrs["replicate"] = out[REPLICATE_OPT]
@@ -251,7 +271,8 @@ def panel_c(ax, m: pd.DataFrame) -> dict:
         e.lines[0].set_gid(f"c:ens:{r.library}")
         off = {"raw": (10, 8, "left", "bottom"),
                "physics_no_cross": (12, 10, "left", "bottom"),
-               "physics": (11, -6, "left", "top")}[r.library]
+               "physics": (11, -6, "left", "top"),
+               "physics_no_tuboil": (11, 8, "left", "bottom")}[r.library]
         ax.annotate(f"{ps.LIB_LABEL[r.library]}\n"
                     rf"$\kappa={r.kappa:.1f}$,  EPI ${r.epi:+.2f}$",
                     xy=(r.survival, r.epi), xytext=off[:2],
@@ -286,14 +307,15 @@ def panel_c(ax, m: pd.DataFrame) -> dict:
         Line2D([], [], marker="o", ls="", mfc=ps.OKABE_ITO["grey"], mec=dark,
                ms=5.5, label="ensemble, $\\lambda=0.05$"),
         Line2D([], [], marker="D", ls="", mfc="none", mec=ps.OKABE_ITO["grey"],
-               ms=4.6, label="STLSQ, $\\lambda=0.05$ (2 of 3)"),
+               ms=4.6, label="STLSQ, $\\lambda=0.05$ (3 of 4)"),
         Line2D([], [], ls="--", lw=0.9, color=ps.OKABE_ITO["grey"],
                label=r"path in order of rising $\kappa$"),
     ], loc="lower right", fontsize=6.4, handletextpad=0.5, labelspacing=0.28,
         borderaxespad=0.3)
 
     ps.annotate_n(ax, "vertical bar: seed-level SE;  horizontal: Wilson 95 %\n"
-                      "these three differ in nothing but the library.  Survival\n"
+                      "the nested three differ in nothing but the library; the\n"
+                      "fourth drops one bilinear term from physics.  Survival\n"
                       "does not rank controllers that differ in more than that.",
                   loc="upper left")
     return out
@@ -440,7 +462,7 @@ def _raw_concat(patterns) -> pd.DataFrame:
 
 def _independent_closed_loop() -> pd.DataFrame:
     d = _raw_concat(["priced_main/*.csv", "priced_dagger/*.csv",
-                     "phys_lib/main_physlib*.csv"])
+                     "phys_lib/main_physlib*.csv", "notuboil/main_notuboil*.csv"])
     d = d.drop_duplicates(subset=["method", "seed", "test_year"], keep="first")
     d = d[d["stop_reason"] != "solver_aborted"]
     return d
@@ -538,9 +560,20 @@ def selfcheck(values: dict) -> int:
                 and epis["physics"] > epis["physics_no_cross"]), True)
     chk_eq("c: worst-conditioned library beats the middle one",
            bool(epis["physics"] > epis["physics_no_cross"]), True)
+    # the falsification of the bilinear-detour reading, pinned so the panel can
+    # never silently revert to telling it
+    chk_eq("c: deletion library does NOT collapse onto physics_no_cross",
+           bool(epis["physics_no_tuboil"] > epis["physics_no_cross"]), True)
+    chk_eq("c: deletion library stays below the raw leader",
+           bool(epis["physics_no_tuboil"] < epis["raw"]), True)
+    kap_ntb = float(pd.read_csv(ps.RESULTS / "notuboil" / "ladder_notuboil.csv")
+                    ["kappa"].mean())
+    chk_eq("c: deletion library keeps physics-level conditioning (49 < kappa < 58)",
+           bool(49.0 < kap_ntb < 58.0), True)
 
     # --- panel (d): the coefficients -------------------------------------
-    for lib, method in ps.LIBRARY_ONE_FACTOR[MATCHED_OPT].items():
+    for lib in ps.LIB_ORDER:
+        method = ps.LIBRARY_ONE_FACTOR[MATCHED_OPT][lib]
         g = cl[cl["method"] == method]
         per_seed = g.groupby("seed")["xi_uboil"].first().abs().sort_values().to_numpy(float)
         chk(f"d: coefficients drawn for {lib}",

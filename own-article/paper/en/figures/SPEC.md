@@ -101,7 +101,7 @@ restored at zero cost to the argument if a reviewer asks for a design overview.
 |---|---|
 | (a) | Scatter, one marker per fit: one-step RMSE of `t_in` (x, linear) against 24-h rollout RMSE (y, **log**). Colour = library, marker = optimizer, **open face = fails the 0.05 divergence gate**. Median + IQR cross per library. The reversal, as raw data. Untouched by the correction. |
 | (b) | What κ **does** buy: κ (x, **log**) against one-step RMSE (left y) and median rollout RMSE (right y, log). Monotone and clean — but **open loop only**. Annotate κ = 8.2 / 24.5 / 53.4. |
-| (c) | The correction: four-season closed-loop EPI (y) against **boiler-term survival** (x) for all three libraries under the matched recipe. κ printed at each point, and a grey path joins them **in order of rising κ** so the reader sees conditioning order them wrongly. Open diamonds repeat the comparison under STLSQ (2 of 3 — see below). |
+| (c) | The correction: four-season closed-loop EPI (y) against **boiler-term survival** (x) for the three nested libraries under the matched recipe, **plus the 17-feature term-deletion probe** `physics_no_tuboil` (green), which lands between at survival 0.40 — the falsification of the bilinear-detour reading, drawn. κ printed at each point, and a grey path joins them **in order of rising κ** so the reader sees conditioning order them wrongly. Open diamonds repeat the comparison under STLSQ (3 of 4 — see below). |
 | (d) | Why `physics_no_cross` is the one that fails: identified \|ξ_uBoil\| per seed against the 0.05 cut, **symlog** so a cut coefficient sits at exactly 0. |
 
 **Source** (a): `ladder_rerun/ladder_rerun.csv` + `ladder_rerun2.csv`
@@ -111,11 +111,14 @@ restored at zero cost to the argument if a reviewer asks for a design overview.
 60 rows, n = 20 — so that (b) and (c) describe the *same* estimator.
 
 **Source** (c),(d): `load_library_pool()` = `priced_main/*.csv` +
-`priced_dagger/*.csv` + `phys_lib/main_physlib*.csv`, 867 → 760 rows.
+`priced_dagger/*.csv` + `phys_lib/main_physlib*.csv`, 867 → 760 rows,
+**plus** `load_notuboil_pool()` = `notuboil/main_notuboil*.csv`, 160 rows
+(joined inside `library_one_factor` only — the probe is not a benchmark
+controller and never enters the Pareto pools).
 The one-factor set is `LIBRARY_ONE_FACTOR`: degree 1, no denoising,
 **threshold 0.05**, only `feature_variant` differing —
-`sindy_mpc_raw_ens` / `sindy_mpc_conf` / `sindy_mpc_phys_ens`, n = 80 each,
-**zero truncated runs**.
+`sindy_mpc_raw_ens` / `sindy_mpc_conf` / `sindy_mpc_phys_ens` /
+`sindy_mpc_notuboil_ens`, n = 80 each, **zero truncated runs**.
 
 **Verified values.** κ 8.2070 / 24.5167 / 53.4254 (identical across optimizers);
 one-step 1.8611 / 1.7284 / 1.6750 °C; rollout median (ensemble) 2.6652 /
@@ -124,6 +127,12 @@ Closed loop: EPI **+4.3173 / +0.2818 / +2.7540**, seed-level SE 0.1989 / 0.6478 
 0.2778, median +5.2855 / −1.2543 / +3.3856; survival **0.55 / 0.15 / 0.55**
 (Wilson 95 %: [0.34, 0.74] / [0.05, 0.36] / [0.34, 0.74]).
 STLSQ replicate: raw +3.8333 at 0.50, physics +2.4762 at 0.55.
+**Deletion probe** (`physics_no_tuboil`, 17 of 18 terms, `t_uBoil` removed):
+κ 52.28 (49.4–57.3 across seeds, `notuboil/ladder_notuboil.csv`), rollout median
+24.17 °C, diverged 0.084; closed loop EPI **+2.11 ± 3.51** (ensemble) and
+**+2.28 ± 3.55** (STLSQ), survival **0.40** (8/20, Wilson [0.22, 0.61]).
+The registered detour prediction was collapse onto `physics_no_cross`
+(≈ +0.3 / ≈ 0.15) — falsified 2026-08-18 (`notuboil/analysis_notuboil.md`).
 Surviving \|ξ_uBoil\|, median 0.0685 / 0.0609 / 0.1430; libraries 11 / 14 / 18
 terms, and only `physics` contains the bilinear `t_uBoil`
 (`article_experiment_utils.py`, parsed by `library_feature_names()`).
@@ -322,7 +331,7 @@ formula in `make_tables.table_prices`, cross-checked against
 | Panel | Content |
 |---|---|
 | (a) | The selection reversal: one-step RMSE (x) against median 24-h rollout RMSE (y, log), arrow raw → physics, divergence rate annotated per library. Marker area is **uniform**. |
-| (b) | The non-monotonicity and what tracks it: the three libraries on an ordinal x axis in κ order (κ printed under each tick, read from the ladder), closed-loop EPI tracing a **V** on the left axis with seed-level SE, boiler-term survival (0.55 / 0.15 / 0.55) overlaid on the right axis reproducing the V. |
+| (b) | The non-monotonicity and what tracks it: the three nested libraries **plus the 17-feature deletion probe** on an ordinal x axis in κ order (κ printed under each tick: 8.2 / 24.5 / 52.3 / 53.4, read from the ladder), closed-loop EPI tracing a **V** on the left axis with seed-level SE, boiler-term survival (0.55 / 0.15 / 0.40 / 0.55) overlaid on the right axis reproducing the V. The probe staying at the full library's level is the falsified bypass reading, drawn. |
 | (c) | The Pareto front, as Figure 2 but with only the five front members labelled. |
 
 **Sources**: (a) as Figure 1a, (b) as Figure 1c, (c) as Figure 2. Duplication
@@ -336,16 +345,18 @@ matter, not a numbered float.
 > weight asserts the retracted claim. The committed PDF contradicted its own
 > caption from 2026-08-13 until the redraw.
 >
-> `make_fig6.py` ends in a **six-item self-check** that fails the build if the
+> `make_fig6.py` ends in an **eight-item self-check** that fails the build if the
 > caption's claims stop holding: κ monotone, EPI not monotone, EPI V-shaped,
-> survival reproducing the V, survival tying the two outer libraries, and the
-> front having five members.
+> survival reproducing the V, survival tying the two outer libraries, the
+> deletion probe landing in survival order, the deletion probe keeping
+> physics-level EPI, and the front having five members.
 
 > **SCOPE GUARD for panel (b)**, carried on the panel face: survival ranks
-> *these three* libraries because nothing else differs between them. It does not
+> *these four* libraries because nothing else differs between them (the probe
+> removes exactly one feature from `physics`). It does not
 > rank the wider pool — `conf_dagger` survives at 0.85 and scores +1.66, below
-> `raw_ens` at 0.55. The bilinear-detour *explanation* is deliberately not drawn:
-> it is a reading, not a measured effect.
+> `raw_ens` at 0.55. The bilinear-detour *explanation* is **falsified**
+> (2026-08-18) and the probe that falsified it is drawn at κ = 52.3.
 
 > **TYPESETTING ACTION.** The environment is currently a numbered `figure` sitting
 > in §5, so as drawn it would print as "Figure 6". It must move to the MDPI front

@@ -102,15 +102,21 @@ PALETTE = [OKABE_ITO[k] for k in
 #: middle one (``physics_no_cross``, kappa 24.5) roughly tenfold in closed loop.
 #: See :func:`library_one_factor`.  Never plot kappa as if it ranked controllers.
 LIB_ORDER = ("raw", "physics_no_cross", "physics")
+#: The 17-feature term-deletion library is NOT in ``LIB_ORDER``: that triple is
+#: the nested sequence used by the ladder panels, and the deletion probe is a
+#: mechanism experiment layered on top of it.  It appears in the one-factor
+#: closed-loop views via :data:`LIBRARY_ONE_FACTOR` and :func:`load_notuboil_pool`.
 LIB_COLOR = {
     "raw":              OKABE_ITO["blue"],
     "physics_no_cross": OKABE_ITO["orange"],
     "physics":          OKABE_ITO["vermilion"],
+    "physics_no_tuboil": OKABE_ITO["green"],
 }
 LIB_LABEL = {
     "raw":              "raw",
     "physics_no_cross": "physics, no cross terms",
     "physics":          "physics",
+    "physics_no_tuboil": "physics $-$ $t\\,u_{\\mathrm{Boil}}$",
 }
 #: Marker per sparse estimator, used wherever the degree-1 block is plotted.
 OPT_MARKER = {"stlsq": "o", "ensemble": "s", "constrained": "^", "sr3": "v"}
@@ -127,6 +133,8 @@ METHOD_LIBRARY = {
     "sindy_mpc_lowthr":       "physics_no_cross",
     "sindy_mpc_phys":         "physics",
     "sindy_mpc_phys_ens":     "physics",
+    "sindy_mpc_notuboil":     "physics_no_tuboil",
+    "sindy_mpc_notuboil_ens": "physics_no_tuboil",
     "nn_mpc":                 None,
     "oracle_mpc":             None,
     "ppo":                    None,
@@ -147,9 +155,11 @@ METHOD_LIBRARY = {
 LIBRARY_ONE_FACTOR = {
     "ensemble": {"raw":              "sindy_mpc_raw_ens",
                  "physics_no_cross": "sindy_mpc_conf",
-                 "physics":          "sindy_mpc_phys_ens"},
+                 "physics":          "sindy_mpc_phys_ens",
+                 "physics_no_tuboil": "sindy_mpc_notuboil_ens"},
     "stlsq":    {"raw":              "sindy_mpc_raw",
-                 "physics":          "sindy_mpc_phys"},
+                 "physics":          "sindy_mpc_phys",
+                 "physics_no_tuboil": "sindy_mpc_notuboil"},
 }
 
 #: Display names.  ``*_dagger`` is a RUN LABEL from the CSVs, never an
@@ -394,6 +404,30 @@ def load_physlib_pool() -> pd.DataFrame:
     return d
 
 
+def load_notuboil_pool() -> pd.DataFrame:
+    """Closed-loop runs on the 17-feature ``physics_no_tuboil`` library
+    (``notuboil/``) -- the falsifiable test of the bilinear-detour reading.
+
+    ``sindy_mpc_notuboil`` (STLSQ) and ``sindy_mpc_notuboil_ens`` (ensemble),
+    threshold 0.05, 20 seeds x 4 seasons = 160 rows, priced objective, zero
+    truncated runs and zero solver aborts.  Measured 2026-08-15, analysed
+    2026-08-18 (``regen/results/notuboil/analysis_notuboil.md``).
+
+    ``notuboil/main_ntbchk.csv`` is deliberately NOT loaded: a 288-step smoke
+    file.  The glob ``main_notuboil*.csv`` excludes it.
+
+    RESULT.  The registered prediction of the detour reading was collapse onto
+    ``physics_no_cross`` (survival ~0.15, EPI ~+0.3).  Measured: survival 0.40,
+    EPI +2.11 / +2.28, kappa 52.3 -- the reading is FALSIFIED.  This pool is a
+    mechanism probe and must NOT be concatenated into the benchmark pool of
+    :func:`load_library_pool`: the manuscript's controller count is fifteen,
+    and these two runs are a library test, not a sixteenth benchmark controller.
+    """
+    d = load_runs(["notuboil/main_notuboil*.csv"])
+    d.attrs["objective"] = "priced"
+    return d
+
+
 def load_library_pool() -> pd.DataFrame:
     """:func:`load_priced_pool` and :func:`load_physlib_pool`, concatenated.
 
@@ -427,11 +461,19 @@ def library_one_factor(optimizer: str = "ensemble") -> pd.DataFrame:
     libraries because they differ in nothing else.  It is NOT a general
     predictor across the wider controller pool: ``sindy_mpc_conf_dagger``
     survives at 0.85 and scores +1.66, below ``sindy_mpc_raw_ens`` at 0.55.
+
+    The table also carries the 17-feature ``physics_no_tuboil`` row (the
+    term-deletion probe): it is one-factor against ``physics`` in the same
+    sense -- one feature removed, nothing else changed.
     """
     pool = load_library_pool()
+    ntb = load_notuboil_pool().copy()
+    ntb["library"] = ntb["method"].map(METHOD_LIBRARY)
+    ntb["boiler_alive"] = (ntb["xi_uboil"].fillna(0.0).abs() > 0).astype(float)
+    pool = pd.concat([pool, ntb], ignore_index=True)
     mapping = LIBRARY_ONE_FACTOR[optimizer]
     rows = []
-    for lib in LIB_ORDER:
+    for lib in list(LIB_ORDER) + ["physics_no_tuboil"]:
         method = mapping.get(lib)
         if method is None:
             continue
@@ -454,7 +496,8 @@ def library_one_factor(optimizer: str = "ensemble") -> pd.DataFrame:
         })
     t = pd.DataFrame(rows)
     t.attrs["objective"] = "priced"
-    t.attrs["source_files"] = pool.attrs["source_files"]
+    t.attrs["source_files"] = (list(load_library_pool().attrs["source_files"])
+                               + list(load_notuboil_pool().attrs["source_files"]))
     return t
 
 

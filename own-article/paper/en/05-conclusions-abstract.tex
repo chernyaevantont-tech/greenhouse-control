@@ -139,23 +139,29 @@ at all \cite{cortiella2021,balanceguided2026,belsley1980}.
 %%   conf     kept n = 12 mean +2.199 vs cut n = 68 mean -0.057, p = 0.053 (n.s.)
 %%   raw_ens  kept n = 44 mean +4.689 vs cut n = 36 mean +3.862, p = 0.44 (n.s.)
 %%   phys_ens kept n = 44 mean +2.475 vs cut n = 36 mean +3.095, p = 0.48 (n.s.)
-%%   The last two nulls are what the detour reading predicts; do not quote them
+%%   The last two nulls were consistent with the detour reading; do not quote them
 %%   as support, only as absence of contradiction.
-%% The detour is an INTERPRETATION.  The cross-term contrasts in priced_mech
-%%   (block == 'cross', physics library at threshold 1e-6, n = 20 paired against
-%%   that block's own baseline) are all non-significant: ko_uboil p = 0.33,
-%%   ko_cross p = 0.48, ko_both p = 0.93.  Consistent with redundancy between the
-%%   direct and bilinear heating terms; it does not establish it.  The bilinear
-%%   term is named `t_uBoil' in the library (run_regen.CROSS_TERM).
+%% The detour reading is FALSIFIED (2026-08-18): the 17-feature physics_no_tuboil
+%%   library (regen/results/notuboil/) keeps kappa 52.3, EPI +2.11/+2.28 and
+%%   survival 0.40 -- the predicted collapse onto physics_no_cross (~+0.3, ~0.15)
+%%   did not occur.  The cross-term contrasts in priced_mech (block == 'cross',
+%%   physics library at threshold 1e-6, n = 20 paired against that block's own
+%%   baseline) are all non-significant: ko_uboil p = 0.33, ko_cross p = 0.48,
+%%   ko_both p = 0.93 -- and they never could test severance, since baseline
+%%   survival there is 1.00.  The bilinear term is named `t_uBoil' in the library
+%%   (run_regen.CROSS_TERM).
 \item \textbf{The closed-loop outcome follows whether the actuator pathway
 survives thresholding.} The direct boiler coefficient survives in $55$, $15$ and
-$55\,\%$ of fits of the three libraries --- the ordering of the margins, which
-conditioning does not reproduce. Reinstating it in the recipe that loses it is
+$55\,\%$ of fits of the three nested libraries --- the ordering of the margins, which
+conditioning does not reproduce --- and in $40\,\%$ of fits of the 17-feature
+deletion library, whose margin ($+2.11$~EUR\,m$^{-2}$) lands between, again in
+survival order. Reinstating it in the recipe that loses it is
 significant but small and right-skewed: median $+0.21$~EUR\,m$^{-2}$, mean
 $+1.92$, 16 of 20 replicates, $p=5.9\times10^{-4}$, one season. Stratifying that
-recipe's own fits by survival agrees, not significantly ($p=0.053$). The full
-library's bilinear temperature--boiler detour is our reading of this, not a
-measured result: the cross-term knockouts are non-significant.
+recipe's own fits by survival agrees, not significantly ($p=0.053$). The bilinear
+temperature--boiler detour once offered as the structural explanation has been
+tested by deleting that single feature and is rejected; why the middle library
+loses the term is open, that survival gates the outcome is not.
 
 %% --- Finding 5 ---------------------------------------------------------
 %% Pareto front recomputed 2026-08-14 over the family of 15 (priced_main/*.csv +
@@ -309,11 +315,15 @@ is 20 seeds, not 80 runs.
 %% Panel (b) THE NON-MONOTONICITY AND WHAT TRACKS IT.  Source CSVs:
 %%   regen/results/priced_main/*.csv (sindy_mpc_raw_ens, sindy_mpc_conf) and
 %%   regen/results/phys_lib/main_physlib.csv (sindy_mpc_phys_ens); dedup on
-%%   (method, seed, test_year), n = 80 per library, zero truncated runs.  Three
-%%   libraries on the x axis in kappa order, annotated 8.2 / 24.5 / 53.4.  Left
+%%   (method, seed, test_year), n = 80 per library, zero truncated runs; PLUS the
+%%   term-deletion probe regen/results/notuboil/main_notuboil.csv
+%%   (sindy_mpc_notuboil_ens, n = 80), drawn as the fourth x tick between the
+%%   middle and the full library (kappa 52.3).  Three nested libraries plus the
+%%   probe on the x axis in kappa order, annotated 8.2 / 24.5 / 52.3 / 53.4.  Left
 %%   y axis: mean closed-loop EPI with its dispersion -- this traces a V, NOT a
-%%   trend.  Right y axis (or a second marker series): boiler-term survival
-%%   0.55 / 0.15 / 0.55, which reproduces the shape of the EPI series.  This
+%%   trend (the probe lands between, in survival order).  Right y axis (or a
+%%   second marker series): boiler-term survival 0.55 / 0.15 / 0.40 / 0.55,
+%%   which reproduces the shape of the EPI series.  This
 %%   panel is the paper's central claim and replaces the old kappa-versus-error
 %%   panel.
 %% Panel (c) PARETO FRONT.  Source CSVs: regen/results/priced_main/*.csv,
@@ -329,8 +339,10 @@ first-order, undenoised block under sparse estimators: candidate libraries
 ordered by one-step prediction error are ordered inversely by 24~h rollout error
 and by divergence rate. (\textbf{b}) Changing only the feature library, the
 condition number and the open-loop rollout error rise monotonically across the
-three libraries while closed-loop margin does not --- the worst-conditioned
-library outperforms the intermediate one --- and the margin instead follows the
+nested libraries while closed-loop margin does not --- the worst-conditioned
+library outperforms the intermediate one, and the 17-feature probe that deletes
+the single bilinear boiler term stays at the full library's level, rejecting the
+bypass explanation --- and the margin instead follows the
 fraction of fits in which the direct boiler coefficient survives thresholding.
 (\textbf{c}) The two-axis outcome over four test seasons under the priced
 objective: the front holds five of the fifteen controllers, so the economic

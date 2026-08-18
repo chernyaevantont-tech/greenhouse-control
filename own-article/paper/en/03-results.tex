@@ -173,18 +173,21 @@ regression: as physically motivated features are added, $\kappa$ rises from $8.2
 $53.4$, the one-step error falls and the median 24-h rollout error rises by an order of
 magnitude, so the two \emph{open-loop} criteria order the three libraries in opposite
 directions. (\textbf{c})~The same three libraries in closed loop, changed one factor at a
-time (ensemble estimator, threshold $0.05$): four-season mean margin with run-level
-standard deviations under the priced objective, each bar annotated with the fraction of
-seeds in which the boiler-input coefficient survives thresholding. The closed-loop series
+time (ensemble estimator, threshold $0.05$), plus the 17-feature probe that deletes the
+single bilinear boiler term from the full physics set: four-season mean margin under the
+priced objective against the fraction of seeds in which the boiler-input coefficient
+survives thresholding. The closed-loop series
 is \emph{not} monotone in $\kappa$ --- the worst-conditioned library outscores the middle
-one tenfold --- and it follows the survival annotation instead
+one tenfold, and the probe, whose conditioning stays at the full library's level
+($\kappa = 52.3$), does not collapse onto the middle library but lands between, in
+survival order --- and the margin follows the survival axis instead
 (Section~\ref{sec:res-mech}). \textbf{Scope:} the reversal in (\textbf{a},\textbf{b})
 holds in the degree-1, undenoised block under the two sparse estimators --- 2 of 72
 configurations per library, $n = 40$ fits per library. Pooled over all 72 labels the
 \emph{raw} library has the best mean one-step RMSE ($2.70$ against $2.98$ and $3.45$) and
 there is no reversal. Data: \texttt{regen/results/ladder\_rerun/} for
-(\textbf{a},\textbf{b}); \texttt{priced\_main/}, \texttt{priced\_dagger/} and
-\texttt{phys\_lib/} ($n = 80$ per controller) for (\textbf{c}).}
+(\textbf{a},\textbf{b}); \texttt{priced\_main/}, \texttt{priced\_dagger/},
+\texttt{phys\_lib/} and \texttt{notuboil/} ($n = 80$ per controller) for (\textbf{c}).}
 \label{fig:kappa}
 \end{figure}
 
@@ -573,26 +576,42 @@ season. Reading across harnesses is what the environment caveat of the section p
 warns about, so this is offered as a consistency check on the shape and not as a fourth
 measurement.
 
-Why the middle library is worse than either neighbour has a candidate explanation, and it
-should be read as \emph{consistent with} the data rather than as independently tested.
-The three libraries are nested: \texttt{raw} is the 11 measured signals;
-\texttt{physics\_no\_cross} adds saturation vapour pressure, vapour-pressure deficit and
-screen-attenuated radiation, which are nonlinear transforms of measured states and
-therefore near-collinear with them; \texttt{physics} adds four bilinear
-state\,$\times$\,input terms on top, among them $T_{\text{in}}u_{\mathrm{boil}}$. The
-middle library thus carries enough collinearity for the threshold to destabilise the
-\emph{direct} boiler term, but --- unlike the full library --- it holds no bilinear term
-able to carry the heating pathway once the direct one is cut. The worst-conditioned basis
-has a detour; the middle one has neither stability nor a detour. Two observations in the
-data are consistent with this and neither establishes it. First, the composition of the
-libraries is a structural fact of the code, not an inference: only \texttt{physics}
-contains $T_{\text{in}}u_{\mathrm{boil}}$. Second, boiler survival carries a strong
-economic signal inside \texttt{physics\_no\_cross} ($+2.36$ against $+0.02$, $p = 0.0015$
-between seeds) and none at all inside \texttt{physics} ($+2.52$ against $+2.74$,
-$p = 0.18$, the point estimate pointing the wrong way), which is what a working detour
-would look like. What is missing is the direct test: the cross-term coefficient was never
-recorded in the closed-loop rows of either physics controller, so the detour is inferred
-from the library definition and from the absence of a survival effect, not measured.
+Why the middle library is worse than either neighbour had one candidate explanation, and
+it has now been tested directly and rejected. The three libraries are nested:
+\texttt{raw} is the 11 measured signals; \texttt{physics\_no\_cross} adds saturation
+vapour pressure, vapour-pressure deficit and screen-attenuated radiation, which are
+nonlinear transforms of measured states and therefore near-collinear with them;
+\texttt{physics} adds four bilinear state\,$\times$\,input terms on top, among them
+$T_{\text{in}}u_{\mathrm{boil}}$. The candidate explanation held that the middle library
+carries enough collinearity for the threshold to destabilise the \emph{direct} boiler
+term, while the full library --- worse conditioned still --- keeps the bilinear term as a
+detour able to carry the heating pathway once the direct one is cut. That account makes a
+sharp, falsifiable prediction: deleting exactly the bilinear feature from the 18-feature
+full library --- sixteen of eighteen features, and essentially all of the collinearity,
+unchanged --- should collapse the truncated library onto the middle one, with boiler
+survival near $0.15$ and margin near $+0.28$ EUR\,m$^{-2}$, not leave it near
+$+2.75$ and $0.55$.
+
+The prediction fails (Table~\ref{tab:survival3}, fourth row pair). The 17-feature library
+(\texttt{physics\_no\_tuboil}), refit at both sparse estimators at threshold $0.05$ and
+simulated over the same four seasons $\times$ 20 seeds with zero truncated runs, keeps the
+full library's conditioning ($\kappa = 52.3$ against $53.4$, mean over 20 refits), its
+open-loop instability (median rollout $24.2$~$^\circ$C, divergence $0.084$) and ---
+decisively --- its closed-loop level: $+2.11$ EUR\,m$^{-2}$ under the ensemble estimator
+and $+2.28$ under STLSQ. That is significantly above the middle library (mean paired
+difference $+1.83$, 62 of 80 pairs, $p_{\text{Holm}} = 4.4\times10^{-6}$ over the four
+contrasts of this block) and at most slightly below the full library (median $-0.18$,
+$p_{\text{Holm}} = 6.4\times10^{-3}$ under the ensemble estimator; the STLSQ arm is not
+separable, $p = 0.089$). Boiler-term survival moves only part of the way down, to $0.40$
+(8 of 20 replicates; exact McNemar test against the full library $p = 0.55$), and nowhere
+near the predicted $0.15$. The small significant cost of the deletion under one estimator
+suggests the bilinear term shares the threshold's pressure with the direct term rather
+than substituting for it. With the detour ruled out, the margin ordering across the four
+libraries continues to track survival --- $0.15 \rightarrow +0.28$, $0.40 \rightarrow
++2.11$, $0.55 \rightarrow +2.75$ and $+4.32$ EUR\,m$^{-2}$ --- while \emph{which} feature
+or correlation pattern makes the threshold sever the direct term in
+\texttt{physics\_no\_cross} becomes an open question, stated as such in
+Section~\ref{sec:discussion}.
 
 The controlled evidence for the mechanism is the single-coefficient ablation, and it is
 the only randomised element in this section. On the frozen recipe, paired over 20 seeds
@@ -654,9 +673,10 @@ Four limits qualify the whole of this subsection. The randomised ablation is
 single-season (2020) and single-recipe, so the causal estimate is not measured under the
 seasonal variation that the rest of the results report. The knock and cross blocks are
 anchored on different baselines (survival $0.15$ against $1.00$) and on different
-libraries, so their deltas are not one ablation family. The three-library comparison is
-randomised in the seed but not in the library --- libraries are not assigned, they are
-chosen --- so it is a controlled comparison rather than an experiment on the mechanism.
+libraries, so their deltas are not one ablation family. The library comparisons ---
+including the term deletion, which is a structural edit and not an assigned factor ---
+are randomised in the seed but not in the library: libraries are not assigned, they are
+chosen, so these are controlled comparisons rather than experiments on the mechanism.
 And survival is measured on one coefficient of one actuator; whether the same account
 holds for the lamp and CO$_2$ pathways was not tested.
 
@@ -664,9 +684,13 @@ holds for the lamp and CO$_2$ pathways was not tested.
 %%   denoise=='none', split by optimizer (n = 20 fits per cell); closed-loop columns from
 %%   regen/results/priced_main/ + priced_dagger/ (raw_ens, conf, raw) and
 %%   regen/results/phys_lib/main_physlib.csv (phys_ens, phys), n = 80 runs per controller.
+%%   The p_ntb rows: open loop from regen/results/notuboil/ladder_notuboil.csv (20 seeds x
+%%   2 optimizers; kappa varies 49.4-57.3 across seeds, mean 52.28 quoted), closed loop
+%%   from regen/results/notuboil/main_notuboil.csv (160 rows, zero truncated/aborted).
 %%   kappa is a property of the library alone (identical across optimizers to 3 d.p.).
 %%   Survival = fraction of the 80 runs with xi_uboil != 0; it is constant within a seed,
-%%   so it is 11/20 seeds for the three 0.55 cells and 3/20 for the 0.15 cell.
+%%   so it is 11/20 seeds for the three 0.55 cells, 3/20 for the 0.15 cell and 8/20 for
+%%   the 0.40 cells.
 %% THE POINT OF THIS TABLE: columns 2-4 are monotone in the library, columns 5-6 are NOT.
 %%   Do not reorder the rows to make the last column monotone.
 \begin{table}[t]
@@ -676,8 +700,12 @@ are held at the frozen recipe's values; only the feature library changes. Open-l
 columns are degree-1 undenoised ladder fits at the matching optimizer ($n=20$); closed-loop
 columns are four test seasons $\times$ 20 seeds under the priced objective ($n=80$, no
 truncated runs). $\xi$ survival is the fraction of runs retaining the boiler-input
-coefficient. Sources: \texttt{regen/results/ladder\_rerun/}, \texttt{priced\_main/},
-\texttt{priced\_dagger/}, \texttt{phys\_lib/}.}
+coefficient. The \texttt{p\_ntb} rows are the 17-feature term-deletion library that tests
+the bilinear-detour reading (Section text): deleting the one cross term that touches the
+boiler leaves $\kappa$, rollout and divergence at the full library's level, and the
+predicted collapse onto the \texttt{p\_nc} row does not occur. Sources:
+\texttt{regen/results/ladder\_rerun/}, \texttt{priced\_main/},
+\texttt{priced\_dagger/}, \texttt{phys\_lib/}, \texttt{notuboil/}.}
 \label{tab:survival3}
 \small
 \begin{tabular}{@{}llccccc@{}}
@@ -689,22 +717,27 @@ Library & Controller & $\kappa$ & Rollout & Diverged & $\xi$ & EPI \\
 \texttt{raw}      & \texttt{sindy\_mpc\_raw\_ens} & 8.21  & \textbf{2.67}  & \textbf{0.0000} & 0.55 & $\mathbf{+4.32\pm4.08}$ \\
 \texttt{p\_nc}    & \texttt{sindy\_mpc\_conf}     & 24.52 & 10.99 & 0.0208 & 0.15 & $+0.28\pm4.11$ \\
 \texttt{phys}     & \texttt{sindy\_mpc\_phys\_ens}& 53.43 & 24.27 & 0.0767 & 0.55 & $+2.75\pm3.47$ \\
+\texttt{p\_ntb}   & \texttt{sindy\_mpc\_notuboil\_ens} & 52.28 & 24.17 & 0.0842 & 0.40 & $+2.11\pm3.51$ \\
 \addlinespace
 \multicolumn{7}{@{}l}{\emph{STLSQ estimator}} \\
 \texttt{raw}      & \texttt{sindy\_mpc\_raw}      & 8.21  & 2.67  & 0.0000 & 0.50 & $+3.83\pm4.23$ \\
 \texttt{p\_nc}    & --- (not run)                 & 24.52 & 10.45 & 0.0200 & ---  & --- \\
 \texttt{phys}     & \texttt{sindy\_mpc\_phys}     & 53.43 & 24.49 & 0.0750 & 0.55 & $+2.48\pm3.62$ \\
+\texttt{p\_ntb}   & \texttt{sindy\_mpc\_notuboil} & 52.28 & 23.58 & 0.0783 & 0.40 & $+2.28\pm3.55$ \\
 \bottomrule
 \end{tabular}
 
 \vspace{2pt}
 \begin{minipage}{\linewidth}\footnotesize
-The first three columns are monotone in the library and the last two are not: the
-worst-conditioned library outscores the middle one by a factor of ten in closed loop, and
-the economic ranking follows $\xi$ survival rather than $\kappa$. No four-season controller
-exists for \texttt{physics\_no\_cross} under STLSQ at threshold $0.05$; the $\lambda=0.05$
+The first three columns are monotone across the three nested libraries and the last two
+are not: the worst-conditioned library outscores the middle one by a factor of ten in
+closed loop, and the economic ranking follows $\xi$ survival rather than $\kappa$; the
+\texttt{p\_ntb} row sits between the two physics rows by construction and is excluded from
+that statement. No four-season controller exists for \texttt{physics\_no\_cross} under
+STLSQ at threshold $0.05$; the $\lambda=0.05$
 level of Table~\ref{tab:lambda} is that configuration on season 2020 and gives survival
-$0.10$ at $+4.04$ EUR\,m$^{-2}$, against $+8.40$ and $+5.82$ for the two STLSQ rows above
+$0.10$ at $+4.04$ EUR\,m$^{-2}$, against $+8.40$ and $+5.82$ for the \texttt{raw} and
+\texttt{phys} STLSQ rows above
 on the same season. That is a cross-harness comparison and is quoted as a consistency
 check only.
 \end{minipage}

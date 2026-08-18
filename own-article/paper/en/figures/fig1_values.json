@@ -19,7 +19,8 @@
       "priced_main\\main_priced_seeds0-3.csv",
       "priced_dagger\\main_pricedDag.csv",
       "priced_dagger\\main_pricedDag2.csv",
-      "phys_lib\\main_physlib.csv"
+      "phys_lib\\main_physlib.csv",
+      "notuboil\\main_notuboil.csv"
     ],
     "matched_optimizer": "ensemble",
     "threshold": 0.05
@@ -170,6 +171,22 @@
         "epi_median": 3.385552057241781,
         "kappa": 53.42536120550458,
         "truncated": 0
+      },
+      {
+        "library": "physics_no_tuboil",
+        "method": "sindy_mpc_notuboil_ens",
+        "n_runs": 80,
+        "n_seeds": 20,
+        "survival": 0.4,
+        "survival_k": 8,
+        "survival_lo": 0.21880653237281705,
+        "survival_hi": 0.6134184992377469,
+        "epi": 2.1125958630415664,
+        "epi_sd": 3.5062534580115363,
+        "epi_se_seed": 0.4673379381484332,
+        "epi_median": 2.7178167589529147,
+        "kappa": 52.28405407645713,
+        "truncated": 0
       }
     ],
     "replicate": [
@@ -188,6 +205,14 @@
         "survival": 0.55,
         "epi": 2.4761603558944363,
         "epi_se_seed": 0.4209523085965333
+      },
+      {
+        "library": "physics_no_tuboil",
+        "method": "sindy_mpc_notuboil",
+        "n_runs": 80,
+        "survival": 0.4,
+        "epi": 2.2829809412398165,
+        "epi_se_seed": 0.43352742123185395
       }
     ],
     "optimizer": "ensemble"
@@ -388,11 +413,13 @@
         "x": [
           0.55,
           0.15,
+          0.4,
           0.55
         ],
         "y": [
           4.317275689079717,
           0.2818027188839799,
+          2.1125958630415664,
           2.754041903767604
         ]
       },
@@ -420,6 +447,14 @@
           2.754041903767604
         ]
       },
+      "c:ens:physics_no_tuboil": {
+        "x": [
+          0.4
+        ],
+        "y": [
+          2.1125958630415664
+        ]
+      },
       "c:stlsq:raw": {
         "x": [
           0.5
@@ -434,6 +469,14 @@
         ],
         "y": [
           2.4761603558944363
+        ]
+      },
+      "c:stlsq:physics_no_tuboil": {
+        "x": [
+          0.4
+        ],
+        "y": [
+          2.2829809412398165
         ]
       }
     },
