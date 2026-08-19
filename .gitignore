@@ -37,3 +37,5 @@ models/
 .server0_ip
 *.log
 own-article/results_scenarios/remote_logs/
+# Local conversion toolchain (pandoc binaries, check scripts)
+.tools/
