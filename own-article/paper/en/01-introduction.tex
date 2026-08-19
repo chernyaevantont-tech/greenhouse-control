@@ -7,73 +7,77 @@
 \section{Introduction}
 \label{sec:intro}
 
-Greenhouse vegetable production is energy-intensive, and its economic result depends
-directly on the quality of climate control. Heating, CO$_2$ enrichment and supplementary
-lighting dominate variable cost, and each has to be weighed against the revenue from the
-additional yield it buys \cite{katzin2020,katzin2021}. This is the natural setting for
-model predictive control (MPC): an economic criterion is optimised over a finite horizon
-subject to the temperature, humidity and CO$_2$ bounds that define a productive
-microclimate \cite{vanhenten1994,mayne2000,rawlings2012,lin2021}. MPC, however, requires
-a process model, and building and calibrating a detailed physical greenhouse model is
-laborious, which motivates surrogate models identified from data. Sparse identification
-of nonlinear dynamics (SINDy) is one such route: the dynamics are recovered explicitly as
-a sparse combination of library functions
-\cite{brunton2016,brunton2016c,kaiser2018,fasel2022}.
-Unlike a neural surrogate, a SINDy model is a white box: its equations can be written out,
-checked for physical and dimensional consistency, and embedded analytically in the MPC
-solver --- which matters when a controller is to be trusted with a crop.
+Protected tomato production depends on maintaining a productive microclimate while
+containing the variable costs of heating, supplementary lighting and CO$_2$ enrichment.
+These inputs affect crop growth and resource use simultaneously, so a control strategy
+should be judged agronomically and economically rather than by setpoint tracking alone
+\cite{katzin2020,katzin2021}. Economic model predictive control (MPC) provides that
+framework: inputs are optimised over a finite horizon subject to temperature, humidity and
+CO$_2$ constraints \cite{vanhenten1994,mayne2000,rawlings2012,lin2021}.
 
-Whether an interpretable surrogate costs anything in control quality is an empirical
-question, and answering it objectively is obstructed by three defects that recur in the
-greenhouse-control and data-driven-control literature. First, learned controllers are
-often compared against a weak heuristic, whereas well-tuned agronomic rules are a strong
-reference \cite{morcego2023,mallick2025,vanlaatum2025}. Second, the reported performance
-index is frequently a setpoint-tracking error rather than economic margin
-\cite{lin2021,morcego2023}, although the two need not be monotonically related. Third ---
-and least obvious --- the hyper-parameters of the surrogate are selected on open-loop
-prediction accuracy \cite{kaiser2018,yonezawa2026}, tacitly assuming that a more accurate
-model yields better control. Table~\ref{tab:defects} states each defect, the remedy
-adopted here, and what we measured the defect to be worth. We emphasise that the first two
-defects were present in our \emph{own} earlier analysis of this dataset --- an untuned
-reference, and an MPC stage cost whose actuator weights contradicted the prices the
-economic criterion itself uses --- and that correcting them removed about two thirds of the
-effect we had originally reported.
+Simulation-based greenhouse studies are established in this application area. Xu et al.\
+used a greenhouse--crop model to compare open- and closed-loop optimal control and to
+estimate lettuce yield and profit in an explicitly computational study
+\cite{xu2023agronomy}. Wen et al.\ combined measured blueberry photosynthesis with an SVR
+model and simulated multi-objective light--CO$_2$ regulation
+\cite{wen2022agronomy}, while E{\'c}im-{\DJ}uri{\'c} et al.\ coupled a TRNSYS greenhouse
+model to an artificial neural network and anchored the thermal model to measured
+temperatures \cite{ecimduric2024}. These examples show both the value and the evidential
+limit of simulation: virtual experiments can isolate controller and model-design effects,
+but field performance requires empirical anchoring. The present study is deliberately at
+the simulation-only end of that spectrum. It uses the independently published GreenLight
+tomato model and recorded weather forcing, but introduces no new greenhouse, plant or
+actuator measurements. Its claims are therefore comparative statements inside a defined
+virtual testbed, not demonstrations of commercial greenhouse performance.
 
-The third assumption is exactly what the identification-for-control literature warns
-against: a model should be judged by the behaviour of the loop it closes, not by the
-quality of its open-loop fit \cite{ljung1999,gevers1993,vandenhof1995}. The same
-phenomenon reappears for learned models under the name \emph{objective mismatch}: one-step
-predictive accuracy is a poor proxy for control performance
-\cite{lambert2020,jackson2022,farahmand2017}, and recent surveys confirm that the point
-is live for modern data-driven surrogates \cite{wei2024,controlorientedsurvey2025}. That
-literature is largely diagnostic, and its prescription --- evaluate candidates in closed
-loop --- costs a simulator, a solver and a full season per candidate. The practical
-question is therefore narrower and, to our knowledge,
-unanswered for economic greenhouse MPC: \emph{if} a surrogate must be selected open-loop,
-\emph{which} open-loop criterion tracks closed-loop economics?
+MPC requires a process model, and calibrating a detailed mechanistic greenhouse model for
+every site is laborious. A surrogate identified from simulated or measured trajectories
+can reduce that burden. Sparse identification of nonlinear dynamics (SINDy) is attractive
+because it expresses the dynamics as a sparse combination of library functions
+\cite{brunton2016,brunton2016c,kaiser2018,fasel2022}. Unlike a neural surrogate, the
+resulting equations can be inspected for physical and dimensional consistency and embedded
+analytically in an MPC solver.
 
-A second, related gap concerns the content of the feature library. Physically motivated
-basis functions --- saturation vapour pressure, vapour-pressure deficit,
-screen-attenuated radiation --- are adopted almost by default in physics-informed
-surrogate modelling \cite{raissi2019,karniadakis2021}, on the reasonable presumption that
-encoding known physics can only help. They are rarely tested for harm. Yet such features
-are nonlinear transforms of the same measured states, hence near-collinear with them, and
-collinearity is known to degrade sparse regression \cite{cortiella2021,balanceguided2026}.
-Whether that presumption survives a closed-loop economic criterion is the second question
-we address.
+Three benchmarking risks complicate an objective comparison of such surrogates. First,
+learned controllers may be compared with an unsearched heuristic even though tuned
+agronomic rules are a strong reference \cite{morcego2023,mallick2025,vanlaatum2025}.
+Second, a setpoint-tracking index may be reported instead of economic margin
+\cite{lin2021,morcego2023}, although the two need not be monotonically related. Third,
+surrogate hyperparameters are commonly selected by one-step prediction accuracy
+\cite{kaiser2018,yonezawa2026}, implicitly assuming that the best short-horizon predictor
+also gives the best controller. Table~\ref{tab:defects} states the safeguards used here
+and quantifies sensitivity to removing them.
+
+The third assumption is precisely what identification-for-control research warns against:
+a model should be judged by the loop it closes, not by open-loop fit alone
+\cite{ljung1999,gevers1993,vandenhof1995}. In model-based reinforcement learning the same
+problem is termed \emph{objective mismatch}: predictive accuracy can be a poor proxy for
+control performance \cite{lambert2020,jackson2022,farahmand2017}, and recent surveys show
+that it remains relevant for modern data-driven surrogates
+\cite{wei2024,controlorientedsurvey2025}. Exhaustive closed-loop screening is expensive
+even in simulation because it requires a solver and a full cropping season per candidate.
+The practical question is therefore narrower: if a greenhouse surrogate must be selected
+open loop, which inexpensive criterion best anticipates seasonal closed-loop economics?
+
+A related question concerns feature-library design. Physically motivated basis functions
+such as saturation vapour pressure, vapour-pressure deficit and screen-attenuated
+radiation are often included on the reasonable assumption that known physics can only
+help \cite{raissi2019,karniadakis2021}. Yet these functions are nonlinear transforms of
+the same climate states and may be nearly collinear with them; collinearity can destabilise
+sparse regression \cite{cortiella2021,balanceguided2026}. We therefore test, rather than
+assume, whether physically motivated features improve a control-oriented surrogate.
 
 \begin{table}[htbp]
 \centering
-\caption{The three benchmarking defects addressed in this study, and the measured cost of
-leaving each in place. All figures are seasonal margin in EUR~m$^{-2}$ unless stated
-otherwise.}
+\caption{Three benchmarking risks, the safeguards used in this study and the measured
+sensitivity to removing each safeguard. All monetary values are simulated seasonal margin
+in EUR~m$^{-2}$ unless stated otherwise.}
 \label{tab:defects}
 \begin{tabular}{p{0.20\textwidth}p{0.30\textwidth}p{0.38\textwidth}}
 \toprule
-\textbf{Defect} & \textbf{Remedy adopted here} & \textbf{Measured consequence of the
-defect} \\
+\textbf{Benchmarking risk} & \textbf{Safeguard used here} & \textbf{Observed sensitivity} \\
 \midrule
-Weak reference: learned controllers compared with a hard-coded heuristic &
+Unsearched reference: learned controllers compared with a hard-coded heuristic &
 The agronomic rule-based reference is tuned on the training seasons only, by a 16-trial
 random search --- the same trial budget the reinforcement-learning agents receive &
 Tuning lifts the heuristic from $-1.23$ to $+2.26$ (gain $+3.49$), so every advantage
@@ -81,8 +85,8 @@ measured against the untuned reference is overstated by that amount. The tuned h
 buys the gain with constraint pressure (2813 to 4339 violation steps) and is itself off
 the Pareto front \\
 \addlinespace
-Proxy objective: tracking error reported instead of margin, and an MPC stage cost whose
-actuator weights contradict the prices the criterion uses &
+Objective mismatch: tracking error reported instead of margin, or MPC actuator weights
+that are inconsistent with the prices used for evaluation &
 Every controller is scored by the simulator's own profit function, jointly with
 constraint violations under Pareto dominance; the MPC stage cost is re-weighted to match
 the price vector &
@@ -130,16 +134,17 @@ with median 24-h rollout RMSE $24.27$~$^\circ$C rather than $2.67$~$^\circ$C \\
 %% kappa also depends on the denoiser: physics is 53.43 undenoised but 41.24 (kalman) /
 %% 43.20 (savgol), so 53.4 vs 8.2 is a denoise=="none" figure.
 
-We address both questions on a validated GreenLight tomato model
-\cite{katzin2020,vanlaatum2025}, driven by recorded weather for a single location and
-simulated at a 15-min control step. Candidate surrogates were identified on two training
+We address both questions in a controlled in silico experiment using the published
+GreenLight tomato model \cite{katzin2020,vanlaatum2025}, ERA5-derived weather for one
+location and a 15-min control step. Candidate surrogates were identified on two training
 seasons, and fifteen controllers were evaluated --- nine SINDy-MPC variants, a
 neural-network MPC, two deep reinforcement-learning agents
 \cite{schulman2017,haarnoja2018,raffin2021},
 a full-simulator-model MPC and the rule-based heuristic in both
 its stock and tuned configurations --- over four held-out test seasons. A \emph{season}
-here is the 60-day window from 1 March, and margin is profit per square metre of floor
-area. Each learned controller was run at 20 identification replicates per season (10 for
+here is the 60-day window from 1 March, and the outcome is model-derived margin per square
+metre of greenhouse floor area. Each learned controller was run at 20 identification
+replicates per season (10 for
 the neural-network MPC); the heuristic is deterministic and was run once per season, and
 the full-simulator-model MPC returned only three of the four seasons, its 2022 runs having
 exhausted the solver-failure budget. Comparisons use non-parametric signed-rank tests with
@@ -167,11 +172,12 @@ for the best physics-informed variant, ahead in 62 of 80 season~$\times$~replica
 run-to-run spread --- standard deviations $4.08$ and $2.71$ for a difference of $1.23$ ---
 and it reverses in one of the four seasons ($-1.56$ against $+0.27$ in 2021). The library
 ordering holds again on four seasons never used at any stage of model or controller
-development (four controllers, eight replicates, default objective). Physical motivation
-of a basis function is therefore not evidence that it belongs in the library.
+development (four controllers, eight replicates, default objective). Within this virtual
+testbed, physical motivation alone is therefore not sufficient evidence that a basis
+function belongs in the control-oriented library.
 
-\textbf{(ii) The damage done by physically motivated features is not monotone in how
-many are added.} All three libraries have now been carried into closed loop under a
+\textbf{(ii) The effect of physically motivated features is non-monotone.} All three
+libraries were carried into closed loop under a
 strict one-factor design --- same estimator, same sparsity threshold, same seeds, same
 priced objective, four seasons $\times$ 20 replicates, zero truncated runs, the library
 the only thing that changes. Open-loop degradation is monotone in the number of physics
@@ -183,23 +189,21 @@ $p = 1.3\times10^{-8}$), in each of the four seasons taken separately. Under the
 sparse estimator only the two endpoints exist as closed-loop controllers ($+3.83$ raw,
 $+2.48$ full physics), so the raw-over-physics direction replicates there but the
 three-point non-monotonicity rests on one estimator. Conditioning therefore predicts
-open-loop multi-step stability cleanly and closed-loop economics not at all; the
-agreement observed while only two of the three libraries had closed-loop controllers was
-a two-point coincidence. This retracts an ill-conditioning mechanism we had previously
-advanced for the closed-loop result, and replaces it with contribution~(iv).
+open-loop multi-step stability cleanly but is not a sufficient explanation of closed-loop
+economics; contribution~(iv) identifies the controller-facing quantity that better tracks
+the outcome.
 
-\textbf{(iii) A benchmark whose comparison defects have been measured rather than
-assumed.} Against the properly tuned heuristic the raw-library controller is better by
+\textbf{(iii) Benchmarking safeguards materially change the apparent effect size.}
+Against the tuned heuristic the raw-library controller is better by
 $+2.06$~EUR~m$^{-2}$, ahead in 75 of 80 season~$\times$~replicate comparisons
-($p_{\mathrm{Holm}} = 6.3 \times 10^{-11}$, Holm correction over a family of 15, which we
-declare wherever a corrected level is quoted). Three further SINDy-MPC variants also clear
+($p_{\mathrm{Holm}} = 6.3 \times 10^{-11}$, Holm correction over a family of 15). Three
+further SINDy-MPC variants also clear
 the tuned heuristic significantly, by smaller margins ($+1.57$, $+0.83$, $+0.82$), and the
 two full-\texttt{physics} controllers are ahead of it in point estimate without being
-separable from it: the raw library is first, not alone. Against the
-untuned reference the same
-advantage would read $+5.54$ --- the failure mode this literature is criticised for,
-reproduced and quantified on our own data. Likewise, two thirds of what initially
-looked like a feature-library effect was in fact a defective MPC stage cost
+separable from it: the raw library is first, not alone. Against the unsearched reference
+the same advantage would read $+5.54$, demonstrating the sensitivity of the headline
+comparison to baseline tuning. Aligning actuator weights with the evaluation price vector
+likewise reduces the raw-minus-physics gap from $+3.66$ to $+1.23$
 (Table~\ref{tab:defects}, row 2).
 
 \textbf{(iv) What the closed-loop outcome does track is survival of the actuator
@@ -242,9 +246,9 @@ ablation is the only randomised contrast anywhere in the mechanism, and the term
 test that removed the detour explanation is, like the library comparison itself, a
 controlled structural comparison rather than a randomised one.
 All results are simulation-only, for one location and one planting date, and
-reproducibility is established within one computing environment only --- the
-cross-environment case was never measured, and the closed-loop loop is chaotic enough
-that even the deterministic reference does not reproduce exactly between two harnesses.
+reproducibility is established within one computing environment only. Consequently, the
+reported margins and rankings are comparative computational evidence, not estimates of
+field-scale benefit or recommendations for direct commercial deployment.
 The remainder of
 the paper is organised as follows. Section~\ref{sec:methods} describes the controlled
 object, the economic criterion, the data, the controllers and the identification

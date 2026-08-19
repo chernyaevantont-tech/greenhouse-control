@@ -37,10 +37,12 @@
 \section{Conclusions}
 \label{sec:conclusions}
 
-We asked which open-loop criterion should select a data-driven surrogate for
-economic MPC, and what explains its success. Multi-step stability selects;
-survival of the actuator term through the sparsity threshold, not conditioning,
-explains (Figure~\ref{fig:graphical-abstract}).
+Within a GreenLight-based in silico greenhouse testbed, we asked which open-loop
+criterion should select a data-driven surrogate for economic MPC and which model
+property best explains the closed-loop result. Multi-step stability selects the
+leading candidate, while survival of the actuator term through the sparsity
+threshold---rather than conditioning alone---best tracks the non-monotone economic
+outcome (Figure~\ref{fig:graphical-abstract}).
 
 \begin{enumerate}
 
@@ -90,16 +92,17 @@ better one step ahead too --- but it reproduces on a held-out year
 %% constant -- see the footnote to Table~\ref{tab:headline}.
 %% n5_years/main_n5.csv contains FOUR methods only (raw_ens, conf, dense,
 %% rule_based); no RL, no NN-MPC, no planner, no tuned heuristic.
-\item \textbf{The library that multi-step stability selects also gives the best
-closed-loop economics, once both comparison defects are corrected.} Across
+\item \textbf{The library selected by multi-step stability also gives the best
+simulated closed-loop economics under the benchmarking safeguards.} Across
 fifteen controllers on four test seasons the raw-library ensemble surrogate
 \cite{fasel2022} led with $+4.32$~EUR\,m$^{-2}$, against $+3.09$ for the best
 physics-informed variant (Holm-corrected $p=4.6\times10^{-4}$, family of 15) and
 $+2.26$ for the agronomic heuristic, re-tuned under the reinforcement-learning
 agents' own 16-trial budget ($\Delta=+2.06$, 75 of 80 runs against a
 deterministic reference) \cite{wilcoxon1945,holm1979}. Tuning was worth $+3.49$,
-and repricing the actuator weights cut the raw-minus-physics gap from $+3.66$ to
-$+1.23$. The direction survives, the magnitude does not.
+and aligning the actuator weights with the evaluation prices cut the raw-minus-physics
+gap from $+3.66$ to $+1.23$. The direction is retained, but its magnitude is sensitive
+to baseline tuning and economic weighting.
 
 %% --- Finding 3 ---------------------------------------------------------
 %% ONE-FACTOR comparison: ensemble optimiser, threshold 0.05, degree 1, no
@@ -115,8 +118,8 @@ $+1.23$. The direction survives, the magnitude does not.
 %% mechanism and the monotone-in-kappa claim outright.  Do not restore them.
 %% Paired against raw_ens on (seed, test_year): conf median +2.873, 75/80,
 %% p = 3.0e-14; phys_ens median +0.971, 67/80, p = 2.5e-9.
-\item \textbf{Physically motivated features hurt, but non-monotonically, and
-conditioning does not explain the economics.} Changing the feature library alone
+\item \textbf{Physically motivated features can reduce performance non-monotonically,
+and conditioning does not order the economics.} Changing the feature library alone
 --- same estimator, threshold and seeds --- the condition number rises
 monotonically, $8.2 \rightarrow 24.5 \rightarrow 53.4$, the fits grow
 \emph{denser} rather than sparser ($20.1 \rightarrow 37.0$ terms), and open-loop
@@ -124,8 +127,8 @@ rollout error rises with them, $2.67 \rightarrow 10.58 \rightarrow
 24.27$~\textdegree C. Closed-loop margin does not: $+4.32 \rightarrow +0.28
 \rightarrow +2.75$~EUR\,m$^{-2}$, the worst-conditioned library beating the
 intermediate one almost tenfold, with the same shape under the other estimator.
-Conditioning predicts open-loop stability cleanly and closed-loop economics not
-at all \cite{cortiella2021,balanceguided2026,belsley1980}.
+Conditioning predicts open-loop stability cleanly but does not order closed-loop
+economics \cite{cortiella2021,balanceguided2026,belsley1980}.
 
 %% --- Finding 4 ---------------------------------------------------------
 %% Survival = fraction of identification replicates retaining a non-zero direct
@@ -158,9 +161,9 @@ deletion library, whose margin ($+2.11$~EUR\,m$^{-2}$) lands between, again in
 survival order. Reinstating it in the recipe that loses it is
 significant but small and right-skewed: median $+0.21$~EUR\,m$^{-2}$, mean
 $+1.92$, 16 of 20 replicates, $p=5.9\times10^{-4}$, one season. Stratifying that
-recipe's own fits by survival agrees, not significantly ($p=0.053$). The bilinear
-temperature--boiler detour once offered as the structural explanation has been
-tested by deleting that single feature and is rejected; why the middle library
+recipe's own fits by survival agrees, not significantly ($p=0.053$). A candidate
+bilinear temperature--boiler detour was tested by deleting that single feature and
+is rejected; why the middle library
 loses the term is open, that survival gates the outcome is not.
 
 %% --- Finding 5 ---------------------------------------------------------
@@ -207,6 +210,13 @@ date, one computing environment.
 
 \end{enumerate}
 
+These findings establish a control-oriented model-selection result within the stated
+virtual greenhouse. They do not demonstrate realised marketable yield, energy savings,
+constraint safety or profitability in a physical facility. Before operational use, the
+selected surrogate and controller require calibration against measured greenhouse
+trajectories, hardware-in-the-loop testing and a crop-scale pilot that independently
+records climate, actuator use, energy consumption and marketable yield.
+
 Table~\ref{tab:headline} lists every headline quantity above together with the
 result file it is read from, so that each can be checked at source.
 
@@ -252,7 +262,7 @@ PPO (EUR\,m$^{-2}$; violation steps) & $+0.45\pm2.97$; 1330 & \texttt{final/main
 Raw-library ensemble MPC (EUR\,m$^{-2}$) & $+6.42\pm0.95$ & \texttt{n5\_years/main\_n5.csv} \\
 Untuned heuristic (EUR\,m$^{-2}$) & $-0.33$ & \texttt{n5\_years/main\_n5.csv} \\
 \midrule
-\multicolumn{3}{@{}l}{\emph{Corrections, mechanism and robustness}} \\
+\multicolumn{3}{@{}l}{\emph{Benchmarking safeguards, mechanism and robustness}} \\
 Gain from tuning the heuristic (EUR\,m$^{-2}$) & $+3.49$ & \texttt{n2\_tune/tune\_rb\_n2.csv} \\
 Raw-minus-physics gap, default $\rightarrow$ priced (EUR\,m$^{-2}$) & $+3.66 \rightarrow +1.23$ & \texttt{priced\_main/*.csv}, \texttt{priced\_dagger/*.csv}, \texttt{final/main.csv}, \texttt{n7/main\_n7.csv} \\
 Boiler-coefficient knock-in, priced: median / mean & $+0.21$ / $+1.92$ (16 of 20, $p=5.9\times10^{-4}$) & \texttt{priced\_mech/ mechanism\_pricedMech*.csv} \\
@@ -334,20 +344,9 @@ is 20 seeds, not 80 runs.
 %%   solver_failures >= max_solver_failures.  Plot mean EPI (y, EUR m^-2)
 %%   against mean violation_steps_total (x), one marker per controller, the five
 %%   front members joined by a step line and the other ten in grey.
-\caption{Graphical abstract. (\textbf{a}) The selection reversal in the
-first-order, undenoised block under sparse estimators: candidate libraries
-ordered by one-step prediction error are ordered inversely by 24~h rollout error
-and by divergence rate. (\textbf{b}) Changing only the feature library, the
-condition number and the open-loop rollout error rise monotonically across the
-nested libraries while closed-loop margin does not --- the worst-conditioned
-library outperforms the intermediate one, and the 17-feature probe that deletes
-the single bilinear boiler term stays at the full library's level, rejecting the
-bypass explanation --- and the margin instead follows the
-fraction of fits in which the direct boiler coefficient survives thresholding.
-(\textbf{c}) The two-axis outcome over four test seasons under the priced
-objective: the front holds five of the fifteen controllers, so the economic
-advantage of the raw library is not Pareto-dominant. Sources are named in the
-LaTeX comment preceding this caption.}
+\caption{Graphical abstract. (\textbf{a})~Open-loop selection reversal.
+(\textbf{b})~Non-monotone closed-loop economics and boiler-term survival.
+(\textbf{c})~The five-member margin--violation Pareto front.}
 \label{fig:graphical-abstract}
 \end{figure}
 
@@ -366,32 +365,31 @@ LaTeX comment preceding this caption.}
 
 \subsection{Abstract}
 
-Economic model predictive control (MPC) of greenhouse climate needs a process
-model, and sparse identification of nonlinear dynamics offers an interpretable
-surrogate; which open-loop criterion should select one is rarely tested. We
-screened 72 identification configurations on the GreenLight tomato model under
-ERA5 weather and compared fifteen controllers over four test seasons at up to 20
-replicates, scored by seasonal margin. One-step accuracy and multi-step
-stability ranked the candidate libraries in opposite orders: physically
-motivated features lowered one-step RMSE from 1.86 to 1.68~\textdegree C while
-raising median 24~h rollout RMSE from 2.67 to 24.27~\textdegree C. Multi-step
-stability selected correctly---the raw library also gave the best economics,
-$+4.32$~EUR\,m$^{-2}$ against $+3.09$ for the best physics-informed variant
-(Holm-corrected $p=4.6\times10^{-4}$, family of 15) and $+2.26$ for an agronomic
-heuristic re-tuned under the same 16-trial budget the reinforcement-learning
-agents received. Conditioning does not explain this: changing only the library,
-the condition number rose monotonically (8.2, 24.5, 53.4) but margin did not
-($+4.32$, $+0.28$, $+2.75$). Margin followed survival of the boiler coefficient
-under thresholding (55, 15, 55~\%); reinstating it is significant but small
-(median $+0.21$, 16 of 20, $p=5.9\times10^{-4}$). The advantage is not
-Pareto-dominant: five controllers hold the margin--violation front.
+Economic model predictive control (MPC) can coordinate crop-climate requirements
+and resource costs in greenhouse production, but comparing candidate process
+models at crop scale is expensive. We therefore conducted an in silico study using
+the published GreenLight tomato greenhouse model driven by ERA5 weather. Seventy-two
+sparse-identification configurations were screened, and fifteen controllers were
+compared over four 60-day test seasons with up to 20 identification replicates.
+Outcomes were simulated seasonal margin and climate-corridor violations. One-step
+accuracy and multi-step stability ranked the feature libraries oppositely:
+physically motivated features reduced one-step temperature RMSE from 1.86 to
+1.68~\textdegree C but increased median 24~h rollout RMSE from 2.67 to
+24.27~\textdegree C. The library selected by multi-step stability achieved the
+highest mean margin ($+4.32$~EUR\,m$^{-2}$), compared with $+3.09$ for the best
+physics-informed variant and $+2.26$ for a tuned agronomic heuristic. Conditioning
+did not explain the non-monotone margin pattern ($+4.32$, $+0.28$, $+2.75$);
+performance instead tracked survival of the direct boiler coefficient after
+sparsification (55, 15, 55~\%). Five controllers remained on the margin--violation
+Pareto front. These results support rollout-based, actuator-aware surrogate
+screening for greenhouse MPC, but establish comparative simulation evidence rather
+than field performance.
 
 \subsection{Keywords}
 
-greenhouse climate control; economic model predictive control; sparse
-identification of nonlinear dynamics; control-oriented model selection;
-multi-step prediction error; physics-informed feature libraries; sparsity
-thresholding; reinforcement learning baselines
+greenhouse climate control; protected tomato production; economic model predictive
+control; sparse identification of nonlinear dynamics; simulation-based evaluation;
+control-oriented model selection; multi-step prediction error; actuator-pathway survival
 
 %% ===========================================================================
 %% NEW REFERENCES NEEDED: none.  `belsley1980' is now cited, in Finding 3 of the

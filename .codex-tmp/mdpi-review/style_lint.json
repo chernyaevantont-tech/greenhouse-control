@@ -1,0 +1,158 @@
+{
+  "input": "C:\\Users\\zergu\\repos\\greenhouse-control\\own-article\\paper\\en\\paper_en.docx",
+  "fonts_by_char_count": {},
+  "direct_run_formatting_runs": 341,
+  "direct_paragraph_formatting_paragraphs": 3,
+  "heading_like_paragraphs_not_heading_style": [
+    {
+      "para_index": 2,
+      "text": "[[AUTHOR 1 \u2013 FULL NAME REQUIRED]]  \u00a0[[ORCID REQUIRED]]",
+      "style": "Normal"
+    },
+    {
+      "para_index": 3,
+      "text": "[[AUTHOR 2 \u2013 FULL NAME REQUIRED]] \u00a0[[ORCID REQUIRED]]",
+      "style": "Normal"
+    },
+    {
+      "para_index": 239,
+      "text": "Defect",
+      "style": "Normal"
+    },
+    {
+      "para_index": 240,
+      "text": "Remedy adopted here",
+      "style": "Normal"
+    },
+    {
+      "para_index": 241,
+      "text": "Measured consequence of the defect",
+      "style": "Normal"
+    },
+    {
+      "para_index": 362,
+      "text": "2.022",
+      "style": "Normal"
+    },
+    {
+      "para_index": 363,
+      "text": "30.84",
+      "style": "Normal"
+    },
+    {
+      "para_index": 390,
+      "text": "1.675",
+      "style": "Normal"
+    },
+    {
+      "para_index": 391,
+      "text": "24.27",
+      "style": "Normal"
+    },
+    {
+      "para_index": 537,
+      "text": "1330",
+      "style": "Normal"
+    },
+    {
+      "para_index": 697,
+      "text": "2624",
+      "style": "Normal"
+    },
+    {
+      "para_index": 722,
+      "text": "2.67",
+      "style": "Normal"
+    },
+    {
+      "para_index": 723,
+      "text": "0.0000",
+      "style": "Normal"
+    },
+    {
+      "para_index": 1015,
+      "text": "8.2",
+      "style": "Normal"
+    },
+    {
+      "para_index": 1016,
+      "text": "20.6",
+      "style": "Normal"
+    },
+    {
+      "para_index": 1018,
+      "text": "2.62 [2.53, 2.80]",
+      "style": "Normal"
+    },
+    {
+      "para_index": 1019,
+      "text": "0.000",
+      "style": "Normal"
+    },
+    {
+      "para_index": 1031,
+      "text": "1.64",
+      "style": "Normal"
+    },
+    {
+      "para_index": 1043,
+      "text": "8.2",
+      "style": "Normal"
+    },
+    {
+      "para_index": 1044,
+      "text": "20.6",
+      "style": "Normal"
+    }
+  ],
+  "examples": {
+    "direct_run_formatting": [
+      {
+        "para_index": 2,
+        "run_text": "[[AUTHOR 1 \u2013 FULL NAME REQUIRED]]",
+        "style": "Normal"
+      },
+      {
+        "para_index": 3,
+        "run_text": "[[AUTHOR 2 \u2013 FULL NAME REQUIRED]]",
+        "style": "Normal"
+      },
+      {
+        "para_index": 4,
+        "run_text": "[[ADD OR DELETE AUTHORS AS REQUIRED]]",
+        "style": "Normal"
+      },
+      {
+        "para_index": 7,
+        "run_text": "Keywords:",
+        "style": "Normal"
+      },
+      {
+        "para_index": 10,
+        "run_text": "own",
+        "style": "Body Text"
+      }
+    ],
+    "direct_paragraph_formatting": [
+      {
+        "para_index": 1167,
+        "text": "Agronomy 2026, 16, x FOR PEER REVIEW\t2 of 8",
+        "style": "Normal"
+      },
+      {
+        "para_index": 1168,
+        "text": "",
+        "style": "Normal"
+      },
+      {
+        "para_index": 1169,
+        "text": "https://doi.org/10.3390/xxxxx",
+        "style": "Footer"
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}

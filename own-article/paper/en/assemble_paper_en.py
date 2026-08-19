@@ -63,6 +63,22 @@ In Proceedings of the 51st IEEE Conference on Decision and Control (CDC), Maui, 
 'lin2021': r"""Lin, D.; Zhang, L.; Xia, X. Model predictive control of a Venlo-type greenhouse system
 considering electrical energy, water and carbon dioxide consumption. \textit{Appl. Energy}
 \textbf{2021}, \textit{298}, 117163. \url{https://doi.org/10.1016/j.apenergy.2021.117163}""",
+'xu2023agronomy': r"""Xu, D.; Li, Y.; Dai, A.; Zhao, S.; Song, W. Closed-loop optimal control of greenhouse
+cultivation based on two-time-scale decomposition: A simulation study in Lhasa.
+\textit{Agronomy} \textbf{2023}, \textit{13}, 102.
+\url{https://doi.org/10.3390/agronomy13010102}""",
+'wen2022agronomy': r"""Wen, X.; Xu, L.; Wei, R. Research on control strategy of light and CO$_2$ in blueberry
+greenhouse based on coordinated optimization model. \textit{Agronomy} \textbf{2022},
+\textit{12}, 2988. \url{https://doi.org/10.3390/agronomy12122988}""",
+'ecimduric2024': r"""E{\'c}im-{\DJ}uri{\'c}, O.; Milanovi{\'c}, M.; Dimitrijevi{\'c}-Petrovi{\'c}, A.;
+Mileusni{\'c}, Z.; Dragi{\v{c}}evi{\'c}, A.; Miodragovi{\'c}, R. Prediction of greenhouse
+microclimatic parameters using building transient simulation and artificial neural networks.
+\textit{Agronomy} \textbf{2024}, \textit{14}, 1147.
+\url{https://doi.org/10.3390/agronomy14061147}""",
+'padillanates2025': r"""Padilla-Nates, J.P.; Garcia, L.D.; Lozoya, C.; Orona, L.; Cortes-Perez, A.
+Greenhouse irrigation control based on reinforcement learning. \textit{Agronomy}
+\textbf{2025}, \textit{15}, 2781.
+\url{https://doi.org/10.3390/agronomy15122781}""",
 'brunton2016': r"""Brunton, S.L.; Proctor, J.L.; Kutz, J.N. Discovering governing equations from data by sparse
 identification of nonlinear dynamical systems. \textit{Proc. Natl. Acad. Sci. USA}
 \textbf{2016}, \textit{113}, 3932--3937. \url{https://doi.org/10.1073/pnas.1517384113}""",
@@ -188,7 +204,8 @@ Pract.} \textbf{2023}, \textit{140}, 105676.
 # now records that check rather than requesting one.
 NEW_KEYS = {'vanhenten1994', 'rawlings2012', 'raissi2019', 'karniadakis2021', 'belsley1980',
             'hjalmarsson2005', 'hersbach2020', 'openmeteo2023', 'wachter2006', 'fiedler2023',
-            'ross2011'}
+            'ross2011', 'xu2023agronomy', 'wen2022agronomy', 'ecimduric2024',
+            'padillanates2025'}
 
 # first-citation order over the assembled body (abstract first, then sections)
 order, seen = [], set()
@@ -270,9 +287,9 @@ PREAMBLE = r"""%% ==============================================================
 %% (non-monotone, not "more physics is worse").  Sources: phys_lib/,
 %% priced_main/, ladder_rerun/, priced_mech/ under own-article/regen/results/.
 %% ===========================================================================
-\title{Multi-step stability selects, actuator-term survival explains:
-physics-informed features have a non-monotone effect on sparse surrogate models
-for economic greenhouse climate control}
+\title{Multi-step stability selects sparse surrogate models for economic
+greenhouse climate control: an in silico study of feature-library design and
+actuator-pathway survival}
 
 %% ===========================================================================
 %% AUTHOR BLOCK -- PLACEHOLDER.  NOTHING HERE IS A REAL NAME.
