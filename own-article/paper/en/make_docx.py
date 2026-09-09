@@ -3,7 +3,10 @@
 Conversion-only adaptations (the .tex source of truth is NOT modified):
   1. includegraphics .pdf -> .png (docx cannot embed PDF)
   2. \\multicolumn{N}{@{}l} -> \\multicolumn{N}{l} (pandoc drops tables whose
-     multicolumn spec carries @{})
+     multicolumn spec carries @{}); \\addlinespace immediately before a
+     \\multicolumn row is dropped, because pandoc silently discards that row and
+     two tables lost their lower-panel label to it. The vertical gap is cosmetic
+     and the label is content, so the gap is what gives way.
   3. \\cite{keys} -> literal [n] / [n,m] / [n-m] (pandoc drops Cite inlines
      without citeproc); numbering follows the \\bibitem order of the file
   4. thebibliography -> \\section*{References} + plain numbered paragraphs
@@ -33,6 +36,13 @@ tex = re.sub(r"(\\includegraphics\[[^\]]*\]\{[^}]*)\.pdf\}", r"\1.png}", tex)
 
 n_mc = tex.count("{@{}l}")
 tex = tex.replace("{@{}l}", "{l}")
+
+_als = re.compile(r"[ \t]*\\addlinespace[ \t]*\r?\n(?=[ \t]*\\multicolumn)")
+n_als = len(_als.findall(tex))
+tex = _als.sub("", tex)
+
+#: Panel labels inside tables, checked against the output at the end.
+panel_labels = re.findall(r"\\multicolumn\{\d+\}\{[^}]*\}\{\\emph\{([^{}]*)\}\}", tex)
 
 # -- 3+4: citations and bibliography -----------------------------------------
 bib_keys = re.findall(r"\\bibitem\{([^}]*)\}", tex)
@@ -72,6 +82,7 @@ tex = tex[: bib_m.start()] + ref_block + tex[bib_m.end() :]
 
 print(
     f"adapted: {n_pdf} includegraphics, {n_mc} multicolumn specs, "
+    f"{n_als} addlinespace before a multicolumn row, "
     f"{n_cites} cite calls, {len(entries)} references"
 )
 
@@ -124,6 +135,10 @@ txt = re.sub(r"<[^>]+>", " ", doc)
 txt = re.sub(r"\s+", " ", txt)
 
 n_bracket = len(re.findall(r"\[\d+(?:[,\u2013-]+\d+)*\]", txt))
+# Every \multicolumn row that labels a panel inside a table has to reach the output:
+# losing one leaves a block of rows unlabelled while the text still refers to it.
+missing_labels = [lab for lab in panel_labels
+                  if lab.replace("--", "\u2013") not in txt]
 checks = {
     "16 tables": doc.count("<w:tbl>") == 16,
     "images embedded": len(zipfile.ZipFile(OUT).namelist()) > 0
@@ -137,7 +152,10 @@ checks = {
     "no dropped cites": "[?]" not in txt,
     "title present": "Multi-step stability selects" in txt,
     "notuboil present": "notuboil" in txt,
+    f"{len(panel_labels)} table panel labels": not missing_labels,
 }
+if missing_labels:
+    print("     lost panel labels:", missing_labels)
 print(f"[{n_bracket} bracketed citation groups in body]")
 for name, ok in checks.items():
     print(("OK  " if ok else "FAIL"), name)

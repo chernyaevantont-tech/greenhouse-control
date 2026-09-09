@@ -1,4 +1,4 @@
-"""E3 boiler knock-out / knock-in ablation (reviewer item #1).
+"""Boiler knock-out / knock-in ablation (reviewer item #1).
 
 Causal test of the central methodological finding: the frozen confirmatory recipe
 (``physics_no_cross`` + ensemble threshold) drops the small-magnitude but

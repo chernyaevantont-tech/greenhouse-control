@@ -5,7 +5,7 @@ Data and code underlying
 > **Multi-step stability selects sparse surrogate models for economic greenhouse climate
 > control: an in silico study**
 
-Every value the article reports — in its tables, its figures and its running text — is
+Every value the article reports (in its tables, its figures and its running text) is
 derived from the comma-separated files under `results/` by the scripts in this directory.
 
 Nothing here is measured in a physical greenhouse. All quantities come from the GreenLight
@@ -16,16 +16,15 @@ tomato greenhouse model, driven by reanalysis weather for Rostov-on-Don (47.24°
 
 A sparse surrogate model of the greenhouse climate is identified from excitation data and
 then used inside an economic model-predictive controller. Two questions are asked. First,
-which inexpensive open-loop criterion — one-step prediction error, multi-step rollout
-stability, or the conditioning of the regression — anticipates the seasonal economics that
+which inexpensive open-loop criterion (one-step prediction error, multi-step rollout stability, or the conditioning of the regression) anticipates the seasonal economics that
 the closed loop eventually delivers. Second, whether physically motivated basis functions,
 which are nonlinear transforms of the same measured states, help or hurt a surrogate built
 for control.
 
-Seventy-two identification configurations were screened open-loop. Fifteen controllers —
-surrogate-based predictive controllers on three feature libraries, a neural-surrogate
+Seventy-two identification configurations were screened open-loop. Fifteen controllers
+(surrogate-based predictive controllers on three feature libraries, a neural-surrogate
 controller, two reinforcement-learning agents, a full-model planner, and an agronomic
-setpoint heuristic before and after tuning — were then compared over four 60-day test
+setpoint heuristic before and after tuning) were then compared over four 60-day test
 seasons with up to twenty identification replicates each. Outcomes are the seasonal economic
 margin and the time spent outside the climate corridors, treated jointly under Pareto
 dominance rather than combined into one score.
@@ -125,7 +124,7 @@ measurement columns:
 | `diverged_frac` | share of rollouts that diverged | — |
 | `rollout_horizons` | the horizons evaluated, in control steps | — |
 
-`ladder_rerun/` adds what the sweep varied — `degree`, `denoise`, `n_days_train` — and two
+`ladder_rerun/` adds what the sweep varied (`degree`, `denoise`, `n_days_train`) and two
 screens, `embeddable` (whether the fit can be embedded in the optimiser's nonlinear program)
 and `sign_pass`.
 
@@ -168,7 +167,7 @@ model through the `article_experiment_utils` interface in the parent directory.
 
 The price sensitivity needs no rollouts. The simulator records per-step profit, so
 `make_tables.py` re-scores the recorded physical quantities over the price grid while
-holding the trajectories at their nominal-price optimum — which is what a claim about the
+holding the trajectories at their nominal-price optimum, which is what a claim about the
 *ranking* being robust to prices means, and what the corresponding table reports.
 
 ### Software

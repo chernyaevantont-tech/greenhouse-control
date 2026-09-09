@@ -235,11 +235,11 @@ SOLVER_BASED = {"sindy_mpc_conf", "sindy_mpc_dense", "sindy_mpc_lowthr", "nn_mpc
 EXPECTED_MAIN_ROWS = len(ALL_CONTROLLERS) * len(TEST_YEARS) * len(SEEDS)   # 10*4*20 = 800
 
 # ── Supporting experiments (were separate runners with their own constants) ───
-# Every one of these previously ran on its own season length: E5 on 14 days, E6/E7 on 30,
-# the main table on 60. The paper presents them side by side without saying so. Here they
+# Every one of these previously ran on its own season length: the guard on 14 days,
+# faults and design on 30, the main table on 60. The paper presents them side by side without saying so. Here they
 # all use the canonical season, and the window is recorded per row regardless.
 
-# E2 identification ladder: the 42 configurations the pre-registration chose from.
+# Identification ladder: the 42 configurations the pre-specification chose from.
 # 3 libraries x 2 degrees x 4 optimisers x 3 denoisers = 72 cells; the historical ladder
 # has 42 because the infeasible combinations were skipped. We enumerate all 72 and let
 # the gates reject; the count is then an outcome, not an assumption.
@@ -247,8 +247,8 @@ LADDER_VARIANTS = ("raw", "physics", "physics_no_cross")
 LADDER_DEGREES = (1, 2)
 LADDER_OPTIMIZERS = ("stlsq", "sr3", "constrained", "ensemble")
 LADDER_DENOISE = ("none", "savgol", "kalman")
-# Open-loop rollout horizons for the ladder, IN STEPS -- the same defaults the original E2
-# used (`evaluate_sindy`'s `rollout_horizons=(4, 20, 96)`), i.e. 1 h / 5 h / 1 day.
+# Open-loop rollout horizons for the ladder, IN STEPS -- the same defaults the original
+# ladder used (`evaluate_sindy`'s `rollout_horizons=(4, 20, 96)`), i.e. 1 h / 5 h / 1 day.
 #
 # The first regen got this wrong and it produced a false alarm worth recording. An earlier
 # draft said the frozen recipe barely diverges "at a forecast length of at least 3 days".
@@ -256,10 +256,10 @@ LADDER_DENOISE = ("none", "savgol", "kalman")
 # constant was named ..._BUDGETS_DAYS = (1, 3, 7) and fed to evaluate_sindy as horizons of
 # 96/288/672 steps -- up to SEVEN days of free running. Everything diverges over seven days:
 # the frozen recipe scored diverged_frac 0.21 and rollout RMSE 12.4 against the historical
-# E2's 0.0 and 2.76, on an identical fit (28 non-zero terms both times), and the harness
-# duly reported that the pre-registered recipe fails its own gates. It does not.
+# 0.0 and 2.76, on an identical fit (28 non-zero terms both times), and the harness
+# duly reported that the pre-specified recipe fails its own gates. It does not.
 #
-# The historical E2 table settles it: `budget_days` there is the TRAINING-DATA budget
+# The historical ladder table settles it: `budget_days` there is the TRAINING-DATA budget
 # (1 day -> diverged 0.55, 3 days and up -> 0.0), not a forecast horizon. That table is
 # `../results_e0_e3_final/tables/e2_stability_vs_budget.csv` in the project repository and
 # is NOT part of this package. The manuscript states the quantity in control steps, so the
@@ -270,20 +270,20 @@ LADDER_DENOISE = ("none", "savgol", "kalman")
 # instead, so ladder provenance stays self-contained.
 LADDER_ROLLOUT_HORIZONS_STEPS = (4, 20, 96)
 
-# The training-data budget curve (E2's other axis). Not currently swept by the ladder;
+# The training-data budget curve (the ladder's other axis). Not swept by the ladder;
 # kept here so the two ideas cannot silently merge again.
 LADDER_TRAIN_BUDGETS_DAYS = (1, 3, 7, 14, 30, 60)
 
-# E4 online adaptation: static surrogate vs data aggregation vs EKF/RLS, on the OOD years.
+# Online adaptation: static surrogate vs data aggregation vs EKF/RLS, on the OOD years.
 ADAPT_MODES = ("static", "dagger", "ekf")
 EKF_FORGETTING = 0.999          # the gentle prior; the aggressive one (0.995/p0=10) wound up
 EKF_P0 = 0.1
 
-# E5 OOD guard: Mahalanobis threshold as a quantile of the training distances.
+# OOD guard: Mahalanobis threshold as a quantile of the training distances.
 GUARD_QUANTILE = 0.95
 ENSEMBLE_VARIANCE_MODELS = 20
 
-# E7 fault injection: six modes, each with and without the residual supervisor.
+# Fault injection: six modes, each with and without the residual supervisor.
 FAULTS = (
     ("t_in_stuck", {"layer": "sensor", "target": "t_in", "type": "stuck", "value": 25.0}),
     ("t_in_offset", {"layer": "sensor", "target": "t_in", "type": "offset", "value": 4.0}),
@@ -295,7 +295,7 @@ FAULTS = (
 FAULT_ONSET_FRACTION = 0.33     # fault starts a third of the way into the season
 FAULT_RESID_THRESHOLD = 3.0
 
-# E6 sensitivity: prices dominate design parameters -- the paper's tornado.
+# Design sensitivity: prices dominate design parameters -- the paper's tornado.
 SENS_FRUIT_PRICE = (0.8, 1.6, 3.2)          # EUR/kg, around the nominal 1.6
 SENS_ENERGY_SCALE = (0.5, 1.0, 2.0)         # multiplier on heat/elec/CO2 prices
 SENS_HORIZONS = (8, 12, 20, 30)
@@ -303,7 +303,7 @@ SENS_THRESHOLDS = (0.01, 0.05, 0.1, 0.2)
 # E-E: the earlier grid (0.1, 0.2, 0.3) at 2 repetitions gave a non-monotone and enormous
 # spread -- 0.2 -> -13.41 at SD 20.4, while 0.3 -> -4.77. That is a sign of too few noise
 # realisations, not a property of the model. Finer grid, more repetitions.
-# Outside _declared()/config_hash: it changes only how much of E6 is run.
+# Outside _declared()/config_hash: it changes only how much of the sweep is run.
 SENS_COEF_PERTURB = (0.02, 0.05, 0.10, 0.15, 0.20)
 SENS_PERTURB_REPS = 4
 

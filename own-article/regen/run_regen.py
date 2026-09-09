@@ -5,7 +5,7 @@ ONE output tree. The 2026-07 state had four runners writing four mutually incons
 headline tables; this replaces that.
 
 Experiments
-  main       10 controllers x 4 test years x 20 seeds  (the E3 table, multi-season)
+  main       10 controllers x 4 test years x 20 seeds  (the headline table, multi-season)
   mechanism  lambda sweep + single-coefficient knock-out/knock-in + cross-term interaction
   parity     oracle horizon sweep + action-replay model-error decomposition
 
@@ -595,14 +595,14 @@ def _seeds(args) -> list[int]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--experiment", default="main", choices=[
-        "main",         # E3  10 controllers x 4 seasons x 20 seeds -- the headline table
-        "mechanism",    # E3b lambda sweep + single-coefficient knock-out/in + cross block
+        "main",         # 10 controllers x 4 seasons x 20 seeds -- the headline table
+        "mechanism",    # lambda sweep + single-coefficient knock-out/in + cross block
         "parity",       # oracle horizon sweep + optimiser budget + action replay
-        "ladder",       # E2  identification-configuration sweep (the pre-registration)
-        "adapt",        # E4  static vs aggregation vs EKF under season shift
-        "guard",        # E5  shift detection + OOD guard
-        "faults",       # E7  six fault modes x supervisor
-        "design",       # E6  horizon / threshold / coefficient perturbation
+        "ladder",       # identification-configuration sweep (the pre-specification)
+        "adapt",        # static vs aggregation vs EKF under season shift
+        "guard",        # shift detection + OOD guard
+        "faults",       # six fault modes x supervisor
+        "design",       # horizon / threshold / coefficient perturbation
         "draws",        # bootstrap draw as a measured variance axis (ensemble recipes)
         "holdout",      # B-3: same open-loop selection, metrics on a HELD-OUT train year
         "tune_rb",      # N-2: tune the rule-based reference on TRAIN years (G-4)

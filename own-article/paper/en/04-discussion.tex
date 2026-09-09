@@ -72,7 +72,7 @@ degree-one undenoised block (Section~\ref{sec:res-ladder}),
 $\kappa = 8.2 \rightarrow 24.5 \rightarrow 53.4$, median 24~h rollout error
 $3.31 \rightarrow 7.11 \rightarrow 30.84$~\textdegree C and divergence
 $0.000 \rightarrow 0.011 \rightarrow 0.130$. One-step error does not order the
-libraries along that direction at all: it is \emph{best} for the worst-conditioned
+libraries along that direction at all: it is best for the worst-conditioned
 library ($2.02$~\textdegree C) while the middle library is marginally worse than
 raw ($2.17$ against $2.14$), so what the ladder establishes is a contrast between
 the extreme points, not a monotone reversal.
@@ -149,8 +149,8 @@ $+1.56$~EUR\,m$^{-2}$ (median $+0.97$, 67 of 80, $p=2.5\times10^{-9}$) -- and it
 also the one with the better rollout, so the open-loop criterion of
 Section~\ref{sec:disc-rule} separates the two survivors where survival does not.
 And in the decomposition over (library) $\times$ (term retained), the raw library
-\emph{without} the term ($+3.48$~EUR\,m$^{-2}$) still beats the physics library
-\emph{with} it ($+2.36$).
+without the term ($+3.48$~EUR\,m$^{-2}$) still beats the physics library
+with it ($+2.36$).
 %% 2x2 cells: priced pool, controllers grouped by feature_variant per
 %% regen/regen_config.py.  Survival is constant across the four seasons of a
 %% seed, so the effective n is 19 and 20 seeds, not 76 and 320 runs.
@@ -158,7 +158,7 @@ That split is observational -- survival is a property of each fit, not a randomi
 factor, and it is confounded with recipe -- so the conservative reading is that
 survival marks which fits collapse rather than measuring the whole library effect.
 
-One plausible explanation for why the middle library is worse than \emph{both} of its
+One plausible explanation for why the middle library is worse than both of its
 neighbours is that the library without cross terms carries enough collinearity for
 the threshold to destabilise the direct boiler term, but -- unlike the full
 library -- holds no bilinear $T_{\text{in}}u_{\text{Boil}}$ term able to carry the
@@ -232,7 +232,7 @@ the ranking: it predicts (i) and (ii) accurately and closed-loop margin not at a
 (5~h) control horizon -- a stress test rather than a matched one, so the screening
 horizon has to be reported with the score. In our ladder the
 raw configuration dominates the frozen physics-informed recipe on all three
-pre-registered axes at once (Section~\ref{sec:res-ladder}), and the two
+pre-specified axes at once (Section~\ref{sec:res-ladder}), and the two
 controllers built on that library then take the top two places in closed loop.
 The frozen recipe leads on exactly one metric, one-step accuracy (rank 8 of 72
 against rank 10), which was not a gate. The screen is close to free: the whole
@@ -240,8 +240,8 @@ ladder cell costs a few seconds per fit, against a simulated season per candidat
 for a closed-loop evaluation.
 
 The strength of that claim must be stated at the resolution the three libraries
-allow. Over the series, the screen \emph{identifies the closed-loop winner} and
-one-step accuracy ranks that same winner \emph{last}; but neither open-loop
+allow. Over the series, the screen identifies the closed-loop winner and
+one-step accuracy ranks that same winner last; but neither open-loop
 criterion reproduces the full closed-loop ordering, because rollout error places
 full physics third where the closed loop places it second. What is established is
 the choice of the top candidate and the rejection of one-step accuracy as a
@@ -271,7 +271,7 @@ $+0.21$~EUR\,m$^{-2}$.
 %% 360 seed-cells, so the grid holds 54 distinct fits under 72 labels.  Ranks 8
 %% and 10 are unaffected (the first tied pair sits at rank 11).
 
-Two qualifications. The ladder's rollout value is a \emph{comparator}, not a
+Two qualifications. The ladder's rollout value is a comparator, not a
 specification: along the oracle controller's own closed-loop trajectory the same
 frozen recipe predicts indoor temperature to $2.62$~\textdegree C at 24~h, four
 times better than the $10.50$~\textdegree C it scores on PRBS-excited
@@ -279,7 +279,7 @@ identification data.
 %% regen/results/v3_parity/parity_v3.csv (120 rows, 5 seeds, season 2020).
 The held-out block supports the ordering but licenses a different claim: the
 ordering is identical in-sample and held-out, yet the dominant factor is the
-\emph{evaluation} year. The physics library without cross terms scores a median
+evaluation year. The physics library without cross terms scores a median
 rollout error of $16.9$~\textdegree C evaluated on 2018
 and $2.7$~\textdegree C on 2019 whatever year it was fitted on, and in one of
 the four fit$\rightarrow$evaluate directions it narrowly beats the raw library
@@ -292,7 +292,7 @@ here is an algebraic function of columns already present, and the two groups in
 which they were added both cost multi-step stability -- the three non-cross features
 take rollout error from $3.31$ to $7.11$~\textdegree C, the four cross terms take
 it on to $30.84$ -- while neither group buys back a closed-loop margin above the raw
-library's. Nor does the \emph{count} of added features order the damage: adding
+library's. Nor does the count of added features order the damage: adding
 three is worse in closed loop than adding seven
 (Section~\ref{sec:disc-mechanism}), so a practitioner cannot reason from ``I added
 only a few, physically sensible terms'' to ``the cost is small''. What we cannot
@@ -360,7 +360,7 @@ advantage by a factor of 2.7.
 %% cross-harness drift disclosed in Section 4.6.  Do not mix the two.
 Only 2 of the 16 random draws beat the stock setpoints: the
 stock configuration sat at the 88th percentile of its own search space: it was a credible
-agronomic baseline even before the search. Tuning also moved the heuristic \emph{onto} the
+agronomic baseline even before the search. Tuning also moved the heuristic onto the
 two-axis front, where untuned it had been dominated.
 %% Default-objective front with the tuned heuristic included: sindy_mpc_raw_ens
 %% (+4.07, 4467), rule_based_tuned (+2.26, 4339), ppo (+0.45, 1330).  The stock
@@ -372,7 +372,7 @@ The default MPC stage cost weighted boiler, lamp and CO$_2$ in the ratio
 $1:0.5:0.1$, while the marginal costs used by the evaluation criterion are
 $1:2.97:0.46$. Re-weighting the resource term to those ratios, with its total at
 $u=(1,1,1)$ held fixed,
-improved \emph{both} axes for all eight MPC controllers, but unevenly: the five
+improved both axes for all eight MPC controllers, but unevenly: the five
 physics-informed variants gained $+1.54\ldots+2.74$~EUR\,m$^{-2}$ and the
 neural-network MPC $+1.57$, against $+0.21\ldots+0.25$ for the two raw ones.
 %% Per-controller deltas (priced - default, seed- and season-matched):
@@ -399,7 +399,7 @@ prediction likelihood is a poor proxy for control
 performance~\cite{lambert2020,wei2024,farahmand2017,jackson2022}. Our
 contribution there is constructive rather than diagnostic: an open-loop screen
 costing seconds per candidate identifies the closed-loop winner, whereas the
-standard screen ranks that winner \emph{last}. The screen needs only free-running
+standard screen ranks that winner last. The screen needs only free-running
 rollouts, so it transfers in principle to any model class; but we exercised it on
 sparse-regression libraries, and over the three of them it selects the winner
 without reproducing the ordering of the two losers
@@ -411,7 +411,7 @@ specified problem. Collinearity in the library is what reweighted and
 balance-guided sparse regression is designed to
 mitigate~\cite{cortiella2021,balanceguided2026,belsley1980}, and our open-loop
 measurements agree with that literature exactly: $\kappa$ orders multi-step
-stability without exception. What we do \emph{not} find is the further step from
+stability without exception. What we do not find is the further step from
 conditioning to closed-loop economics, where the ordering breaks
 (Section~\ref{sec:disc-mechanism}). The consequence is not that library design
 matters less but that it has to be scored on what the controller actually uses -- a
@@ -509,7 +509,7 @@ ensemble triple is complete, whereas at threshold $0.05$ under sequential
 thresholded least squares only the raw and full-physics libraries were run
 ($+3.83$ and $+2.48$~EUR\,m$^{-2}$), so the raw-over-physics direction replicates
 but the non-monotonicity itself does not exist as a three-point series on that
-axis. Boiler-term survival is \emph{measured, not manipulated}, at library level:
+axis. Boiler-term survival is measured, not manipulated, at library level:
 the libraries differ in the basis, and survival is a downstream property of the
 resulting fits. The only randomised manipulation anywhere in this argument is the
 single-coefficient ablation, whose median effect is $+0.21$~EUR\,m$^{-2}$ -- so the
@@ -564,11 +564,11 @@ the heuristic received 16 trials each.
 \item \textbf{Reproducibility is within-environment only, and cross-environment
 reproducibility was never measured.} The pipeline reproduces nine digests
 bit-for-bit on one machine. Whether closed-loop margins survive a change of
-machine is \emph{unknown}: every wave reported here ran in one environment, and
+machine is unknown: every wave reported here ran in one environment, and
 the manifests do not even record which one (Section~\ref{sec:repro}). What is
 measurable in the tree is that closed-loop margins move under changes far
 smaller than a change of platform -- the two harnesses score the
-\emph{deterministic} heuristic differently in all four seasons at identical
+deterministic heuristic differently in all four seasons at identical
 configuration hash, by up to $0.038$~EUR\,m$^{-2}$ and monotonically more with
 each season. A controller with no stochastic element reproducing itself only to
 two decimal places is the conservative reading of this limitation, and it is
@@ -628,7 +628,7 @@ all four estimators of the full ladder the one-step ordering is no longer
 strict. The medians overstate the separation: both physics libraries are
 strongly dispersed, and the lower quartile of the no-cross library falls to the
 raw library's level, which Section~\ref{sec:disc-rule} attributes to the
-evaluation year. The table is an \emph{open-loop} measurement throughout:
+evaluation year. The table is an open-loop measurement throughout:
 $\kappa$ orders every column here, and it does not order closed-loop margin, where
 the series is non-monotone (Section~\ref{sec:disc-mechanism}). The column is
 reported as a diagnostic and must not be read as a performance ranking.}

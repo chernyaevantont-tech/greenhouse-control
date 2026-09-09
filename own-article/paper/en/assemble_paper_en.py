@@ -189,9 +189,10 @@ pp. 6402--6413.""",
 Nicolas, J.; Peubey, C.; Radu, R.; Schepers, D.; et al. The ERA5 global reanalysis.
 \textit{Q. J. R. Meteorol. Soc.} \textbf{2020}, \textit{146}, 1999--2049.
 \url{https://doi.org/10.1002/qj.3803}""",
-'openmeteo2023': r"""Zippenfenig, P. Open-Meteo.com Weather API, 2023; Zenodo.
-\url{https://doi.org/10.5281/zenodo.7970649}. Historical archive endpoint available online:
-\url{https://archive-api.open-meteo.com/v1/archive} (accessed on 11 August 2026).""",
+'openmeteo2023': r"""Zippenfenig, P. Open-Meteo.com Weather API, 2023; Zenodo (concept DOI,
+all versions). \url{https://doi.org/10.5281/zenodo.7970649}. Historical archive endpoint
+available online: \url{https://archive-api.open-meteo.com/v1/archive}
+(accessed on 11 August 2026).""",
 'wachter2006': r"""W\"achter, A.; Biegler, L.T. On the implementation of an interior-point filter line-search
 algorithm for large-scale nonlinear programming. \textit{Math. Program.} \textbf{2006},
 \textit{106}, 25--57. \url{https://doi.org/10.1007/s10107-004-0559-y}""",
@@ -450,6 +451,16 @@ FOOTER = r"""
 %%                         -- cited as preprints; the arXiv identifier is the
 %%                            locator and no journal version exists (or, for the
 %%                            survey, none with a volume yet).
+%%
+%% ONE DOI IS A ZENODO CONCEPT DOI, deliberately.  openmeteo2023 carries
+%% 10.5281/zenodo.7970649, which is what the project's own CITATION.cff asks for and
+%% which resolves to whichever version is newest -- 1.4.0 of 2024-12-31 today, so
+%% DataCite reports publicationYear 2024 while the entry says 2023.  2023 is the year
+%% the work first appeared on Zenodo (version 0.2.47, 2023-05-25) and is the only
+%% stable year a concept DOI has; the 2024 release was never used here.  A version DOI
+%% is not cited because nothing records which server build answered the requests, and
+%% the values themselves are ERA5/ERA5-Land, cited separately as hersbach2020.  The
+%% entry says "concept DOI, all versions" so that the year is not "corrected" later.
 %%
 %% FOUR KEYS WERE RENAMED so that each key's year matches the version of record
 %% now cited (the old keys are dead; do not reintroduce them):

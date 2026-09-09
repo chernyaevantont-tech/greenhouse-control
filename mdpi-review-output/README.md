@@ -46,6 +46,11 @@ python make_docx.py && python format_mdpi_docx.py
 2. **C-2** — "pre-registered" is claimed five times with no preregistration link. Either
    supply the link or change the word to "pre-specified".
 
+> **C-2 closed 2026-09-09.** Both halves were done: every occurrence now reads
+> "pre-specified", and the protocol itself was translated into English and added to the
+> deposit as `EXPERIMENT_PROTOCOL.md`, with Section 2.5 pointing at it. C-1 is still open
+> and still needs the DOI.
+
 Everything else is either passing or a listed author decision.
 
 ## Integrity of the revision

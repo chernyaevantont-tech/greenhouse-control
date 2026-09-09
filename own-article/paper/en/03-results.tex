@@ -14,9 +14,9 @@ the productive envelope. Result rows were deduplicated on
 waves were resumed after interruptions and the files overlap; runs in which the solver
 exhausted its failure budget were excluded. All waves reported here carry the same
 \texttt{config\_hash} (\texttt{637c6b535a9e}), which therefore identifies the code base but
-\emph{not} the experimental variant; variants are identified by the per-row
+not the experimental variant; variants are identified by the per-row
 \texttt{objective} and \texttt{horizon} fields and by the results tree. Two objectives
-appear: the original stage cost, and the \emph{priced} stage cost, in which the actuator
+appear: the original stage cost, and the priced stage cost, in which the actuator
 weights were made consistent with the prices the economic criterion itself uses.
 Section~\ref{sec:res-main} uses the priced objective for every controller that optimises a
 surrogate stage cost, which is every model-predictive controller except the full-model
@@ -58,7 +58,7 @@ $0.0000$, $0.0208$ and $0.0767$.
 
 This is the whole of what conditioning is claimed to predict in this work. It orders the
 three libraries on open-loop multi-step stability, monotonically, and the ordering
-reproduces on a held-out year (below). It does \emph{not} transfer to the closed loop. The
+reproduces on a held-out year (below). It does not transfer to the closed loop. The
 same three libraries, compared one factor at a time -- ensemble estimator, threshold
 $0.05$, only the library changed -- return $+4.32$, $+0.28$ and $+2.75$ EUR\,m$^{-2}$ over
 four test seasons (Table~\ref{tab:main}), so the worst-conditioned library outscores the
@@ -73,25 +73,25 @@ is strictly $\text{physics} < \text{physics\_no\_cross} < \text{raw}$
 ($1.675 < 1.728 < 1.862\,^\circ$C), the exact inverse of every multi-step ordering.
 Pooled over all four optimizer labels the one-step ordering is not strict -- the raw
 library also beats \texttt{physics\_no\_cross} on one-step error ($2.137$ vs.\ $2.174$).
-The supportable statement is therefore: \emph{the library with the best one-step accuracy
-is the worst on every multi-step metric}, and the strict inversion holds under sparse
+The supportable statement is therefore: the library with the best one-step accuracy
+is the worst on every multi-step metric, and the strict inversion holds under sparse
 estimation. Two properties of the grid qualify the counts: the \texttt{constrained} and
 \texttt{sr3} labels are bit-identical in all 360 seed-cells, so 72 labels cover 54 distinct
 fits and the pooled upper panel of Table~\ref{tab:ladder} double-weights that estimator;
 and embeddability coincides exactly with the degree-1 filter here (36 of 36 against
 0 of 36), so it is not an independent screen. Of the 72 labels, 32 pass both
-pre-registered gates (embeddable and diverged fraction $\le 0.05$).
+pre-specified gates (embeddable and diverged fraction $\le 0.05$).
 
 The pre-specified frozen recipe
 (\texttt{physics\_no\_cross}/degree~1/ensemble/no denoising) passes both gates
 (diverged fraction $0.0208$), but it ranks 8th of 72 on one-step error and 59th--60th on
 every multi-step metric. The comparator \texttt{raw}/degree~1/STLSQ/no denoising
-dominates it simultaneously on all three pre-registered axes: mean rollout RMSE $2.684$
+dominates it simultaneously on all three pre-specified axes: mean rollout RMSE $2.684$
 vs.\ $10.496\,^\circ$C, diverged fraction $0.0000$ vs.\ $0.0208$, active terms $19.9$ vs.\
 $28.25$. The frozen recipe is better on exactly one metric, one-step accuracy, which was
 never a gate. The full \texttt{physics} library at the same degree and estimator is worse
-still on the pre-registered axes -- 63rd of 72 on median rollout error, 64th on divergence
--- and it is one of the 40 labels that \emph{fail} the divergence gate
+still on the pre-specified axes -- 63rd of 72 on median rollout error, 64th on divergence
+-- and it is one of the 40 labels that fail the divergence gate
 ($0.0767 > 0.05$), so the open-loop procedure would have rejected it outright.
 
 That last fact bounds what the selection rule may be claimed to do, and the bound belongs
@@ -243,7 +243,7 @@ Gain       & $+1.66$ \quad $+4.99$ & $+1.50$ \quad $+5.79$ & $\mathbf{+3.49}$ \q
 \label{sec:res-main}
 
 Fifteen controllers were compared on the test seasons 2020--2023 (Table~\ref{tab:main};
-Figure~\ref{fig:pareto}). Every \emph{surrogate-based} model-predictive controller ran
+Figure~\ref{fig:pareto}). Every surrogate-based model-predictive controller ran
 under the priced objective at horizon 20. The reinforcement-learning controllers and the
 heuristic have no surrogate stage cost, and the full-model planner optimises the
 simulator's own economic return directly rather than a weighted surrogate cost, so none of
@@ -275,10 +275,10 @@ exactly five members -- \texttt{sindy\_mpc\_raw\_ens} ($+4.32$, 4130),
 \texttt{sindy\_mpc\_dense\_dagger} ($+1.37$, 3615) and \texttt{ppo} ($+0.45$, 1330).
 Neither new controller enters it: \texttt{sindy\_mpc\_raw\_ens} dominates
 \texttt{sindy\_mpc\_phys\_ens} ($+2.75$, 4193) and \texttt{sindy\_mpc\_phys} ($+2.48$,
-4174) on \emph{both} axes, higher margin at fewer violation steps, so the full physics
+4174) on both axes, higher margin at fewer violation steps, so the full physics
 library buys nothing that the raw library does not already provide. PPO attains roughly
 one third of the constraint pressure of the leader and is the only controller on the front
-that trades margin for safety at that rate. The tuned heuristic is \emph{off} the front
+that trades margin for safety at that rate. The tuned heuristic is off the front
 under the priced objective, dominated on both axes by \texttt{sindy\_mpc\_dense}. Front
 membership of \texttt{sindy\_mpc\_dense\_dagger} is marginal: 7 of its 80 runs terminated
 early, and over completed runs only its violation mean rises to 3657 against 3683 for
@@ -310,7 +310,7 @@ test between them returns $p=0.012$. Significance here is not magnitude, and the
 family size is a reporting choice that shifts every corrected level.
 
 The comparison of default and price-aligned stage costs is itself a result. Matched on
-seed and season, the priced objective improves \emph{both} axes for all eight MPC
+seed and season, the priced objective improves both axes for all eight MPC
 controllers for which both objectives were run, significantly in every case. The two
 full-\texttt{physics} controllers are not among those eight and exist only under the priced
 objective, so nothing here is claimed about their objective sensitivity. The magnitude differs
@@ -483,7 +483,7 @@ from 71 to 26. Replication counts and exclusions are reported in Table~\ref{tab:
 
 Four weather seasons (2014--2017) that took no part in identification, gate evaluation,
 selection or tuning were used as an external check (Table~\ref{tab:unseen}). These runs
-use the \emph{default} stage cost; they are
+use the default stage cost; they are
 therefore not comparable in level with Table~\ref{tab:main}, only in ordering. The lead
 holds: the raw-library ensemble controller averages $+6.42$ EUR\,m$^{-2}$
 ($\text{SD}=0.95$, $n=32$) against $+2.38$ for the frozen recipe, $+1.07$ for the dense
@@ -492,7 +492,7 @@ seed$\times$season pairs against each. With all differences of one sign at $n=32
 signed-rank test is at its exact floor, so these should be read as $p<10^{-9}$ rather than
 as measured levels.
 
-The ordering \emph{below} the lead does not carry over. Compared like for like -- the same
+The ordering below the lead does not carry over. Compared like for like -- the same
 four controllers on 2020--2023 under the same original objective -- the dense variant
 scores $+0.34$, the frozen recipe $-1.26$ and the heuristic $-1.21$; on 2014--2017 the two
 \texttt{physics\_no\_cross} variants exchange places and the frozen recipe rises from last
@@ -504,14 +504,14 @@ found in the held-out check (Section~\ref{sec:res-ladder}) and a further reason 
 any single ranking of the physics-informed variants as a property of the recipe. Three
 further caveats:
 only 8 seeds were run
-here against 20 in the main wave; the reference is the \emph{hard-coded} heuristic, since
+here against 20 in the main wave; the reference is the hard-coded heuristic, since
 the tuned setpoints were never evaluated on 2014--2017; and the margin is again bought with
 constraint pressure ($4385$ against $2624$ violation steps).
 
 %% Source: regen/results/n5_years/main_n5.csv (128 rows; objective column == "full").
 \begin{table}[t]
 \centering
-\caption{Four seasons never used at any stage, \emph{original} objective, 8 seeds. EPI in
+\caption{Four seasons never used at any stage, original objective, 8 seeds. EPI in
 EUR\,m$^{-2}$. Source: \texttt{regen/results/n5\_years/main\_n5.csv}.}
 \label{tab:unseen}
 \small
@@ -547,7 +547,7 @@ cleanly, and only that: open-loop multi-step stability, monotonically in the lib
 \cite{cortiella2021} and as expected from the identification-for-control literature
 \cite{gevers1993,vandenhof1995}. It does not predict the economics. The three libraries
 compared one factor at a time (Table~\ref{tab:survival3}) put the worst-conditioned basis
-in the \emph{middle} of the economic ranking, ten times above the middle-conditioned one,
+in the middle of the economic ranking, ten times above the middle-conditioned one,
 so the closed-loop series in $\kappa$ is non-monotone and no monotone conditioning
 argument can be made from it. The quantity that does track the ranking is the fraction of
 seeds in which the boiler-input coefficient $\xi_{u_{\mathrm{boil}}}$ is retained by the
@@ -573,7 +573,7 @@ vapour pressure, vapour-pressure deficit and screen-attenuated radiation, which 
 nonlinear transforms of measured states and therefore near-collinear with them;
 \texttt{physics} adds four bilinear state\,$\times$\,input terms on top, among them
 $T_{\text{in}}u_{\mathrm{boil}}$. The candidate explanation held that the middle library
-carries enough collinearity for the threshold to destabilise the \emph{direct} boiler
+carries enough collinearity for the threshold to destabilise the direct boiler
 term, while the full library -- worse conditioned still -- keeps the bilinear term as a
 detour able to carry the heating pathway once the direct one is cut. That account makes a
 sharp, falsifiable prediction: deleting exactly the bilinear feature from the 18-feature
@@ -599,7 +599,7 @@ near the predicted $0.15$. The small significant cost of the deletion under one 
 suggests the bilinear term shares the threshold's pressure with the direct term rather
 than substituting for it. With the detour ruled out, the margin ordering across the four
 libraries continues to track survival -- $0.15 \rightarrow +0.28$, $0.40 \rightarrow
-+2.11$, $0.55 \rightarrow +2.75$ and $+4.32$ EUR\,m$^{-2}$ -- while \emph{which} feature
++2.11$, $0.55 \rightarrow +2.75$ and $+4.32$ EUR\,m$^{-2}$ -- while which feature
 or correlation pattern makes the threshold sever the direct term in
 \texttt{physics\_no\_cross} becomes an open question, stated as such in
 Section~\ref{sec:discussion}.
@@ -649,8 +649,8 @@ Table~\ref{tab:twobytwo} decomposes EPI over the four test seasons by library an
 whether the boiler term survived, now over all three libraries. Inside
 \texttt{physics\_no\_cross} the gap is $+2.34$ EUR\,m$^{-2}$ and inside \texttt{raw}
 $+1.13$; inside \texttt{physics} it is $-0.22$ and not significant. The raw library with
-the term \emph{dropped} ($+3.48$) still beats every cell of both physics libraries,
-including \texttt{physics\_no\_cross} with the term \emph{kept} ($+2.36$), so survival does
+the term dropped ($+3.48$) still beats every cell of both physics libraries,
+including \texttt{physics\_no\_cross} with the term kept ($+2.36$), so survival does
 not exhaust the library effect either. This decomposition is observational, not a
 randomised ablation -- survival is a property of the fit, constant across the four seasons
 of a seed, so the effective sample is 20 seeds per controller and not 80 runs, and the
@@ -874,7 +874,7 @@ coefficient it removes has mostly been cut already.}
 \subsection{Alternative explanations}
 \label{sec:res-alt}
 
-\textit{Model accuracy is not the binding constraint.} A planner using the simulator's own
+Model accuracy is not the binding constraint. A planner using the simulator's own
 dynamics ranks in the lower third ($-2.65$ EUR\,m$^{-2}$), and its shortfall cannot be
 attributed to the price-aligned surrogate cost of Section~\ref{sec:res-main}: it never optimised
 the weighted surrogate cost in the first place, but maximised the simulator's own economic
@@ -890,7 +890,7 @@ figure of about $-2.20$ instead of $-2.65$; both should be quoted, and the corre
 is that the full model does not fit the common budget, not that it cannot be solved. Its
 rank is unaffected either way.
 
-\textit{Prediction error along the operating trajectory is small.} Replaying both
+Prediction error along the operating trajectory is small. Replaying both
 \texttt{physics\_no\_cross}
 surrogates along the full-model planner's own closed-loop trajectory (5760 steps, 5 seeds,
 season 2020) gives one-step temperature RMSE of $1.89\pm0.09$ and $1.82\pm0.04\,^\circ$C
@@ -900,7 +900,7 @@ $10.5\,^\circ$C on the excitation data of the ladder -- roughly four times large
 surrogate is far more accurate along a smooth closed-loop trajectory than on PRBS-excited
 identification data, and the ladder number must not be read as its error in operation.
 
-\textit{The horizon was never tuned, and correcting for it does not change the ordering.}
+The horizon was never tuned, and correcting for it does not change the ordering.
 At horizon 8 every MPC improves over horizon 20 on matched seeds and seasons
 (\texttt{sindy\_mpc\_raw\_ens} $+4.58$ vs.\ $+4.29$, $\Delta=+0.29$, 33/40;
 \texttt{sindy\_mpc\_lowthr} $+2.78$ vs.\ $+0.67$, $\Delta=+2.11$, 40/40;
@@ -914,7 +914,7 @@ controllers were not in this block, so this argument is not extended to them. A 
 from $\text{SD}=0.87$ to $4.03$). The asymmetry runs against the MPCs: the learned
 controllers received 16 tuning trials and the horizon was never tuned for any MPC.
 
-\textit{The bootstrap draw of the ensemble optimizer is a real but secondary axis.}
+The bootstrap draw of the ensemble optimizer is a real but secondary axis.
 Resampling the ensemble draw (6 seeds $\times$ 6 draws $\times$ 4 seasons, original
 objective) leaves the raw-library controller leading in 32 of 36 seed$\times$draw cells
 ($0.89$). Its spread across draws within a seed averages $0.26$ EUR\,m$^{-2}$ against
@@ -945,7 +945,7 @@ The Mahalanobis-distance safety guard \cite{mahalanobis1936,lee2018} does not pa
 runs average $-2.59$ EUR\,m$^{-2}$ against $-1.91$ unguarded; the paired mean difference is
 $-0.69$ but the paired median is $+0.19$ with the guard better in 335 of 600 pairs
 ($p=0.0047$), because the guard shortens a heavy left tail while shaving the centre; both
-statistics must be reported. Violations are \emph{worse} under the guard ($+430$ steps,
+statistics must be reported. Violations are worse under the guard ($+430$ steps,
 worse in 529 of 600, $p=5\times10^{-85}$), and 179 of 600 guarded seasons terminate early;
 restricted to completed seasons the margin difference is $-0.33$ and not significant
 ($p=0.081$). The underlying detector is weak: the area under the ROC curve is
@@ -1012,7 +1012,7 @@ EUR\,m$^{-2}$ on this 10-seed rerun but only $1.87$ on the canonical 20-seed gri
 disagree by about $1$ EUR\,m$^{-2}$ even on matched seeds at the two lowest thresholds, so
 the span of this factor is not well determined and only the direction should be relied on.
 Violations rise by half between the extreme levels (6167 at threshold $0.01$ against 9569
-at $0.20$) but \emph{not} monotonically: the $0.05$ level, at which the boiler term is lost
+at $0.20$) but not monotonically: the $0.05$ level, at which the boiler term is lost
 in 9 of 10 seeds, has the fewest violations of the four (5155), and the canonical grid
 reproduces that dip (6263, 5423, 8440, 9219). Varying the horizon spans $4.76$--$5.21$.
 
@@ -1025,7 +1025,7 @@ supportable from this comparison. What is supportable is that the ranking is not
 price-invariant either: two distinct controllers win across the nine price points (the
 heuristic at six, a re-identified SINDy variant at three). This last statement carries an
 important restriction: the price grid was re-scored only for the ten controllers of the
-canonical wave, and \emph{neither raw-library controller is in it}. The price sensitivity
+canonical wave, and neither raw-library controller is in it. The price sensitivity
 of the leading controller of Table~\ref{tab:main} has therefore not been measured, and the
 nine-point winner counts must not be read as a re-ranking of the main comparison.
 
@@ -1036,7 +1036,7 @@ consumed only by the main and mechanism blocks; consequently, a directory label 
 only as default-objective results. The mechanism sparsity sweep and the design threshold factor fit the same
 model at the same levels, and under the original objective the two agree exactly on all 80
 overlapping (level, seed) cells (max $|\Delta| = 0$). The rerun labelled priced, by
-contrast, disagrees with the genuinely priced mechanism sweep on \emph{all} 40 overlapping
+contrast, disagrees with the genuinely priced mechanism sweep on all 40 overlapping
 cells (mean $\Delta = +1.23$ EUR\,m$^{-2}$), while remaining within execution-environment
 drift of the original-objective values (39 of 40 horizon cells and 36 of 40 threshold cells
 within $0.2$ EUR\,m$^{-2}$; the remainder are chaotic amplifications). The coefficient and

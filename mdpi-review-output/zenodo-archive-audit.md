@@ -138,5 +138,12 @@ and keep the disclosure loud.
 - The 612 CSV/JSON files were not scanned for prose; they carry data, not writing.
 - `EXPERIMENT_PROTOCOL.md` is **not in this archive** and so was not part of this audit. It
   is in Russian and will need its own pass if you add it (which C-2 requires).
+
+  > **Added 2026-09-09.** It is in the deposit now, as an English translation built from
+  > the Russian original, which stays in the project tree. It was written against the same
+  > pattern set as the rest of this audit: no high-severity pattern hits, no em dashes,
+  > and the two "not X but Y" clauses inherited from the Russian were rewritten. The
+  > header states that the file names in it belong to the earlier working tree and that
+  > the numbers in its status notes are superseded by `regen/results/`.
 - Whether the deposit should be typed Dataset or Software; `ZENODO.md` already reasons about
   that and settles on Dataset, which reads correctly.

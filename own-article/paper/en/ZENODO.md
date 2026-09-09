@@ -8,12 +8,14 @@ One file goes up. Everything below is the metadata form, filled in, ready to cop
 greenhouse-control-regen-data-v1.0.zip
 ```
 
-At the repository root. 5.97 MB, 625 entries, SHA-256
-`b767d3615b1ad703397a6e51e1cba172c4bbf9738ab0970498582d50b28dc94b`.
+At the repository root. 5.99 MB, 629 entries, SHA-256
+`a7a05906faf9e2857c6573a28e4f8143b2c4a01b1bac32effe67c48dfca5c5c1`.
 
 Nothing else is deposited: not the manuscript (MDPI publishes it), not the cover letter,
 not the repository. Rebuild the archive with `python own-article/regen/make_archive.py`;
-it is deterministic, so an unchanged tree gives a byte-identical file and the same hash.
+it is deterministic on any platform, because entries are sorted, timestamps are fixed and
+the line endings of text entries are normalised, so an unchanged tree gives a
+byte-identical file and the same hash.
 
 ## Form fields
 
@@ -60,7 +62,9 @@ guard, fault injection, design sensitivity, the bootstrap-draw axis, and the lat
 re-scored under the price-aligned objective: 21 waves in all. Alongside them are the driver
 that produced them, the acceptance gates, the table generator, the analysis of the 17-feature
 falsification probe, and the figure scripts that draw the manuscript's figures from these
-files.
+files. EXPERIMENT_PROTOCOL.md carries the study's plan in English translation, including
+the gates declared for the identification ladder, against which the manuscript reports
+what was applied.
 
 Not every wave used the same objective, and the archive records which used which.
 priced_main, priced_mech and priced_dagger were scored under the price-aligned weights. The
@@ -83,12 +87,28 @@ Bit-level reproduction is established within one computing environment; no wave 
 environment fingerprint, so cross-environment agreement is unmeasured. README.txt in the
 archive states the limits, the acceptance-gate failures the tree ships with and why they are
 expected, and which two files are superseded by later waves.
+
+Funding: this research was funded by the Ministry of Science and Higher Education of the
+Russian Federation under the agreement on the provision of a grant from the federal budget
+in the form of a subsidy for state support of the development programmes of world-class
+research centres performing research in priority areas of scientific and technological
+development, agreement no. 075-15-2025-592 of 24 June 2025.
+
+The archive is released under CC BY 4.0; LICENSE.txt at its root carries the terms and the
+attribution to use.
 ```
 
 **License** — Creative Commons Attribution 4.0 International (CC-BY-4.0).
-The archive mixes data and code; CC-BY is the usual choice for a deposit that accompanies a
-paper, and it is what MDPI's own data policy expects. If the scripts should carry a software
-licence instead, MIT is the alternative — Zenodo allows only one licence per record.
+This is the usual choice for a replication package that accompanies a paper, and it is what
+MDPI's data policy expects. Zenodo allows one licence per record, and the same one now
+applies inside the archive: `LICENSE.txt` at its root states CC BY 4.0 over the tables, the
+scripts, the protocol and the documentation, gives the attribution to use, and records that
+no third-party code or data is redistributed here — gl_gym and the GreenLight model are
+imported rather than shipped, and the ERA5 weather is fetched from Open-Meteo by
+`make_weather.py` rather than included, so both keep their own terms.
+Splitting the deposit — CC BY for the tables and MIT for the scripts — is the alternative if
+a software licence is wanted on the code; it needs a second licence statement inside the
+archive, because the record itself can carry only one.
 
 **Version** — `1.0`
 
@@ -107,9 +127,18 @@ control-oriented model selection; multi-step prediction error; reproducibility; 
 minting a new DOI.
 
 **Grant / funding** — Ministry of Science and Higher Education of the Russian Federation,
-agreement no. 075-15-2025-592 of 24 June 2025 (World-Class Research Centre programme). Zenodo
-searches a funder registry that may not list this agreement; if it is not found, state it in
-the description instead of leaving a wrong funder attached.
+agreement no. 075-15-2025-592 of 24 June 2025 (World-Class Research Centre programme).
+
+Checked against Zenodo's registry on 2026-09-09. The agreement number is **not** there: a
+search for `075-15-2025-592` returns unrelated awards. The ministry appears only under its
+former name, "The Ministry of Education and Science of the Russian Federation"
+(ROR `00ghqgy32`), the body that was split in 2018.
+
+The funding statement is therefore carried in the **Description**, where it is exact and
+under your control, and it matches the manuscript's Funding statement word for word.
+Attaching the ROR entry as well is defensible, since it is the same ministry lineage, but it
+would display a name that is not the funder's current one; leaving the funder field empty
+loses nothing, because the description already says it.
 
 ## Order of operations
 

@@ -1,0 +1,44 @@
+Licence
+=======
+
+Copyright (c) 2026 Ivan I. Naumov, Maksim V. Lyashov, Anton T. Chernyaev,
+Mariya S. Kilina, Marina M. Zhdanova, Elena O. Chernyaeva, Marina S. Kharina,
+Angelina E. Merzlikina, Mariya N. Kulinich (Don State Technical University).
+
+Everything in this archive -- the result tables, the manifests, the analysis and
+figure scripts, the experiment protocol and this documentation -- is released
+under the Creative Commons Attribution 4.0 International licence (CC BY 4.0),
+the same licence the Zenodo record carries.
+
+  https://creativecommons.org/licenses/by/4.0/
+
+You may copy, redistribute, adapt and build upon this material for any purpose,
+including commercially, provided you give appropriate credit, link to the
+licence, and indicate whether changes were made.
+
+
+How to attribute
+----------------
+Cite the accompanying article and this deposit:
+
+  Naumov, I.I.; Lyashov, M.V.; Chernyaev, A.T.; Kilina, M.S.; Zhdanova, M.M.;
+  Chernyaeva, E.O.; Kharina, M.S.; Merzlikina, A.E.; Kulinich, M.N.
+  Multi-step stability selects sparse surrogate models for economic greenhouse
+  climate control: an in silico study of feature-library design and
+  actuator-pathway survival.
+
+  Regeneration data and analysis scripts for the article above. Zenodo, 2026.
+
+
+What this licence does not cover
+--------------------------------
+This archive contains no third-party code or data. The scripts import the
+GreenLight tomato greenhouse model as packaged in gl_gym 0.3.1, but neither that
+package nor the GreenLight model itself is redistributed here; both carry their
+own terms.
+
+The weather used by the study is ERA5/ERA5-Land, retrieved through the
+Open-Meteo historical archive API. The weather files are not in this archive
+either: make_weather.py reconstructs them by calling that API. ERA5 is a
+Copernicus Climate Change Service product and the Open-Meteo API has its own
+terms of use; both apply to the data you retrieve, not to this deposit.

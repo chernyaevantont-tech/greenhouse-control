@@ -372,7 +372,7 @@ def collect_rule_based_dataset(
     Excitation overlaid on the agronomic rule-based action:
       - gaussian noise (``noise_scale``), refreshed every ``noise_period`` steps;
       - PRBS (``prbs_scale`` > 0): piecewise-constant +/- step on each actuator,
-        flipping every ``prbs_period`` steps -> richer identifiability (E1).
+        flipping every ``prbs_period`` steps -> richer identifiability.
     Per-step economics (EPI ``info``) are captured into ``TrajectoryData.econ``.
     """
     cfg = ExperimentConfig(**{**asdict(cfg), "n_days": n_days or cfg.n_days})
@@ -553,7 +553,7 @@ def condition_number(matrix: np.ndarray) -> float:
 
 
 def _denoise_states(states: np.ndarray, method: str) -> np.ndarray:
-    """Smooth the raw state signal before forming the one-step map (E2 denoise factor)."""
+    """Smooth the raw state signal before forming the one-step map (the denoise factor)."""
     if method in ("none", None):
         return states
     x = np.asarray(states, dtype=np.float64)
@@ -630,7 +630,7 @@ def fit_sindy(
 ) -> SINDyBundle:
     """Fit a discrete one-step SINDy map x_{k+1}=f(x_k,u_k) (pysindy 2.x).
 
-    E2 identification-ladder factors are exposed as: ``optimizer`` in
+    Identification-ladder factors are exposed as: ``optimizer`` in
     {stlsq, sr3, constrained, ensemble}, ``denoise`` in {none, savgol, kalman},
     ``feature_variant`` (library) and ``library_degree``. Defaults reproduce the
     original STLSQ + physics + degree-1 recipe.
@@ -1116,7 +1116,7 @@ def rollout_mpc_guarded(
     start_date: str | None = None,
     max_solver_failures: int = 100,
 ) -> pd.DataFrame:
-    """SINDy-MPC with an OOD safety guard (E5): when the Mahalanobis distance of the
+    """SINDy-MPC with an OOD safety guard: when the Mahalanobis distance of the
     current exogenous input exceeds ``threshold`` (out-of-distribution), fall back to the
     safe rule-based action instead of trusting the surrogate MPC. Records guard activations."""
     cfg_run = ExperimentConfig(**{**asdict(cfg), "n_days": n_days})
@@ -1184,7 +1184,7 @@ def rollout_mpc_faulty(
     resid_threshold: float = 3.0,
     max_solver_failures: int = 100,
 ) -> pd.DataFrame:
-    """SINDy-MPC under a sensor/actuator fault (E7, the safety half).
+    """SINDy-MPC under a sensor/actuator fault (the safety half of the protocol).
 
     ``fault`` = {layer: 'sensor'|'actuator', target: 't_in'|'uVent'|..., type:
     'stuck'|'offset'|'dead', value: float, start_step: int}. A sensor fault corrupts the
@@ -1262,7 +1262,7 @@ def trajectory_from_frame(df: pd.DataFrame, cfg: ExperimentConfig, source: str) 
     )
 
 
-# ── E5 OOD trust signals: Mahalanobis (input novelty) + ensemble variance ────
+# ── OOD trust signals: Mahalanobis (input novelty) + ensemble variance ───────
 
 def fit_mahalanobis(train_data: "TrajectoryData") -> dict:
     """Gaussian model of the exogenous inputs (weather + time-of-day) of the training
@@ -1331,7 +1331,7 @@ def rollout_mpc_ekf(
     p0: float = 0.1,
     max_solver_failures: int = 100,
 ) -> pd.DataFrame:
-    """SINDy-MPC with EKF/RLS online adaptation of the surrogate coefficients (E4).
+    """SINDy-MPC with EKF/RLS online adaptation of the surrogate coefficients.
 
     The discrete SINDy map x_{k+1}=Xi.phi(x_k,u_k) is linear in the coefficients Xi, so
     the extended Kalman filter reduces to recursive least squares with a forgetting
@@ -1465,7 +1465,7 @@ def epi_metrics(
     corridors: dict | None = None,
     prices: dict | None = None,
 ) -> dict:
-    """Primary protocol metrics (E0): EPI from the simulator economics + corridors.
+    """Primary protocol metrics: EPI from the simulator economics + corridors.
 
     EPI [EUR/m2.season] = sum of per-step ``profit`` harvested from gl_gym's
     GreenhouseReward (captured into rollout/dataset frames as the ECON_FIELDS
@@ -2285,7 +2285,7 @@ def plot_coefficient_heatmap(bundle: SINDyBundle, figures_dir: Path, top_n: int 
     save_figure(fig, figures_dir / "sindy_coefficient_heatmap.png")
 
 
-# ── E2 gates: MPC-embeddability + transparency (sign checks + structural stability) ──
+# ── Gates: MPC-embeddability + transparency (sign checks + structural stability) ─────
 
 def mpc_embeddability_gate(
     bundle: SINDyBundle,
@@ -2293,7 +2293,7 @@ def mpc_embeddability_gate(
     start_date: str | None = None,
     budget_ms: float = 250.0,
 ) -> dict:
-    """Gate: a model is admitted to E3 only if it embeds in the MPC solver cheaply.
+    """Gate: a model reaches the benchmark only if it embeds in the MPC solver cheaply.
 
     Degree-1 SINDy maps embed analytically into do-mpc/CasADi; degree>1 does not
     (build_mpc_controller raises). Returns embeddability and the measured MPC-step time.
@@ -2392,7 +2392,7 @@ def transparency_gate(
             "structural_stability": stab, "passed": bool(passed)}
 
 
-# ── E3 oracle-MPC: receding-horizon CEM over the TRUE simulator model env.F ──
+# ── Oracle-MPC: receding-horizon CEM over the TRUE simulator model env.F ─────
 
 def rollout_oracle_mpc(
     cfg: ExperimentConfig,
@@ -2505,7 +2505,7 @@ def rollout_oracle_mpc(
     return pd.DataFrame(rows)
 
 
-# ── E3 RL baselines: PPO / SAC via stable-baselines3 ─────────────────────────
+# ── RL baselines: PPO / SAC via stable-baselines3 ────────────────────────────
 
 def _scenario_reset_env(cfg: ExperimentConfig, n_days: int, scenario: dict):
     import gymnasium as gym
@@ -2592,7 +2592,7 @@ def rollout_rl(
     return pd.DataFrame(rows)
 
 
-# ── E3 / E8 statistics: paired Wilcoxon + Holm + bootstrap CI + effect size ──
+# ── Statistics: paired Wilcoxon + Holm + bootstrap CI + effect size ──────────
 
 def paired_stats(
     df: pd.DataFrame,

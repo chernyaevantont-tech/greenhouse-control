@@ -36,14 +36,14 @@ post-freeze 2014–2017 block in §2.1 (`02-methods.tex:58–62`); "No closed-lo
 quantity enters it" in §2.5 (`02-methods.tex:218`); heuristic tuning "selected on
 the training seasons 2018–2019 only, the test seasons taking no part in
 selection" in §3.2 (`03-results.tex:136`). A diagram that restates four sentences
-is a fifth statement of them. Dropped — this is the one figure that could be
+is a fifth statement of them. Dropped: this is the one figure that could be
 restored at zero cost to the argument if a reviewer asks for a design overview.
 
 **Deviations from the editorial recommendation.** Two, both small:
 
 1. Figure 1 is given panels beyond the two the editorial recommendation
    allowed. Without them, dropping `fig01` would lose the only graphic that
-   connects the open-loop selection criterion to the economic outcome — which
+   connects the open-loop selection criterion to the economic outcome, which
    is the paper's thesis. **Updated 2026-08-14**: this is now a 2 × 2 figure,
    because the closed-loop result no longer follows the conditioning series
    and both the open-loop ordering (which κ predicts) and the closed-loop one
@@ -65,13 +65,13 @@ restored at zero cost to the argument if a reviewer asks for a design overview.
   design `(factor, value, seed, test_year, rep)`.
 - **Abort rule** (`_plotstyle.usable`): drop `stop_reason == "solver_aborted"`,
   or where that column is absent, `truncated AND solver_failures >= 100`.
-  A simulator-terminated season is **kept** — it is an economic outcome.
+  A simulator-terminated season is **kept**: it is an economic outcome.
 - **Colour**: Okabe–Ito. Libraries fixed at raw = blue, physics-no-cross =
   orange, physics = vermilion, in every panel of every figure.
 - **Type**: serif, 8 pt base, 7 pt ticks and legends. Widths 8.5 cm / 17.5 cm.
   Output vector PDF plus 600 dpi PNG, TrueType embedded (`pdf.fonttype = 42`).
 - **`*_dagger`** is a run label from the CSVs. Render it as
-  "on-policy re-identification" — never as DAgger, expert or imitation
+  "on-policy re-identification", never as DAgger, expert or imitation
   (REVISION_LOG G-6).
 - Wherever a mean and a median disagree, plot **both** (heavy tick = median,
   open symbol = mean). Two figures depend on the reader seeing that gap.
@@ -80,15 +80,15 @@ restored at zero cost to the argument if a reviewer asks for a design overview.
 
 ## Figure 1 — Selection reversal and survival of the actuator pathway
 
-> **REBUILT 2026-08-14.** The previous specification of this figure — three
+> **REBUILT 2026-08-14.** The previous specification of this figure (three
 > panels, conditioning as the mechanism, `physics` "not evaluated in closed
-> loop" — is superseded. `regen/results/phys_lib/` closed that gap on
+> loop") is superseded. `regen/results/phys_lib/` closed that gap on
 > 2026-08-13 and the closed-loop series turned out **non-monotone in κ**, so
 > the conditioning mechanism, the monotone-in-κ claim and the old panel (c)
 > are all retracted (REVISION_LOG 2026-08-13). The specification below is what
 > `make_fig1.py` now draws.
 
-- **File**: `fig1_selection_and_conditioning.pdf` (legacy stem — kept so that
+- **File**: `fig1_selection_and_conditioning.pdf` (legacy stem, kept so that
   `03-results.tex:167` and every `\ref` stay valid; the name now understates
   the figure)
 - **Label**: `fig:kappa` (unchanged)
@@ -100,23 +100,22 @@ restored at zero cost to the argument if a reviewer asks for a design overview.
 | Panel | Content |
 |---|---|
 | (a) | Scatter, one marker per fit: one-step RMSE of `t_in` (x, linear) against 24-h rollout RMSE (y, **log**). Colour = library, marker = optimizer, **open face = fails the 0.05 divergence gate**. Median + IQR cross per library. The reversal, as raw data. Untouched by the correction. |
-| (b) | What κ **does** buy: κ (x, **log**) against one-step RMSE (left y) and median rollout RMSE (right y, log). Monotone and clean — but **open loop only**. Annotate κ = 8.2 / 24.5 / 53.4. |
+| (b) | What κ **does** buy: κ (x, **log**) against one-step RMSE (left y) and median rollout RMSE (right y, log). Monotone and clean, but **open loop only**. Annotate κ = 8.2 / 24.5 / 53.4. |
 | (c) | The correction: four-season closed-loop EPI (y) against **boiler-term survival** (x) for the three nested libraries under the matched recipe, **plus the 17-feature term-deletion probe** `physics_no_tuboil` (green), which lands between at survival 0.40 — the falsification of the bilinear-detour reading, drawn. κ printed at each point, and a grey path joins them **in order of rising κ** so the reader sees conditioning order them wrongly. Open diamonds repeat the comparison under STLSQ (3 of 4 — see below). |
 | (d) | Why `physics_no_cross` is the one that fails: identified \|ξ_uBoil\| per seed against the 0.05 cut, **symlog** so a cut coefficient sits at exactly 0. |
 
 **Source** (a): `ladder_rerun/ladder_rerun.csv` + `ladder_rerun2.csv`
 → `load_ladder(degree=1, denoise="none", optimizers=("stlsq","ensemble"))`.
 1440 rows → 120 in block, **n = 40 per library**.
-**Source** (b): the same loader restricted to `optimizers=("ensemble",)` —
-60 rows, n = 20 — so that (b) and (c) describe the *same* estimator.
+**Source** (b): the same loader restricted to `optimizers=("ensemble",)` (60 rows, n = 20) so that (b) and (c) describe the *same* estimator.
 
 **Source** (c),(d): `load_library_pool()` = `priced_main/*.csv` +
 `priced_dagger/*.csv` + `phys_lib/main_physlib*.csv`, 867 → 760 rows,
 **plus** `load_notuboil_pool()` = `notuboil/main_notuboil*.csv`, 160 rows
-(joined inside `library_one_factor` only — the probe is not a benchmark
+(joined inside `library_one_factor` only; the probe is not a benchmark
 controller and never enters the Pareto pools).
 The one-factor set is `LIBRARY_ONE_FACTOR`: degree 1, no denoising,
-**threshold 0.05**, only `feature_variant` differing —
+**threshold 0.05**, only `feature_variant` differing:
 `sindy_mpc_raw_ens` / `sindy_mpc_conf` / `sindy_mpc_phys_ens` /
 `sindy_mpc_notuboil_ens`, n = 80 each, **zero truncated runs**.
 
@@ -132,7 +131,7 @@ STLSQ replicate: raw +3.8333 at 0.50, physics +2.4762 at 0.55.
 24.17 °C, diverged 0.084; closed loop EPI **+2.11 ± 3.51** (ensemble) and
 **+2.28 ± 3.55** (STLSQ), survival **0.40** (8/20, Wilson [0.22, 0.61]).
 The registered detour prediction was collapse onto `physics_no_cross`
-(≈ +0.3 / ≈ 0.15) — falsified 2026-08-18 (`notuboil/analysis_notuboil.md`).
+(≈ +0.3 / ≈ 0.15), falsified 2026-08-18 (`notuboil/analysis_notuboil.md`).
 Surviving \|ξ_uBoil\|, median 0.0685 / 0.0609 / 0.1430; libraries 11 / 14 / 18
 terms, and only `physics` contains the bilinear `t_uBoil`
 (`article_experiment_utils.py`, parsed by `library_feature_names()`).
@@ -148,7 +147,7 @@ terms, and only `physics` contains the bilinear `t_uBoil`
 > `sindy_mpc_conf_dagger` survives at 0.85 and scores +1.66, below
 > `sindy_mpc_raw_ens` at 0.55.
 > (iii) **The STLSQ row is 2 of 3.** No `physics_no_cross` controller exists at
-> STLSQ/0.05 — `dense` is 1e-3 and `lowthr` 1e-6. Never draw or imply a third
+> STLSQ/0.05: `dense` is 1e-3 and `lowthr` 1e-6. Never draw or imply a third
 > diamond.
 > **AND ONE THING PANEL (d) MUST NOT CLAIM.** A cut coefficient is written as
 > exactly 0.0, so the pre-threshold magnitude of a cut term is not in these
@@ -181,7 +180,7 @@ line; everything else grey. Label the tuned heuristic explicitly as **dominated*
 | `ppo`, `sac`, `oracle_mpc`, `rule_based` (stock) | `final/main.csv` | default |
 | `rule_based_tuned` | `n2_tune/tune_rb_n2.csv`, `block == "tuned_test"` | default |
 
-> **FIFTEEN controllers, via `load_library_pool()` — not `load_priced_pool()`.**
+> **FIFTEEN controllers, via `load_library_pool()`, not `load_priced_pool()`.**
 > Until 2026-08-14 this figure called `load_priced_pool()` and therefore drew
 > **thirteen**, while §3.3 and the caption both said fifteen. The front is
 > unchanged at five members: `sindy_mpc_phys_ens` (+2.75, 4193) and
@@ -210,7 +209,7 @@ line; everything else grey. Label the tuned heuristic explicitly as **dominated*
 - **Label**: `fig:lambda`
 - **Lives in**: §3.5 (`03-results.tex`)
 - **Referenced from**: §3.5 (`03-results.tex:425`), §4.1 (`04-discussion.tex:79`,
-  repointed from `fig:disc-knockin` — cite as "Figure 3c")
+  repointed from `fig:disc-knockin`; cite as "Figure 3c")
 - **Width**: 17.5 cm, three panels
 
 | Panel | Content |
@@ -253,13 +252,12 @@ positive in 1/20 both ways.
 > 1.2 × 10⁻³" mixed the two families and is not reproducible as one.
 
 **Axis note.** The 13 λ levels are drawn **evenly spaced, not on a log axis**:
-on a log axis four of the six decades carry a flat plateau and the collapse —
-which is the point of the panel — occupies two millimetres. Every level is
+on a log axis four of the six decades carry a flat plateau and the collapse, which is the point of the panel, occupies two millimetres. Every level is
 tick-labelled and the axis label says so.
 
 > **RETRACTION GUARD.** +3.05 is the superseded magnitude (REVISION_LOG G-6) and
 > may appear **only** beside its +0.21 replacement. Under the priced objective
-> the mean is nine times the median — plotting the mean alone would restate the
+> the mean is nine times the median; plotting the mean alone would restate the
 > retracted number in disguise. The heavy tick must dominate the panel visually.
 
 ---
@@ -283,11 +281,11 @@ against 5.72 median.
 
 **Source** (b): recomputed from `final/main.csv` (`test_year == 2020`) by the
 formula in `make_tables.table_prices`, cross-checked against
-`final/tables/sensitivity_prices.csv` — agreement to 3.6 × 10⁻¹⁵.
+`final/tables/sensitivity_prices.csv`, agreement to 3.6 × 10⁻¹⁵.
 
 > **TWO LABELS THE CAPTION MUST CARRY.**
 > (i) Despite the directory name, `priced_design/` holds **original-objective**
-> runs — `experiments_support.py` hard-codes `objective="full"` in every
+> runs: `experiments_support.py` hard-codes `objective="full"` in every
 > supporting block. Never caption panel (a) as priced.
 > (ii) The price grid **re-scores** fixed trajectories rather than re-optimising,
 > and covers only the ten canonical-wave controllers: **neither raw-library
@@ -307,8 +305,8 @@ formula in `make_tables.table_prices`, cross-checked against
 | (a) | Raw-library advantage over the heuristic. Start **+5.54**, one descending bar "16-trial tuning of the baseline" **−3.49**, end **+2.06**. Annotate 75/80 wins. |
 | (b) | Raw-minus-physics library gap. Start **+3.66** (default objective), descending bar "stage cost priced to the criterion" **−2.43**, end **+1.23** (priced). Annotate 62/80 wins. |
 
-**Source** (a): both ends from `n2_tune/tune_rb_n2.csv` — `stock_test` −1.2264,
-`tuned_test` +2.2613 — against `sindy_mpc_raw_ens` +4.3173 from the priced pool.
+**Source** (a): both ends from `n2_tune/tune_rb_n2.csv` (`stock_test` −1.2264,
+`tuned_test` +2.2613) against `sindy_mpc_raw_ens` +4.3173 from the priced pool.
 **Verified to close exactly**: 5.5437 − 3.4878 = 2.0560.
 
 **Source** (b): `n7/main_n7.csv` `sindy_mpc_raw_ens` +4.0718 minus
@@ -338,7 +336,7 @@ formula in `make_tables.table_prices`, cross-checked against
 | (c) | The Pareto front, as Figure 2 but with only the five front members labelled. |
 
 **Sources**: (a) as Figure 1a, (b) as Figure 1c, (c) as Figure 2. Duplication
-with the body is expected and acceptable here — the graphical abstract is front
+with the body is expected and acceptable here: the graphical abstract is front
 matter, not a numbered float.
 
 > **DO NOT RESTORE** the two-panel version or the **κ-as-marker-area** encoding
@@ -357,7 +355,7 @@ matter, not a numbered float.
 > **SCOPE GUARD for panel (b)**, carried on the panel face: survival ranks
 > *these four* libraries because nothing else differs between them (the probe
 > removes exactly one feature from `physics`). It does not
-> rank the wider pool — `conf_dagger` survives at 0.85 and scores +1.66, below
+> rank the wider pool: `conf_dagger` survives at 0.85 and scores +1.66, below
 > `raw_ens` at 0.55. The bilinear-detour *explanation* is **falsified**
 > (2026-08-18) and the probe that falsified it is drawn at κ = 52.3.
 

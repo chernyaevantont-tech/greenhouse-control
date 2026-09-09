@@ -1,4 +1,4 @@
-"""Single source of truth for the E0-E3 experiment protocol (Rostov-on-Don, EPI).
+"""Single source of truth for the experiment protocol (Rostov-on-Don, EPI).
 
 Everything the notebooks need to agree on lives here: location, the leakage-free
 year split, data budgets, horizons, seeds, the equal hyperparameter budget, and the
@@ -10,7 +10,7 @@ Design choices (see own-article/EXPERIMENT_PROTOCOL.md):
   gl_gym/data/weather/Rostov-on-Don/{2018..2023}.csv. rostov_soil.apply_rostov_soil()
   is wired into article_experiment_utils._make_env (gated on location).
 - Split (leakage-free): TRAIN = {2018, 2019}; in-distribution TEST = 2020;
-  OOD = {2021, 2022, 2023} (OOD is exercised by E5 in the next pass).
+  OOD = {2021, 2022, 2023} (exercised by the generalization pass).
 - Primary metric: EPI = sum of per-step simulator profit [EUR/m2.season]; harvested
   from env.step(...) info, decomposed into revenue / heat / co2 / electricity.
 """
@@ -51,11 +51,11 @@ class ProtocolConfig:
     noise_scale: float = 0.1
     noise_period: int = 5
 
-    # Equal hyperparameter budget shared by every tuned controller (E3) and the
-    # identification ladder search (E2): number of trial configurations.
+    # Equal hyperparameter budget shared by every tuned controller and the
+    # identification ladder search: number of trial configurations.
     hp_budget: int = 16
 
-    # RL (PPO/SAC) training budget in env steps -- equal for both (E3).
+    # RL (PPO/SAC) training budget in env steps -- equal for both.
     rl_train_steps: int = 200_000
 
     fast: bool = False
@@ -143,7 +143,7 @@ class ProtocolConfig:
 
 # ── Canonical confirmatory identification recipe (single source of truth) ─────
 
-# Pre-registered CONFIRMATORY recipe: chosen in E2 by open-loop identification metrics
+# Pre-specified CONFIRMATORY recipe: chosen by open-loop identification metrics
 # BEFORE any closed-loop EPI (guards against circularity, EXPERIMENT_PROTOCOL 1.4.1).
 # NOTE (documented limitation): physics_no_cross + the default STLSQ/ensemble threshold
 # (~0.05) drops the small-magnitude but control-critical boiler term (uBoil) from the
@@ -157,13 +157,14 @@ CANONICAL_RECIPE = {
 
 
 def load_frozen_recipe() -> dict[str, Any]:
-    """The one identification recipe every E3/E4/E5 runner must agree on.
+    """The one identification recipe every runner must agree on.
 
     Reads results_scenarios/recipe_frozen.json (the pre-registered confirmatory recipe);
     falls back to CANONICAL_RECIPE if the file is missing. Centralised so the surrogate
-    identification stays IDENTICAL across the closed-loop benchmark (E3), online
-    adaptation (E4) and generalization (E5) -- previously E4/E5 hard-coded STLSQ while E3
-    used the frozen ensemble recipe, an unintended inconsistency.
+    identification stays IDENTICAL across the closed-loop benchmark, online
+    adaptation and generalization -- the adaptation and generalization runners once
+    hard-coded STLSQ while the benchmark used the frozen ensemble recipe, an
+    unintended inconsistency.
     """
     import json
     path = results_dir_path() / "recipe_frozen.json"

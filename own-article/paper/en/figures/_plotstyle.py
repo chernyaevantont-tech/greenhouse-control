@@ -955,7 +955,7 @@ def scatter_by_library(ax, d: pd.DataFrame, x: str, y: str, size=None,
     Open faces mark configurations that FAIL the divergence gate
     (``diverged_frac > 0.05``).  That threshold was applied as a hard cut in
     ``make_tables.py:318`` but declared only qualitatively in the protocol --
-    a pre-registration deviation the manuscript reports honestly.
+    a deviation from the pre-specified plan that the manuscript reports honestly.
     """
     for lib in LIB_ORDER:
         sub = d[d["variant"] == lib]

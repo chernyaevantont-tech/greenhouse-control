@@ -30,11 +30,20 @@ without reference to any text.
 
 Contents
 --------
+  LICENSE.txt                the terms this archive is released under: CC BY 4.0,
+                             the same licence the Zenodo record carries
+  EXPERIMENT_PROTOCOL.md     the experiment protocol, in English translation: the
+                             plan the study was run to, including which gates were
+                             declared for the identification ladder and the status
+                             notes recording what became of each hypothesis
   article_experiment_utils.py  the compute API: identification, MPC construction,
                              rollouts, economic scoring
   protocol_config.py         the protocol dataclasses regen_config builds on
   rostov_soil.py             the continental soil boundary condition for this site
   make_weather.py            reconstructs the ERA5-derived weather CSVs
+  e3_dagger_compare.py       the dagger/dense counter-experiment, imported by the driver
+  run_knockout_ablation.py   the single-coefficient knock-out/knock-in ablation, also
+                             imported by the driver
   figures/                   the figure layer: _plotstyle.py, which owns the dedup
                              key and the solver-abort rule -- how a CSV becomes a
                              number in the paper -- plus the six make_figN.py that

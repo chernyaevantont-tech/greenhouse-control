@@ -51,7 +51,7 @@ and quantifies sensitivity to removing them.
 The third assumption is precisely what identification-for-control research warns against:
 a model should be judged by the loop it closes, not by open-loop fit alone
 \cite{ljung1999,gevers1993,vandenhof1995}. In model-based reinforcement learning the same
-problem is termed \emph{objective mismatch}: predictive accuracy can be a poor proxy for
+problem is termed objective mismatch: predictive accuracy can be a poor proxy for
 control performance \cite{lambert2020,jackson2022,farahmand2017}, and recent surveys show
 that it remains relevant for modern data-driven surrogates
 \cite{wei2024,controlorientedsurvey2025}. Exhaustive closed-loop screening is expensive
@@ -141,7 +141,7 @@ seasons, and fifteen controllers were evaluated -- nine SINDy-MPC variants, a
 neural-network MPC, two deep reinforcement-learning agents
 \cite{schulman2017,haarnoja2018,raffin2021},
 a full-simulator-model MPC and the rule-based heuristic in both
-its stock and tuned configurations -- over four held-out test seasons. A \emph{season}
+its stock and tuned configurations -- over four held-out test seasons. A season
 here is the 60-day window from 1 March, and the outcome is model-derived margin per square
 metre of greenhouse floor area. Each learned controller was run at 20 identification
 replicates per season (10 for
@@ -221,7 +221,7 @@ construction held fixed, is positive in 16 of 20 replicates
 $+0.21$~EUR~m$^{-2}$ and mean
 $+1.92$ -- significant, typically small and heavily right-skewed -- while the
 complementary knock-out is null. We are explicit about the limits of this account.
-Survival \emph{gates} the outcome but does not \emph{order} it: among the two libraries
+Survival gates the outcome but does not order it: among the two libraries
 that keep the term the raw one still wins by $+1.56$~EUR~m$^{-2}$, and raw-library runs
 that lost the term still average $+3.48$, above physics-library runs that kept it
 ($+2.52$). The obvious structural account of why the middle library is the worst --

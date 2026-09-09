@@ -1,9 +1,9 @@
-"""E3 counter-experiment: boiler term <-> controllability (dagger/dense variants).
+"""Counter-experiment: boiler term <-> controllability (dagger/dense variants).
 
 Reproduces the sindy_mpc_{confirmatory,conf_dagger,dense,dense_dagger} rows of the
-E3 headline PLUS the uBoil->t_in coefficient per variant -- the causal diagnostic
+headline table PLUS the uBoil->t_in coefficient per variant -- the causal diagnostic
 that closed-loop EPI tracks whether the control-critical boiler term survived
-sparsification (methodological finding, EXPERIMENT_PROTOCOL 1.4.1 / E3 ablation).
+sparsification (methodological finding, EXPERIMENT_PROTOCOL 1.4.1).
 
 Variants (all physics_no_cross, degree 1):
   sindy_mpc_confirmatory   ensemble (frozen recipe, threshold ~0.05) -> uBoil often ~0
@@ -12,7 +12,7 @@ Variants (all physics_no_cross, degree 1):
   sindy_mpc_dense_dagger   DAgger on the dense recipe
 
 Distributed like run_e3_seeds.py: each invocation handles --seeds and writes a
-partial e3_seeded_dagger_<tag>.csv; merge_e3.py folds it into the E3 main table
+partial e3_seeded_dagger_<tag>.csv; merge_e3.py folds it into the main table
 (dedup on method,seed). Method names are disjoint from run_e3_seeds output.
 
 Examples

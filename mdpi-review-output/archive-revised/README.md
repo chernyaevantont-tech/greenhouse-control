@@ -60,10 +60,15 @@ You are rebuilding the archive anyway to add `EXPERIMENT_PROTOCOL.md` (required 
 the preregistration pointer would otherwise link to a package that does not contain the
 plan). Do both in one rebuild.
 
-**Then update the SHA-256 in `ZENODO.md`.** It currently reads
-`b767d3615b1ad703397a6e51e1cba172c4bbf9738ab0970498582d50b28dc94b`, and any change to the
-archive changes it. The hash appears only in `ZENODO.md`, not in the manuscript, so nothing
-else needs touching.
+**Then update the SHA-256 in `ZENODO.md`.** Any change to the archive changes it. The hash
+appears only in `ZENODO.md`, not in the manuscript, so nothing else needs touching.
+
+> **Superseded in part, 2026-09-09.** The archive was rebuilt to add
+> `EXPERIMENT_PROTOCOL.md` and to normalise text line endings to LF, and `ZENODO.md` now
+> carries the resulting hash,
+> `e46e8a834cdb707c54213040463d9b4991c8c6a9bb97c04633493dcadbba6037`. The two revised
+> copies in this directory were **not** part of that rebuild, so the em-dash reduction
+> below is still pending and still applies.
 
 ## Not changed, deliberately
 

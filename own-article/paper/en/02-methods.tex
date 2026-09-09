@@ -20,7 +20,7 @@
 %%       productive corridor bounds 300-1600 ppm / 15-34 C / 50-85 %, and
 %%       components/rewards.py:200-225, where reward = scaled profit - scaled
 %%       violation penalties while EPI is the unscaled `profit` field alone;
-%%   (e) the pre-registration own-article/EXPERIMENT_PROTOCOL.md (E2) -- which two
+%%   (e) the pre-specification own-article/EXPERIMENT_PROTOCOL.md (E2) -- which two
 %%       gates were declared, as against which two were applied.
 %% No number in this section is asserted without one of these sources.
 %% VERIFIED 2026-08-13 against the CSVs: prices 0.09/0.30/0.30 and the actuator
@@ -89,7 +89,7 @@ variable costs of heating (0.09~EUR/(kW$\cdot$h)), supplementary lighting
 (0.30~EUR/(kW$\cdot$h)) and CO$_2$ enrichment (0.30~EUR/kg). Dividing the logged cost
 columns by the logged energy and CO$_2$ columns of
 \texttt{regen/results/final/main.csv} returns exactly these three prices across all 780
-retained runs. $J$ is \emph{not} the scalar the environment returns as its reward: that
+retained runs. $J$ is not the scalar the environment returns as its reward: that
 scalar rescales the profit and subtracts normalised corridor-violation penalties. The
 distinction matters, because the two reinforcement-learning controllers are trained on the
 penalised reward while every controller is scored on the unpenalised $J$ -- their position
@@ -103,7 +103,7 @@ biomass standing in the house at the end of the 60-day window. The surrogates of
 Section~\ref{sec:sindy} carry a three-component climate state and no crop state, so
 terminal biomass cannot be priced inside the optimisation even in principle. That is why
 the MPC stage cost (Section~\ref{sec:mpc}) is a proxy rather than a discretisation of
-Equation~(1), and why $J$ is reported as a \emph{margin} and not as a farm
+Equation~(1), and why $J$ is reported as a margin and not as a farm
 profit: a controller that harvests within the window is rewarded over one that builds a
 crop for a later window, and no result here separates the two.
 
@@ -114,7 +114,7 @@ compared by Pareto dominance in two axes -- $J$ and the seasonal count of steps 
 violation -- and no scalarised ``margin-minus-penalty'' criterion is introduced,
 because the simulator does not express violations in money. This corridor is also not the
 one the predictive controllers minimise against: their stage cost (Section~\ref{sec:mpc})
-penalises humidity only \emph{above} 85\,\% and CO$_2$ only \emph{below} a floor, so the
+penalises humidity only above 85\,\% and CO$_2$ only below a floor, so the
 lower humidity and upper CO$_2$ bounds are unweighted in the optimisation yet counted on
 the violation axis.
 
@@ -122,12 +122,12 @@ the violation axis.
 \label{sec:controllers}
 
 Fifteen controllers were compared (Table~\ref{tab:controllers}). The
-\emph{low-threshold} SINDy variant is not a reduced first-principles grey box; it is the
+low-threshold SINDy variant is not a reduced first-principles grey box; it is the
 same sparse estimator on the same feature library at a threshold of $10^{-6}$, i.e.\ the
 least sparse member of the family. Second, the aggregation loop applied to two SINDy
 controllers rolls the learner's own MPC in closed loop on the training seasons, appends
 the visited states to the identification set and re-estimates the model (3~iterations of
-5-day episodes). The rule-based controller is \emph{never queried} in that loop: this is
+5-day episodes). The rule-based controller is never queried in that loop: this is
 on-policy re-identification, not DAgger and not imitation learning, and the rule-based
 controller is not an expert in it. One asymmetry inside that loop survives into the
 headline comparison and is disclosed here: its episodes are rolled under the default stage
@@ -168,14 +168,14 @@ Label & Family & Definition \\
 Four of the SINDy-MPC labels form a deliberate one-factor design over the feature
 library, and the mechanism analysis of Section~\ref{sec:res-mech} rests on it. Holding
 the polynomial degree (1), the denoiser (none), the estimator and the sparsity threshold
-($0.05$) at the frozen recipe's values, and changing \emph{only} $\Theta$, gives
+($0.05$) at the frozen recipe's values, and changing only $\Theta$, gives
 \texttt{sindy\_mpc\_raw\_ens} (\texttt{raw}), \texttt{sindy\_mpc\_conf}
 (\texttt{physics\_no\_cross}) and \texttt{sindy\_mpc\_phys\_ens} (\texttt{physics}) under
 the ensemble estimator, and \texttt{sindy\_mpc\_raw} and \texttt{sindy\_mpc\_phys} under
 STLSQ. The ensemble arm is a complete three-point series; the STLSQ arm has only the two
 endpoints, because the two \texttt{physics\_no\_cross} STLSQ controllers were frozen at
 thresholds $10^{-3}$ and $10^{-6}$ rather than $0.05$. Any statement about how the
-library ordering behaves \emph{between} the endpoints therefore rests on the ensemble arm
+library ordering behaves between the endpoints therefore rests on the ensemble arm
 alone, and is scoped that way throughout.
 %% One-factor mapping read from regen/regen_config.py: CONFIRMATORY / RAW_ENS / PHYS_ENS
 %% differ only in feature_variant; RAW_STLSQ / PHYS_STLSQ likewise. DENSE (1e-3) and
@@ -188,7 +188,7 @@ unsearched baseline. That match is a stated budget, not a measured search trace:
 agents are trained once per seed at stock
 Stable-Baselines3 defaults and the neural surrogate at a fixed architecture, and no
 hyper-parameter search artefact for either exists in the results tree. The prediction
-horizon was \emph{not} tuned for any predictive controller either; that asymmetry runs
+horizon was not tuned for any predictive controller either; that asymmetry runs
 against the MPC family and is disclosed in the Discussion.
 
 \subsection{Feature libraries and sparse identification}
@@ -232,7 +232,7 @@ design axis, and the number of draws is recorded per row rather than assumed -- 
 seed in the canonical wave, 6 per seed in the later wave that added the raw-library
 controller.
 
-\subsection{Identification ladder and pre-registered open-loop criteria}
+\subsection{Identification ladder and pre-specified open-loop criteria}
 \label{sec:ladder}
 
 The identification recipe was selected in an open-loop ladder computed on the training
@@ -242,13 +242,14 @@ years alone: 3 libraries $\times$ 2 polynomial degrees $\times$ 4 estimators $\t
 records the one-step RMSE, the multi-step rollout RMSE and divergence fraction at
 horizons of 4, 20 and 96 steps (1~h, 5~h, 24~h; the reported value is always the 24-h
 figure), the number of non-zero terms, the regression condition number, and whether the
-map can be embedded analytically in the MPC. The pre-registration declared two gates,
+map can be embedded analytically in the MPC. The protocol declared two gates,
 MPC-embeddability and a sign-and-dimension transparency check, and specified multi-step
 stability only qualitatively, as a divergence fraction near zero. What was applied differs
 on both counts and is reported as applied: the divergence criterion was operationalised as
 a fixed threshold of 0.05 in the table generator, and the transparency column is empty in
 all 1440 rows, so that gate was never evaluated and is not claimed here. Under
-embeddability and the 0.05 threshold, 32 of the 72 labels pass.
+embeddability and the 0.05 threshold, 32 of the 72 labels pass. The protocol that
+fixed these criteria is included in the archived replication package.
 Figure~\ref{fig:kappa}a shows the degree-1 undenoised block of this grid in the plane of
 the two prediction criteria, with the 0.05 gate encoded by marker fill.
 
@@ -370,7 +371,7 @@ Three accounting rules precede any average. First, several waves were resumed af
 interruptions and their files overlap, so rows are deduplicated on
 (method, seed, test\_year) -- or on the block-specific factor key -- before
 aggregation; the deduplicated priced pool contains 600 rows. Second, a run is excluded
-when it was truncated \emph{and} exhausted the solver-failure budget, which removes 20 of
+when it was truncated and exhausted the solver-failure budget, which removes 20 of
 the 800 rows of the canonical main table, all \texttt{oracle\_mpc} in 2022. Third,
 seasons terminated by the simulator rather than the solver are retained as outcomes
 (42~such seasons in the canonical table), and every headline figure is recomputed three
@@ -423,8 +424,8 @@ default objective, and no supporting block, neither the identification ladder no
 replay block, is exercised.
 
 One caveat qualifies every reproducibility statement here, and it is a limit on what was
-measured rather than a measurement. The self-test establishes bit-identity \emph{within}
-one environment. Nothing in the results tree establishes it \emph{across} environments,
+measured rather than a measurement. The self-test establishes bit-identity within
+one environment. Nothing in the results tree establishes it across environments,
 and no such claim is made: the study was executed in a single environment, so the
 cross-environment comparison was never run and its magnitude is unknown.
 %% NOT SOURCEABLE: earlier drafts quoted a Linux-cluster/Windows-workstation comparison
@@ -446,7 +447,7 @@ discrepancy growing monotonically over the four seasons ($0.003$, $0.013$, $0.02
 $0.038$~EUR/m$^2$ for 2020--2023). A deterministic controller re-run on the same season
 should return the same number; that it does not is chaotic amplification of last-bit
 floating-point differences through a 5760-step nonlinear loop, which is the same
-mechanism that makes agreement across operating environments implausible \emph{a priori}.
+mechanism that makes agreement across operating environments implausible a priori.
 The rule adopted here is therefore that a whole wave is regenerated in one environment
 and is never mixed cell-by-cell with another for closed-loop numbers. Because the
 environment itself is not recorded in the manifests, this provenance scheme cannot support

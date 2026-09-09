@@ -126,13 +126,13 @@ def check_ladder_prose():
     check("ladder", "physics rollout q75", float(phys.quantile(0.75)),
           "upper rollout quartile", r"quartile \$(\d+\.\d+)\$")
 
-    # the pre-registered pick against the raw/degree-1/STLSQ comparator, on the three axes
+    # the pre-specified pick against the raw/degree-1/STLSQ comparator, on the three axes
     full = ps.load_ladder(degree=None, denoise=None, optimizers=None)
     a = full[(full["variant"] == "raw") & (full["degree"] == 1)
              & (full["optimizer"] == "stlsq") & (full["denoise"] == "none")]
     b = full[(full["variant"] == "physics_no_cross") & (full["degree"] == 1)
              & (full["optimizer"] == "ensemble") & (full["denoise"] == "none")]
-    anchor = "dominates it simultaneously on all three pre-registered axes"
+    anchor = "dominates it simultaneously on all three pre-specified axes"
     check("ladder", "comparator rollout (raw)", float(a["rollout_rmse_t_in"].mean()),
           anchor, r"mean rollout RMSE \$(\d+\.\d+)\$")
     check("ladder", "comparator rollout (selected)", float(b["rollout_rmse_t_in"].mean()),
@@ -635,7 +635,7 @@ def check_guard_prose():
     check("guard", "guard p", float(wilcoxon(delta)[1]), anchor,
           r"pairs \(\$p=(\d+\.\d+)\$\)")
 
-    anchor2 = "Violations are \\emph{worse} under the guard"
+    anchor2 = "Violations are worse under the guard"
     dv = _paired(d.rename(columns={"epi": "_e", "violation_steps_total": "epi"}),
                  "guarded", "plain")
     check("guard", "extra violation steps", float(dv.mean()), anchor2,
@@ -1054,7 +1054,7 @@ def check_intro_prose():
     check("intro", "raw_ens in 2021", -a21, anchor, r"\(\$-(\d+\.\d+)\$ against")
     check("intro", "lowthr in 2021", b21, anchor, r"against \$\+(\d+\.\d+)\$ in 2021")
 
-    anchor2 = "gates} the outcome but does not"
+    anchor2 = "gates the outcome but does not"
     e = np.asarray(ps.paired_deltas(pool, "sindy_mpc_raw_ens", "sindy_mpc_phys_ens"), float)
     e = e[~np.isnan(e)]
     check("intro", "raw over phys_ens", float(e.mean()), anchor2,

@@ -1,8 +1,9 @@
-"""Supporting experiments E2/E4/E5/E6/E7, folded into the regen's single config.
+"""The supporting experiments, folded into the regen's single config.
 
 These were five separate runners (`regen_e2_interpretability.py`, `run_e4_shift.py`,
 `run_e5_grid.py`, `run_e6_sensitivity.py`, `run_e7_faults.py`), each with its own season
-length -- E5 on 14 days, E6/E7 on 30, the main table on 60 -- and each reading
+length -- the guard on 14 days, faults and design on 30, the main table on 60 --
+and each reading
 `protocol_config` defaults rather than a shared frozen config. The paper presents their
 results side by side without saying they were measured on different windows.
 
@@ -37,7 +38,7 @@ import article_experiment_utils as U
 import regen_config as C
 
 
-# ── E2: identification ladder (the pre-registration artifact) ────────────────
+# ── Identification ladder (the pre-specification artifact) ───────────────────
 
 def exp_ladder(args, seeds, pc, econ, out: Path) -> int:
     """Reproduce the configuration sweep the confirmatory recipe was frozen from.
@@ -53,7 +54,7 @@ def exp_ladder(args, seeds, pc, econ, out: Path) -> int:
     import run_regen as R
 
     rows, path = [], out / f"ladder_{args.tag}.csv"
-    # Horizons in STEPS, matching the original E2. See regen_config for why this is not a
+    # Horizons in STEPS, matching the original ladder. See regen_config for why this is
     # day count -- the first regen fed 7-day horizons here and wrongly concluded that the
     # pre-registered recipe fails its own open-loop gates.
     horizons = C.LADDER_ROLLOUT_HORIZONS_STEPS[:2] if args.fast else C.LADDER_ROLLOUT_HORIZONS_STEPS
@@ -101,7 +102,7 @@ def _openloop_stability(bundle, data, horizons) -> dict:
     """Multi-step rollout error and divergence fraction -- the frozen selection criteria.
 
     `horizons` are STEPS and are passed straight through. They used to be days, converted
-    here into steps; that turned E2's 1-day worst case into a 7-day one and made every
+    here into steps; that turned the ladder's 1-day worst case into a 7-day one and made
     configuration look unstable. See regen_config.LADDER_ROLLOUT_HORIZONS_STEPS.
     """
     out = {}
@@ -148,7 +149,7 @@ def _embeddable(bundle, pc, seed) -> bool:
         return False
 
 
-# ── E4: online adaptation under season shift ─────────────────────────────────
+# ── Online adaptation under season shift ─────────────────────────────────────
 
 def exp_adapt(args, seeds, pc, econ, out: Path) -> int:
     """Static surrogate vs data aggregation vs EKF/RLS on the out-of-distribution seasons.
@@ -221,7 +222,7 @@ def _adapt_rollouts(R, rows, path, static, dagger, pc, econ, s, dr, years, args)
                            f"{type(exc).__name__}: {str(exc)[:120]}")
 
 
-# ── E5: distribution-shift detection and the OOD guard ───────────────────────
+# ── Distribution-shift detection and the OOD guard ───────────────────────────
 
 def exp_guard(args, seeds, pc, econ, out: Path) -> int:
     """Does the surrogate know when it is out of its depth, and does acting on it help?
@@ -322,7 +323,7 @@ def _one_step_abs_error(bundle, data) -> np.ndarray:
     return np.abs(pred[:, 0] - data.states[1:, 0])
 
 
-# ── E7: fault injection and the residual supervisor ──────────────────────────
+# ── Fault injection and the residual supervisor ──────────────────────────────
 
 def exp_faults(args, seeds, pc, econ, out: Path) -> int:
     """Six sensor/actuator faults, each with and without the residual-based supervisor.
@@ -376,7 +377,7 @@ def exp_faults(args, seeds, pc, econ, out: Path) -> int:
     return 0
 
 
-# ── E6: design-parameter sensitivity (the price half is post-processing) ─────
+# ── Design-parameter sensitivity (the price half is post-processing) ─────────
 
 def exp_design(args, seeds, pc, econ, out: Path) -> int:
     """Horizon, sparsity threshold and coefficient perturbation.
