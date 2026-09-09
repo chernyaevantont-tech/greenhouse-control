@@ -307,7 +307,11 @@ def table_ladder(d: pd.DataFrame, tdir: Path, claims: list) -> None:
                         "sign_pass", "embeddable", "kappa") if c in d.columns]
     agg = {c: "mean" for c in cols if d[c].dtype.kind in "fi"}
     t = d.groupby("condition").agg({**agg, **({"embeddable": "min"} if "embeddable" in d else {})})
-    t = t.reset_index().sort_values("rollout_rmse_t_in" if "rollout_rmse_t_in" in t else "condition")
+    # sr3 and constrained produce bit-identical fits, so the metric alone leaves ties;
+    # the condition name breaks them, and the row order stops depending on groupby.
+    keys = (["rollout_rmse_t_in", "condition"] if "rollout_rmse_t_in" in t
+            else ["condition"])
+    t = t.reset_index().sort_values(keys)
     t.to_csv(tdir / "ladder.csv", index=False)
     frozen = (f"{C.CONFIRMATORY['feature_variant']}/d{C.CONFIRMATORY['library_degree']}"
               f"/{C.CONFIRMATORY['optimizer']}/{C.CONFIRMATORY['denoise']}")
@@ -439,7 +443,7 @@ def main() -> int:
 
     print(f"wrote {len(list(tdir.glob('*.csv')))} tables -> {tdir}")
     print(f"wrote {out / 'NUMBERS.md'} ({len(claims)} claims)")
-    for c, v, s in claims:
+    for c, v, _src in claims:
         print(f"  - {c}: {v}")
     return 0
 

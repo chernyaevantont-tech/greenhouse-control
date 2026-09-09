@@ -139,7 +139,9 @@ def panel_a(ax, runs: pd.DataFrame, stats: pd.DataFrame, rng_seed: int = 4) -> d
 
     lo = float(runs["epi"].min())
     hi = float(runs["epi"].max())
-    pad = 0.10 * (hi - lo)
+    # The bottom pad carries the legend and the note: at 0.10 they sat on the
+    # early-termination markers and on each other.
+    pad = 0.34 * (hi - lo)
     ax.set_ylim(lo - pad, hi + 0.42 * (hi - lo))
 
     # Early-termination counts, one per level, along the top.
@@ -158,9 +160,6 @@ def panel_a(ax, runs: pd.DataFrame, stats: pd.DataFrame, rng_seed: int = 4) -> d
 
     span_mean = float(mean.max() - mean.min())
     span_med = float(med.max() - med.min())
-    ax.text(0.035, 0.055,
-            f"span of the mean {span_mean:.2f} vs span of the median {span_med:.2f} EUR m$^{{-2}}$",
-            transform=ax.transAxes, fontsize=6.5, color="#333333", ha="left", va="bottom")
 
     from matplotlib.lines import Line2D
     handles = [
@@ -170,11 +169,15 @@ def panel_a(ax, runs: pd.DataFrame, stats: pd.DataFrame, rng_seed: int = 4) -> d
         Line2D([], [], color=TERM_COLOR, lw=0, marker="o", mfc="none",
                mec=TERM_COLOR, markersize=4.0, label="season ended early"),
     ]
-    ax.legend(handles=handles, loc="lower left", bbox_to_anchor=(0.0, 0.10),
+    ax.legend(handles=handles, loc="lower left", bbox_to_anchor=(0.0, 0.16),
               ncol=1, handlelength=1.4, borderaxespad=0.2)
 
-    ps.annotate_n(ax, f"n = {int(stats['n'].iloc[0])} per level, season {ps.IN_DIST_YEAR}\n"
-                      "original objective (see caption)", loc="lower right")
+    # The span sentence used to be a free text at the left and the replication
+    # counts a corner note at the right; at this width they met in the middle.
+    ps.annotate_n(ax, f"n = {int(stats['n'].iloc[0])} per level, season {ps.IN_DIST_YEAR}; "
+                      "original objective (see caption)\n"
+                      f"span of the mean {span_mean:.2f} vs span of the median "
+                      f"{span_med:.2f} EUR m$^{{-2}}$", loc="lower left")
     drawn["span_mean"], drawn["span_median"] = span_mean, span_med
     return drawn
 
@@ -211,14 +214,16 @@ def panel_b(ax, wide: pd.DataFrame, winners: pd.DataFrame, spans: pd.Series) -> 
 
     lo = float(wide.to_numpy().min())
     hi = float(wide.to_numpy().max())
-    ax.set_ylim(lo - 0.34 * (hi - lo), hi + 0.06 * (hi - lo))
+    # Top band: the note and the fruit-price headers both live above the data
+    # instead of on top of it.
+    ax.set_ylim(lo - 0.34 * (hi - lo), hi + 0.34 * (hi - lo))
     ax.set_xlim(-0.45, len(cells) - 0.55)
     ax.set_xticks(x)
     ax.set_xticklabels([f"{ke:g}" for _, ke in cells])
     ax.set_xlabel("energy price scale ($\\times$ nominal), grouped by fruit price")
     ax.set_ylabel("re-scored seasonal margin EPI (EUR m$^{-2}$)")
 
-    ytxt = hi + 0.005 * (hi - lo)
+    ytxt = hi + 0.10 * (hi - lo)
     for k, pf in enumerate(ps.SENS_FRUIT_PRICE):
         ax.text(3 * k + 1.0, ytxt, f"fruit {pf:g} EUR kg$^{{-1}}$", fontsize=6.5,
                 color="#444444", ha="center", va="top")

@@ -10,7 +10,9 @@ Conversion-only adaptations (the .tex source of truth is NOT modified):
      (pandoc leaks the {99} width argument and adds no heading)
 """
 import io
+import os
 import re
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -19,7 +21,10 @@ ROOT = r"C:\Users\zergu\repos\greenhouse-control"
 TEX = ROOT + r"\own-article\paper\en\paper_en.tex"
 OUT = ROOT + r"\own-article\paper\en\paper_en.docx"
 REF = ROOT + r"\mdpi-template\agronomy-template.docx"
-PANDOC = ROOT + r"\.tools\pandoc-3.10.2\pandoc.exe"
+_PINNED = ROOT + r"\.tools\pandoc-3.10.2\pandoc.exe"
+# The pinned tree is gitignored and absent on a clean checkout; fall back to
+# the pandoc on PATH (3.10 line) so the pipeline is reproducible from the repo.
+PANDOC = _PINNED if os.path.exists(_PINNED) else (shutil.which("pandoc") or _PINNED)
 
 tex = open(TEX, encoding="utf-8").read()
 
@@ -87,7 +92,6 @@ if p.returncode:
 
 # -- 5: fix OMML property order (pandoc emits <m:nor/><m:sty/>, the OOXML
 #       schema wants <m:sty/> first inside <m:rPr>) -----------------------------
-import shutil
 import tempfile
 
 tmp = OUT + ".tmp"

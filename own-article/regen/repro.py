@@ -104,7 +104,7 @@ def _digest(arr) -> str:
     return hashlib.sha256(a.tobytes()).hexdigest()[:16]
 
 
-RL_IN_SELFTEST = False       # V4, включается ключом --rl
+RL_IN_SELFTEST = False       # V4, switched on with --rl
 
 
 def selftest(fast: bool = True) -> int:
@@ -152,12 +152,13 @@ def selftest(fast: bool = True) -> int:
         d["rollout_epi"] = f"{float(df['profit'].sum()):.12e}" if "profit" in df else "n/a"
         d["rollout_states"] = _digest(df[list(U.STATE_NAMES)].to_numpy())
 
-        # V4: PPO/SAC were never covered here. The README states outright that "PPO/SAC
-        # reproducibility has not been re-verified under the new pinning", so the paper's
-        # blanket reproducibility claim was unsupported for two of its ten controllers.
-        # SB3 takes an explicit `seed=`, but its env resets, action sampling and torch
-        # init are separate streams -- whether they land identically has to be measured.
-        # Off by default because training is the expensive part; enable with --rl.
+        # V4: PPO/SAC were not covered here for a long time, so the paper's blanket
+        # reproducibility claim was unsupported for two of its ten controllers. SB3 takes an
+        # explicit `seed=`, but its env resets, action sampling and torch init are separate
+        # streams, and whether they land identically had to be measured rather than assumed.
+        # Measured 2026-09-02 on env_hash 173131a17717: both policy digests match across two
+        # runs, at this branch's fast-mode training budget. Still off by default, because
+        # training is the expensive part of the self-test.
         if RL_IN_SELFTEST:
             for algo in ("ppo", "sac"):
                 seed_everything(0)
@@ -192,7 +193,7 @@ def main() -> int:
     ap.add_argument("--fingerprint", action="store_true")
     ap.add_argument("--full", action="store_true", help="selftest on the real 60-day season")
     ap.add_argument("--rl", action="store_true",
-                    help="V4: включить PPO/SAC в самотест (долго)")
+                    help="V4: include PPO/SAC in the selftest (slow)")
     a = ap.parse_args()
     if a.fingerprint:
         print(json.dumps(env_fingerprint(), indent=2))

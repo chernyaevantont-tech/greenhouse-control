@@ -51,11 +51,32 @@ import pandas as pd
 HERE = Path(__file__).resolve().parent                      # .../paper/en/figures
 PAPER_EN = HERE.parent                                       # .../paper/en
 REPO = PAPER_EN.parents[2]                                   # .../greenhouse-control
-RESULTS = REPO / "own-article" / "regen" / "results"
 FIGDIR = HERE
 
-if not RESULTS.is_dir():                                     # pragma: no cover
-    raise RuntimeError(f"results tree not found at {RESULTS}")
+
+def _find_results() -> Path:
+    """The regen results tree: in the repository, in a deposit, or wherever REGEN_RESULTS says.
+
+    The layout used to be hard-coded, so these scripts ran in the checkout and nowhere
+    else -- not even inside the archive built to reproduce the paper, where `figures/` and
+    `regen/` are siblings.
+    """
+    env = os.environ.get("REGEN_RESULTS")
+    candidates = ([Path(env)] if env else []) + [
+        REPO / "own-article" / "regen" / "results",          # the repository
+        HERE.parent / "regen" / "results",                   # figures/ beside regen/
+        HERE.parents[1] / "regen" / "results",
+        HERE.parents[2] / "regen" / "results",
+    ]
+    for path in candidates:
+        if path.is_dir():
+            return path.resolve()
+    raise RuntimeError(
+        "results tree not found; set REGEN_RESULTS to the regen results directory. "
+        f"Tried: {[str(c) for c in candidates]}")
+
+
+RESULTS = _find_results()
 
 # ---------------------------------------------------------------------------
 # Constants that must agree with regen/regen_config.py
@@ -244,8 +265,25 @@ def panel_label(ax, letter: str, dx: float = -0.16, dy: float = 1.04) -> None:
             fontsize=9, fontweight="bold", va="bottom", ha="left")
 
 
+def _silence_log_minor_labels(fig) -> None:
+    """Label decades only on log axes.
+
+    Matplotlib labels minor log ticks when the axis spans less than one decade,
+    and how many it labels has changed between releases: the same script gave a
+    clean 8/16/32/64 axis on one machine and an overlapping
+    ``16 2x10^1 3x10^1 4x10^1`` on another.  Fixing it here keeps the figures
+    identical across environments instead of across versions.
+    """
+    from matplotlib.ticker import NullFormatter
+    for ax in fig.get_axes():
+        for axis in (ax.xaxis, ax.yaxis):
+            if axis.get_scale() == "log":
+                axis.set_minor_formatter(NullFormatter())
+
+
 def finish(fig, stem: str, formats=("pdf", "png")) -> list[Path]:
     """Save under :data:`FIGDIR` as ``stem.pdf`` (vector) and ``stem.png`` (600 dpi)."""
+    _silence_log_minor_labels(fig)
     out = []
     for ext in formats:
         p = FIGDIR / f"{stem}.{ext}"
@@ -537,6 +575,28 @@ def boiler_coefficients(optimizer: str = "ensemble") -> pd.DataFrame:
     return t
 
 
+def _find_experiment_utils() -> Path:
+    """The compute module, in the repository or in the deposited archive.
+
+    The figures need one structural fact that no results CSV carries -- which library holds
+    the bilinear t_uBoil term -- and they read it out of the module that built the fits
+    rather than retyping it. That module lives at own-article/ in the repository and at the
+    archive root beside figures/ in the deposit.
+    """
+    candidates = [
+        REPO / "own-article" / "article_experiment_utils.py",   # the repository
+        HERE.parent / "article_experiment_utils.py",            # figures/ beside it
+        HERE.parents[1] / "article_experiment_utils.py",
+        HERE.parents[2] / "article_experiment_utils.py",
+    ]
+    for path in candidates:
+        if path.is_file():
+            return path
+    raise RuntimeError(
+        "article_experiment_utils.py not found; tried: "
+        f"{[str(c) for c in candidates]}")
+
+
 def library_feature_names() -> dict[str, list[str]]:
     """Feature-name list of each library, parsed out of the experiment module.
 
@@ -553,7 +613,7 @@ def library_feature_names() -> dict[str, list[str]]:
     """
     import ast
 
-    src = REPO / "own-article" / "article_experiment_utils.py"
+    src = _find_experiment_utils()
     tree = ast.parse(src.read_text(encoding="utf-8"))
     env: dict[str, list[str]] = {}
 
@@ -952,7 +1012,9 @@ def annotate_n(ax, text: str, loc: str = "lower right") -> None:
           "upper right": (0.98, 0.97, "right", "top"),
           "upper left": (0.02, 0.97, "left", "top")}[loc]
     ax.text(xy[0], xy[1], text, transform=ax.transAxes, fontsize=6.5,
-            color="#444444", ha=xy[2], va=xy[3])
+            color="#444444", ha=xy[2], va=xy[3], zorder=20,
+            bbox=dict(facecolor="white", alpha=0.82, edgecolor="none",
+                      boxstyle="square,pad=0.25"))
 
 
 # ---------------------------------------------------------------------------

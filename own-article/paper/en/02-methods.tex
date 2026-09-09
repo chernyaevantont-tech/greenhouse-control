@@ -80,7 +80,7 @@ tracking-error proxy is used. At step $k$ that term is a marginal income $\pi_k$
 seasonal economic performance indicator (EPI), written $J$ throughout, is
 %
 \begin{equation}
-J=\sum_{k}\pi_k=\sum_{k}\bigl(g_k-c_k\bigr)\qquad\text{(1)},
+J=\sum_{k}\pi_k=\sum_{k}\bigl(g_k-c_k\bigr),
 \end{equation}
 %
 where $g_k$ is income from modelled fruit dry-matter growth, converted to fresh mass
@@ -92,7 +92,7 @@ columns by the logged energy and CO$_2$ columns of
 retained runs. $J$ is \emph{not} the scalar the environment returns as its reward: that
 scalar rescales the profit and subtracts normalised corridor-violation penalties. The
 distinction matters, because the two reinforcement-learning controllers are trained on the
-penalised reward while every controller is scored on the unpenalised $J$ --- their position
+penalised reward while every controller is scored on the unpenalised $J$ -- their position
 on the violation axis partly reflects optimising a different objective from the one
 reported.
 
@@ -110,8 +110,8 @@ crop for a later window, and no result here separates the two.
 $J$ carries no penalty for leaving the productive range, so margin can be bought with
 violations. The simulator's productive band is CO$_2\in[300,1600]$~ppm, air temperature
 $[15,34]\,^\circ$C and relative humidity $[50,85]\,\%$. Controllers are therefore
-compared by Pareto dominance in two axes --- $J$ and the seasonal count of steps in
-violation --- and no scalarised ``margin-minus-penalty'' criterion is introduced,
+compared by Pareto dominance in two axes -- $J$ and the seasonal count of steps in
+violation -- and no scalarised ``margin-minus-penalty'' criterion is introduced,
 because the simulator does not express violations in money. This corridor is also not the
 one the predictive controllers minimise against: their stage cost (Section~\ref{sec:mpc})
 penalises humidity only \emph{above} 85\,\% and CO$_2$ only \emph{below} a floor, so the
@@ -198,7 +198,7 @@ Sparse regression \cite{brunton2016,brunton2016c,kaiser2018} recovers an explici
 discrete one-step map
 %
 \begin{equation}
-x_{k+1}=\Xi\,\Theta(x_k,u_k,d_k)\qquad\text{(2)},
+x_{k+1}=\Xi\,\Theta(x_k,u_k,d_k),
 \end{equation}
 %
 with state $x_k=(T_{\mathrm{in}},c,\varphi)^{\top}$ (air temperature, CO$_2$, relative
@@ -208,14 +208,14 @@ temperature, global radiation, outdoor CO$_2$, two diurnal harmonics). Three fea
 libraries were compared, differing only in $\Theta$:
 
 \begin{itemize}
-\item \texttt{raw} --- 11 features: the five disturbance channels and the six controls,
+\item \texttt{raw} -- 11 features: the five disturbance channels and the six controls,
       with no state transform whatsoever;
-\item \texttt{physics\_no\_cross} --- those 11 plus three physically motivated transforms
+\item \texttt{physics\_no\_cross} -- those 11 plus three physically motivated transforms
       of state, radiation and screen position (14 features): saturation vapour pressure
       $e_s(T_{\mathrm{in}})=0.6108\exp\bigl(17.27\,T_{\mathrm{in}}/(T_{\mathrm{in}}+237.3)\bigr)$
       by the Magnus--Tetens relation, vapour-pressure deficit $D=(1-\varphi/100)\,e_s$,
       and screen-attenuated radiation $S_{\mathrm{eff}}=I\,(1-u_{\mathrm{thscr}})$;
-\item \texttt{physics} --- those 14 plus four bilinear state\,$\times$\,control cross
+\item \texttt{physics} -- those 14 plus four bilinear state\,$\times$\,control cross
       terms ($T_{\mathrm{in}}S_{\mathrm{eff}}$, $\varphi u_{\mathrm{vent}}$,
       $(c-c_{\mathrm{out}})u_{\mathrm{vent}}$, $T_{\mathrm{in}}u_{\mathrm{boil}}$),
       18 features.
@@ -228,7 +228,7 @@ and the coefficients are transformed back to physical units. Four estimators wer
 available: STLSQ, SR3, a constrained variant, and an ensemble optimiser with 20 bagged
 bootstrap replicates \cite{fasel2022}. Because the ensemble re-draws its bootstrap, a
 single fit is one realisation of a lottery; the draw is therefore carried as an explicit
-design axis, and the number of draws is recorded per row rather than assumed --- 10 per
+design axis, and the number of draws is recorded per row rather than assumed -- 10 per
 seed in the canonical wave, 6 per seed in the later wave that added the raw-library
 controller.
 
@@ -339,8 +339,8 @@ Setpoint & Range searched & Hard-coded & Selected \\
 \texttt{co2\_day} (ppm)                   & 400--1200  & 800  & 828.26 \\
 \texttt{lamp\_rad\_sum\_limit}            & 5.0--25.0  & 10   & 7.62 \\
 \midrule
-Training $J$ (mean 2018--2019, EUR/m$^2$) & --- & $-1.937$ & $+0.920$ \\
-Test $J$ (mean 2020--2023, EUR/m$^2$)     & --- & $-1.226$ & $+2.261$ \\
+Training $J$ (mean 2018--2019, EUR/m$^2$) & -- & $-1.936$ & $+0.920$ \\
+Test $J$ (mean 2020--2023, EUR/m$^2$)     & -- & $-1.226$ & $+2.261$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -368,14 +368,14 @@ versions once per season, so the tuned reference has $n=4$ and no seed axis at a
 
 Three accounting rules precede any average. First, several waves were resumed after
 interruptions and their files overlap, so rows are deduplicated on
-(method, seed, test\_year) --- or on the block-specific factor key --- before
+(method, seed, test\_year) -- or on the block-specific factor key -- before
 aggregation; the deduplicated priced pool contains 600 rows. Second, a run is excluded
 when it was truncated \emph{and} exhausted the solver-failure budget, which removes 20 of
 the 800 rows of the canonical main table, all \texttt{oracle\_mpc} in 2022. Third,
 seasons terminated by the simulator rather than the solver are retained as outcomes
 (42~such seasons in the canonical table), and every headline figure is recomputed three
-ways --- as-is, over complete seasons only, and normalised by the realised season
-fraction --- with any rank change reported.
+ways -- as-is, over complete seasons only, and normalised by the realised season
+fraction -- with any rank change reported.
 
 Paired comparisons use the Wilcoxon signed-rank test \cite{wilcoxon1945} with Holm
 correction \cite{holm1979}. Because Holm's adjustment depends on the family, the family
@@ -408,7 +408,7 @@ configuration rather than passed on the command line. Every result row carries a
 so cannot by itself discriminate between them, and the per-row variant fields only partly
 can: \texttt{horizon} and \texttt{max\_solver\_failures} are written by the main runner but
 by none of the supporting blocks, and \texttt{objective} only by waves generated after that
-flag was added --- it is absent from the canonical main table, which is default-objective by
+flag was added -- it is absent from the canonical main table, which is default-objective by
 construction. The identifying key is therefore the results tree and block together with
 these fields where present; \texttt{git\_sha} is \texttt{unknown} in a few early resumed
 files.
@@ -435,8 +435,8 @@ The provenance record makes the gap explicit rather than hiding it: although
 \texttt{repro.py} can emit an environment fingerprint (\texttt{--fingerprint}), the field
 is absent from all twenty run manifests under \texttt{regen/results} and the generated
 provenance map prints \texttt{env\_hash:\ n/a}. Waves are separated only by
-\texttt{git\_sha} --- eleven distinct values across those twenty manifests at one common
-\texttt{config\_hash} --- which identifies the code but not the machine it ran on.
+\texttt{git\_sha} -- eleven distinct values across those twenty manifests at one common
+\texttt{config\_hash} -- which identifies the code but not the machine it ran on.
 
 What the tree does show is that closed-loop margins move at a magnitude the identifying
 fields do not capture, even for a controller with no stochastic element. The hard-coded

@@ -1,0 +1,423 @@
+%% ===========================================================================
+%%  05-conclusions-abstract.tex  --  MDPI Agronomy manuscript, English version
+%%  Body text only: no preamble, no \documentclass.
+%%  Requires in the master preamble: booktabs, graphicx, amsmath, siunitx-free
+%%  (units are typeset manually as EUR\,m$^{-2}$).
+%%
+%%  PROVENANCE.  Every numeric value below is traceable to a file under
+%%  own-article/regen/results/.  The source file is named in a comment beside
+%%  the value or in the "Source" column of Table~\ref{tab:headline}.
+%%  Dedup rule: rows deduplicated on (method, seed, test_year) before averaging.
+%%  Exclusion rule: runs with truncated == True AND
+%%  solver_failures >= max_solver_failures were dropped.
+%%
+%%  REFRAMED 2026-08-14, after the full `physics' library reached closed loop
+%%  (regen/results/phys_lib/main_physlib.csv; 4 seasons x 20 seeds, priced
+%%  objective, zero truncated runs).  The conditioning frame this section used to
+%%  carry -- the title "Ill-Conditioning, Not Sparsity", a monotone kappa series,
+%%  and "the mechanism is conditioning" as Finding 2 -- is RETRACTED.  Recomputed
+%%  over the one-factor comparison, kappa 8.21 / 24.52 / 53.43 is monotone but
+%%  EPI +4.32 / +0.28 / +2.75 is not.  What EPI follows is boiler-term survival
+%%  (0.55 / 0.15 / 0.55).  Do not restore the conditioning mechanism, and do not
+%%  restore the +3.05 default-objective ablation median (retracted; only the
+%%  priced value is quoted here).
+%%
+%%  FAMILY SIZE CHANGED 13 -> 15.  sindy_mpc_phys and sindy_mpc_phys_ens are two
+%%  further controllers in the same comparison, so the Holm family is now 15 and
+%%  the corrected p for raw_ens against the best physics-informed variant is
+%%  4.6e-4, not the 7.7e-4 computed over 13; against the tuned heuristic it is
+%%  6.3e-11, not 6.9e-11.  Section 3 has already been brought into line
+%%  (03-results.tex:288, "family of 15, enlarged from 13").  STILL STALE and to
+%%  be fixed before submission: 01-introduction.tex:136 and :164 ("thirteen
+%%  controllers", 7.7e-4), :178 ("family of 13", 6.9e-11), and
+%%  04-discussion.tex:336 and :450 ("thirteen", "a declared family of 13"), plus
+%%  the p_Holm = 7.7e-4 quoted in figures/SPEC.md.
+%% ===========================================================================
+
+\section{Conclusions}
+\label{sec:conclusions}
+
+Within a GreenLight-based in silico greenhouse testbed, we asked which open-loop
+criterion should select a data-driven surrogate for economic MPC and which model
+property best explains the closed-loop result. Multi-step stability selects the
+leading candidate, while survival of the actuator term through the sparsity
+threshold, rather than conditioning alone, best tracks the non-monotone economic
+outcome (Graphical Abstract).
+
+\begin{enumerate}
+
+%% --- Finding 1 ---------------------------------------------------------
+%% Source: regen/results/ladder_rerun/ladder_rerun.csv + ladder_rerun2.csv
+%% (1440 rows = 20 seeds x 72 configs, zero duplicates).  QUOTED SLICE:
+%%   degree == 1 AND denoise == 'none' AND optimizer in {stlsq, ensemble},
+%%   n = 40 rows per library.  Recomputed 2026-08-14, raw / no_cross / physics:
+%%   one-step 1.8616 / 1.7281 / 1.6753; median 24 h rollout 2.6683 / 10.5755 /
+%%   24.2678; divergence 0.0000 / 0.0204 / 0.0758; non-zero 20.05 / 28.18 /
+%%   36.98; kappa 8.207 / 24.517 / 53.425.
+%% SCOPE WARNING, verified by recomputation: pooled over ALL 72 labels the
+%%   one-step means are raw 2.703 < physics_no_cross 2.975 < physics 3.454, i.e.
+%%   the raw library is best on one-step error too and there is NO reversal.  The
+%%   reversal exists only in the degree-1 block (all denoisers) and is sharpest
+%%   undenoised.  Do not restate it as a property of the whole ladder.
+%% Held-out replication: regen/results/holdout/holdout_holdout.csv, in_sample
+%%   == False, n = 40 per library: one-step 1.895 / 1.819 / 1.765, median
+%%   rollout 2.722 / 15.421 / 21.568.
+\item \textbf{One-step accuracy and multi-step stability rank the candidate
+models in opposite orders.} In the first-order, undenoised block of a
+72-configuration ladder, under two sparse estimators, physically motivated
+features lowered one-step RMSE from $1.86$ to $1.68$~$^\circ$C but raised
+the median 24~h rollout RMSE from $2.67$ to $24.27$~$^\circ$C. The reversal
+is confined to that block, pooled over all 72 labels the raw library predicts better one step ahead too, but it reproduces on a held-out year
+\cite{lambert2020,wei2024,gevers1993,vandenhof1995,yonezawa2026}.
+
+%% --- Finding 2 ---------------------------------------------------------
+%% Four test seasons (2020-2023), priced objective: priced_main/*.csv,
+%% priced_dagger/*.csv, phys_lib/main_physlib.csv, n2_tune/tune_rb_n2.csv,
+%% final/main.csv.  Unseen seasons (2014-2017), DEFAULT objective:
+%% n5_years/main_n5.csv.
+%% "Fifteen controllers" = nine SINDy-MPC variants (raw, raw_ens, conf, dense,
+%% lowthr, phys, phys_ens and two on-policy re-identification variants), nn_mpc,
+%% ppo, sac, oracle_mpc and the rule-based heuristic in its stock and tuned form,
+%% which are distinct controllers with distinct setpoints.  Section 3.4 still
+%% says thirteen and must be updated with this section.
+%% Replicates: 20 seeds for all except nn_mpc (10 seeds, n = 40), either form of
+%% the heuristic (deterministic, one run per season, n = 4) and oracle_mpc
+%% (n = 60; all 20 runs of 2022 dropped by the solver-abort rule).
+%% Holm recomputed over the family of 15 (14 comparisons against raw_ens):
+%%   lowthr raw p = 1.832e-4 -> Holm 4.625e-4; dense raw p = 1.542e-4 -> Holm
+%%   4.625e-4 (monotonicity binds the pair); tuned heuristic raw p = 6.95e-12 ->
+%%   Holm 6.26e-11, mean delta +2.056, better in 75 of 80 runs.
+%% The test against either heuristic is a ONE-SAMPLE signed-rank test against a
+%% constant -- see the footnote to Table~\ref{tab:headline}.
+%% n5_years/main_n5.csv contains FOUR methods only (raw_ens, conf, dense,
+%% rule_based); no RL, no NN-MPC, no planner, no tuned heuristic.
+\item \textbf{The library selected by multi-step stability also gives the best
+simulated closed-loop economics under the benchmarking safeguards.} Across
+15 controllers on four test seasons the raw-library ensemble surrogate
+\cite{fasel2022} led with $+4.32$~EUR\,m$^{-2}$, against $+3.09$ for the best
+physics-informed variant (Holm-corrected $p=7.7\times10^{-4}$, family of 15) and
+$+2.26$ for the agronomic heuristic, re-tuned under the reinforcement-learning
+agents' own 16-trial budget ($\Delta=+2.06$, 75 of 80 runs against a
+deterministic reference) \cite{wilcoxon1945,holm1979}. Tuning was worth $+3.49$,
+and aligning the actuator weights with the evaluation prices cut the raw-minus-physics
+gap from $+3.66$ to $+1.23$. The direction is retained, but its magnitude is sensitive
+to baseline tuning and economic weighting.
+
+%% --- Finding 3 ---------------------------------------------------------
+%% ONE-FACTOR comparison: ensemble optimiser, threshold 0.05, degree 1, no
+%% denoising; ONLY the feature library changes.  Recomputed 2026-08-14 from
+%% priced_main/*.csv (sindy_mpc_raw_ens, sindy_mpc_conf) and
+%% phys_lib/main_physlib.csv (sindy_mpc_phys_ens); 4 seasons x 20 seeds each,
+%% n = 80 per library, zero truncated runs, priced objective:
+%%   raw               kappa  8.21   rollout  2.67   EPI +4.3173   survival 0.55
+%%   physics_no_cross  kappa 24.52   rollout 10.58   EPI +0.2818   survival 0.15
+%%   physics           kappa 53.43   rollout 24.27   EPI +2.7540   survival 0.55
+%% Same one-factor change under STLSQ at 0.05: raw +3.8333, physics +2.4762.
+%% kappa and rollout are monotone; EPI is NOT.  This retracts the conditioning
+%% mechanism and the monotone-in-kappa claim outright.  Do not restore them.
+%% Paired against raw_ens on (seed, test_year): conf median +2.873, 75/80,
+%% p = 3.0e-14; phys_ens median +0.971, 67/80, p = 2.5e-9.
+\item \textbf{Physically motivated features can reduce performance non-monotonically,
+and conditioning does not order the economics.} Changing the feature library alone (same estimator, threshold and seeds) the condition number rises
+monotonically, $8.2 \rightarrow 24.5 \rightarrow 53.4$, the fits grow
+\emph{denser} rather than sparser ($20.1 \rightarrow 37.0$ terms), and open-loop
+rollout error rises with them, $2.67 \rightarrow 10.58 \rightarrow
+24.27\,^\circ$C. Closed-loop margin does not: $+4.32 \rightarrow +0.28
+\rightarrow +2.75$~EUR\,m$^{-2}$, the worst-conditioned library beating the
+intermediate one almost tenfold. The raw-over-physics direction reproduces under the
+other estimator, for which the intermediate library was not run.
+Conditioning predicts open-loop stability cleanly but does not order closed-loop
+economics \cite{cortiella2021,balanceguided2026,belsley1980}.
+
+%% --- Finding 4 ---------------------------------------------------------
+%% Survival = fraction of identification replicates retaining a non-zero direct
+%% uBoil -> t_in coefficient (run_regen._uboil).  Recomputed over the same
+%% n = 80 rows per controller: raw_ens 0.55, conf 0.15, phys_ens 0.55.  Survival
+%% is a property of the FIT, so the effective n is 20 seeds, not 80 runs.
+%% Knock-in: priced_mech/mechanism_pricedMech*.csv, block == 'knock',
+%%   test_year == 2020, deduped on (block, condition, seed, test_year), n = 20
+%%   paired: median +0.2134, mean +1.9165, better in 16 of 20, p = 5.86e-4.
+%% Within-library stratification, priced pool, Mann-Whitney:
+%%   conf     kept n = 12 mean +2.199 vs cut n = 68 mean -0.057, p = 0.053 (n.s.)
+%%   raw_ens  kept n = 44 mean +4.689 vs cut n = 36 mean +3.862, p = 0.44 (n.s.)
+%%   phys_ens kept n = 44 mean +2.475 vs cut n = 36 mean +3.095, p = 0.48 (n.s.)
+%%   The last two nulls were consistent with the detour reading; do not quote them
+%%   as support, only as absence of contradiction.
+%% The detour reading is FALSIFIED (2026-08-18): the 17-feature physics_no_tuboil
+%%   library (regen/results/notuboil/) keeps kappa 52.3, EPI +2.11/+2.28 and
+%%   survival 0.40 -- the predicted collapse onto physics_no_cross (~+0.3, ~0.15)
+%%   did not occur.  The cross-term contrasts in priced_mech (block == 'cross',
+%%   physics library at threshold 1e-6, n = 20 paired against that block's own
+%%   baseline) are all non-significant: ko_uboil p = 0.33, ko_cross p = 0.48,
+%%   ko_both p = 0.93, and they never could test severance, since baseline
+%%   survival there is 1.00.  The bilinear term is named `t_uBoil' in the library
+%%   (run_regen.CROSS_TERM).
+\item \textbf{The closed-loop outcome follows whether the actuator pathway
+survives thresholding.} The direct boiler coefficient survives in $55$, $15$ and
+$55\,\%$ of fits of the three nested libraries (the ordering of the margins, which conditioning does not reproduce) and in $40\,\%$ of fits of the 17-feature
+deletion library, whose margin ($+2.11$~EUR\,m$^{-2}$) lands between, again in
+survival order. Reinstating it in the recipe that loses it is
+significant but small and right-skewed: median $+0.21$~EUR\,m$^{-2}$, mean
+$+1.92$, 16 of 20 replicates, $p=5.9\times10^{-4}$, one season. Stratifying that
+recipe's own fits by survival agrees, not significantly ($p=0.053$). A candidate
+bilinear temperature--boiler detour was tested by deleting that single feature and
+is rejected; why the middle library
+loses the term is open, that survival gates the outcome is not.
+
+%% --- Finding 5 ---------------------------------------------------------
+%% Pareto front recomputed 2026-08-14 over the family of 15 (priced_main/*.csv +
+%% priced_dagger/*.csv + phys_lib/main_physlib.csv + final/main.csv +
+%% n2_tune/tune_rb_n2.csv): raw_ens (+4.32, 4130), lowthr (+3.09, 3692),
+%% dense (+3.08, 3686), dense_dagger (+1.37, 3615), ppo (+0.45, 1330).  Five
+%% members, UNCHANGED by the two new controllers -- both are dominated.  Margin
+%% gap raw_ens - ppo = 3.864.
+%% Guard: final/guard.csv, paired on (seed, draw, test_year), n = 600 pairs:
+%%   median +0.189, mean -0.686, violations +430, AUC 0.6625 against 0.6269 for
+%%   the plain-signal detector at threshold 2.8595, 179 of 600 guarded runs
+%%   terminated early; completed pairs only (n = 421) delta -0.332, p = 0.081.
+%% Coefficient perturbation, DEFAULT OBJECTIVE (the run.log label is wrong:
+%%   experiments_support.py lines 21-23 warn these blocks hard-coded
+%%   objective="full" and silently ignored --objective priced):
+%%   design_priced_real/design_designPriced.csv (280 rows, git 97b66f9, run.log
+%%   line 1 reads "priced"), factor == coef_perturb, n = 40 per level:
+%%   0.02 +4.110, 0.05 +4.029, 0.10 +2.960, 0.15 -3.863, 0.20 -8.125.
+%%   0.15 against 0.02: Mann-Whitney p = 4.3e-3, mean -7.97 but median only
+%%   -3.35, 45 % of runs negative, worst -42.9 -- a catastrophic minority.
+%%   This SUPERSEDES priced_design/, whose objective key was silently ignored by
+%%   experiments_support.py; the "under the original objective" caveat is gone.
+%% Front caveats (both in Section 3.4): sindy_mpc_dense and sindy_mpc_lowthr
+%%   differ by 0.0066 EUR/m2 and 5 violation steps -- two front points, one
+%%   controller; sindy_mpc_dense_dagger has 7 of 80 runs truncated and its
+%%   violation lead over dense narrows from 71 to 26 steps over completed runs.
+%% Cross-environment check: NOT MEASURED. Earlier drafts cited a paired adapt
+%%   wave on two machines (0 of 180 cells matching, mean |delta| 1.33 EUR/m2);
+%%   that wave is not under regen/results and no second machine exists, so the
+%%   magnitudes were removed on 2026-08-14. In-tree evidence that survives: the
+%%   DETERMINISTIC heuristic scores -1.2061 (final/main.csv) against -1.2264
+%%   (n2_tune/tune_rb_n2.csv, stock_test) at identical config_hash, per-season
+%%   |delta| 0.0031 / 0.0134 / 0.0266 / 0.0381.
+\item \textbf{The advantage is neither Pareto-dominant nor unconditional.} The
+margin--violation front holds five of the 15 controllers, and PPO
+\cite{schulman2017} incurs $1330$ violation steps against the raw library's
+$4130$ at $3.86$~EUR\,m$^{-2}$ less margin, though two of those points are
+one controller under two thresholds and a third rests partly on seven truncated
+runs. The surrogate has no crop state, so terminal biomass is unpriced; the
+out-of-distribution guard is a negative result (paired mean
+$-0.69$~EUR\,m$^{-2}$, $+430$ violation steps); a $\pm15\,\%$ coefficient
+perturbation costs $7.97$ on the mean against $3.35$ on the median
+($p=4.3\times10^{-3}$); and all of it is simulation, one location, one planting
+date, one computing environment.
+
+\end{enumerate}
+
+These findings establish a control-oriented model-selection result within the stated
+virtual greenhouse. They do not demonstrate realised marketable yield, energy savings,
+constraint safety or profitability in a physical facility. Before operational use, the
+selected surrogate and controller require calibration against measured greenhouse
+trajectories, hardware-in-the-loop testing and a crop-scale pilot that independently
+records climate, actuator use, energy consumption and marketable yield.
+
+Table~\ref{tab:headline} lists every headline quantity above together with the
+result file it is read from, so that each can be checked at source.
+
+%% ---------------------------------------------------------------------------
+\begin{table}[htbp]
+\centering
+\caption{Headline quantities of the study and the result files they are read
+from. All paths are relative to \texttt{own-article/regen/results/}. EPI is the
+seasonal economic performance indicator (margin) returned by the simulator;
+$n$ counts runs after deduplication on (method, seed, test year). Where three
+values are given they are the three feature libraries in the order raw /
+physics-no-cross / physics.}
+\label{tab:headline}
+\small
+\begin{tabular}{@{}p{0.36\textwidth}p{0.24\textwidth}p{0.34\textwidth}@{}}
+\toprule
+Quantity & Value & Source file \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Identification ladder} (degree 1, no denoising, sparse estimators, $n=40$ per library)} \\
+One-step RMSE, $T_{\text{in}}$ (\textdegree C) & 1.86 / 1.73 / 1.68 & \texttt{ladder\_rerun/ ladder\_rerun*.csv} \\
+Median 24~h rollout RMSE (\textdegree C) & 2.67 / 10.58 / 24.27 & as above \\
+Divergence fraction & 0.000 / 0.020 / 0.076 & as above \\
+Condition number $\kappa$ & 8.21 / 24.52 / 53.43 & as above \\
+Non-zero terms & 20.1 / 28.2 / 37.0 & as above \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{One-factor library change} (ensemble, threshold 0.05, priced objective, four seasons, $n=80$ per} \\
+\multicolumn{3}{@{}l}{library, zero truncated runs). Only the feature library differs between these three controllers.} \\
+Closed-loop EPI (EUR\,m$^{-2}$) & $+4.32$ / $+0.28$ / $+2.75$ & \texttt{priced\_main/*.csv}, \texttt{phys\_lib/ main\_physlib.csv} \\
+Boiler-term survival$^{b}$ & 0.55 / 0.15 / 0.55 & as above \\
+The same change under STLSQ (EUR\,m$^{-2}$) & $+3.83$ / -- / $+2.48$ & as above \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Four test seasons 2020--2023}, 15 controllers ($n=80$ unless stated). MPC rows use the priced} \\
+\multicolumn{3}{@{}l}{stage cost; PPO, SAC, the heuristic and the full-model planner have no MPC stage cost and are} \\
+\multicolumn{3}{@{}l}{quoted from the canonical wave.} \\
+Raw-library ensemble MPC (EUR\,m$^{-2}$; violation steps) & $+4.32\pm4.08$; 4130 & \texttt{priced\_main/*.csv} \\
+Best physics-informed MPC (EUR\,m$^{-2}$) & $+3.09\pm2.71$ & \texttt{priced\_main/*.csv} \\
+Raw ensemble vs.\ that variant & $p_{\text{Holm}}=7.7\times10^{-4}$ & recomputed over the family of 15 \\
+Tuned heuristic (EUR\,m$^{-2}$) & $+2.26$ ($n=4$)$^{a}$ & \texttt{n2\_tune/tune\_rb\_n2.csv} \\
+Stock heuristic (EUR\,m$^{-2}$) & $-1.23$ ($n=4$)$^{a}$ & \texttt{n2\_tune/tune\_rb\_n2.csv} \\
+PPO (EUR\,m$^{-2}$; violation steps) & $+0.45\pm2.97$; 1330 & \texttt{final/main.csv} \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Unseen seasons 2014--2017, default objective} ($n=32$, 8 replicates, four controllers only)} \\
+Raw-library ensemble MPC (EUR\,m$^{-2}$) & $+6.42\pm0.95$ & \texttt{n5\_years/main\_n5.csv} \\
+Untuned heuristic (EUR\,m$^{-2}$) & $-0.33$ & \texttt{n5\_years/main\_n5.csv} \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Benchmarking safeguards, mechanism and robustness}} \\
+Gain from tuning the heuristic (EUR\,m$^{-2}$) & $+3.49$ & \texttt{n2\_tune/tune\_rb\_n2.csv} \\
+Raw-minus-physics gap, default $\rightarrow$ priced (EUR\,m$^{-2}$) & $+3.66 \rightarrow +1.23$ & \texttt{priced\_main/*.csv}, \texttt{priced\_dagger/*.csv}, \texttt{final/main.csv}, \texttt{n7/main\_n7.csv} \\
+Boiler-coefficient knock-in, priced: median / mean & $+0.21$ / $+1.92$ (16 of 20, $p=5.9\times10^{-4}$) & \texttt{priced\_mech/ mechanism\_pricedMech*.csv} \\
+$\pm15\,\%$ coefficient perturbation, default objective: mean / median cost (EUR\,m$^{-2}$) & $-7.97$ / $-3.35$ ($p=4.3\times10^{-3}$) & \texttt{design\_priced\_real/ design\_designPriced.csv} \\
+\bottomrule
+\end{tabular}
+
+\vspace{2pt}
+\footnotesize $^{a}$ The heuristic is deterministic and was run once per season,
+so $n=4$ and no run-to-run dispersion exists; the dispersion of its seasonal
+values must not be read as an error bar, and any signed-rank test against it is
+a one-sample test against a constant. Both heuristic rows are quoted from the
+same harness, \texttt{n2\_tune}, so that the tuning gain is internally
+consistent; the canonical wave returns $-1.21$ rather than $-1.23$ for the
+identical deterministic controller, a $0.02$~EUR\,m$^{-2}$ discrepancy
+discussed with the reproducibility limits. The two values must not be mixed
+within one table. $^{b}$ Fraction of identification replicates in which the
+direct boiler-to-temperature coefficient is non-zero after thresholding.
+Survival is a property of the fit rather than of the run, so its effective $n$
+is 20 seeds, not 80 runs.
+\end{table}
+
+%% ---------------------------------------------------------------------------
+%% GRAPHICAL ABSTRACT -- the only float that is UNNUMBERED (figures/SPEC.md: five
+%% numbered body figures plus an unnumbered graphical abstract).  RESOLVED 2026-08-28:
+%% the float carries \captionsetup{labelformat=empty}, so it prints as "Graphical
+%% abstract." and not as "Figure 6", and it carries no \label -- the single mention of
+%% it in the Conclusions names it instead of \ref-ing it.  Before this change the Word
+%% pipeline (format_mdpi_docx.py) already labelled the caption "Graphical Abstract."
+%% and numbered only five figures, so the body text of the DOCX pointed at a
+%% "Figure 6" that no caption defined.  At submission the graphical abstract is also
+%% uploaded as its own file.  Its duplication with Figures 1a and 2 is deliberate and
+%% acceptable for a graphical abstract -- it is not a numbered body float.
+%%
+%% REDRAWN 2026-08-14 -- the caption below and the PDF on disk now agree.
+%% What was wrong: the committed PDF had been generated on 2026-08-13 to the
+%% superseded TWO-panel specification, whose panel (a) encoded kappa as marker area
+%% and whose premise was the conditioning mechanism.  The caption had already been
+%% rewritten to three panels, so the figure contradicted it.  make_fig6.py now draws
+%% three panels, does not encode kappa as area anywhere, and ends in a six-item
+%% self-check that FAILS THE BUILD if any claim this caption makes stops holding
+%% (kappa monotone; EPI not monotone; EPI V-shaped; survival reproducing the V;
+%% survival tying the two outer libraries; the front having five members).
+%% Also fixed in the same pass: panel (c) was built from load_priced_pool() and so
+%% covered only THIRTEEN controllers while the caption said fifteen; it now uses
+%% load_library_pool(), which adds sindy_mpc_phys and sindy_mpc_phys_ens.  The front
+%% is unchanged at five members -- both new controllers are dominated by
+%% sindy_mpc_raw_ens on BOTH axes.  Figure 2 had the identical defect and the
+%% identical fix.  figures/SPEC.md carries the retraction guard.
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/fig-graphical-abstract.pdf}
+%% THREE panels, one row, 17.5 cm.
+%% Panel (a) SELECTION REVERSAL.  Source CSV:
+%%   regen/results/ladder_rerun/ladder_rerun.csv + ladder_rerun2.csv
+%%   (filter: degree == 1, denoise == 'none', optimizer in {stlsq, ensemble};
+%%    dedup on (variant, degree, optimizer, denoise, seed), n = 40 per library).
+%%   Scatter of one-step RMSE (x) against median 24 h rollout RMSE (y, log
+%%   scale), one marker per configuration, coloured by feature library
+%%   (raw / physics_no_cross / physics).  Draw the arrow raw -> physics to make
+%%   the reversal explicit.  DO NOT encode kappa as marker area any more --
+%%   kappa now belongs in panel (b), where it is shown NOT to predict the
+%%   economics.
+%% Panel (b) THE NON-MONOTONICITY AND WHAT TRACKS IT.  Source CSVs:
+%%   regen/results/priced_main/*.csv (sindy_mpc_raw_ens, sindy_mpc_conf) and
+%%   regen/results/phys_lib/main_physlib.csv (sindy_mpc_phys_ens); dedup on
+%%   (method, seed, test_year), n = 80 per library, zero truncated runs; PLUS the
+%%   term-deletion probe regen/results/notuboil/main_notuboil.csv
+%%   (sindy_mpc_notuboil_ens, n = 80), drawn as the fourth x tick between the
+%%   middle and the full library (kappa 52.3).  Three nested libraries plus the
+%%   probe on the x axis in kappa order, annotated 8.2 / 24.5 / 52.3 / 53.4.  Left
+%%   y axis: mean closed-loop EPI with its dispersion -- this traces a V, NOT a
+%%   trend (the probe lands between, in survival order).  Right y axis (or a
+%%   second marker series): boiler-term survival 0.55 / 0.15 / 0.40 / 0.55,
+%%   which reproduces the shape of the EPI series.  This
+%%   panel is the paper's central claim and replaces the old kappa-versus-error
+%%   panel.
+%% Panel (c) PARETO FRONT.  Source CSVs: regen/results/priced_main/*.csv,
+%%   priced_dagger/*.csv and phys_lib/main_physlib.csv (SINDy and NN-MPC),
+%%   regen/results/final/main.csv (PPO, SAC, oracle), and
+%%   regen/results/n2_tune/tune_rb_n2.csv (both forms of the heuristic).
+%%   Dedup on (method, seed, test_year); drop rows with truncated &
+%%   solver_failures >= max_solver_failures.  Plot mean EPI (y, EUR m^-2)
+%%   against mean violation_steps_total (x), one marker per controller, the five
+%%   front members joined by a step line and the other ten in grey.
+\captionsetup{labelformat=empty}
+\caption{Graphical abstract. (\textbf{a})~Open-loop selection reversal.
+(\textbf{b})~Non-monotone closed-loop economics and boiler-term survival.
+(\textbf{c})~The five-member margin--violation Pareto front.}
+\end{figure}
+
+%% ===========================================================================
+\section{Abstract and Keywords}
+\label{sec:abstract}
+
+%% NOTE FOR TYPESETTING: in the MDPI class this material belongs in the front
+%% matter, inside \begin{abstract}...\end{abstract} and \begin{keyword}...
+%% It is placed here only so that the section can be drafted and reviewed as a
+%% unit with the Conclusions.
+%%
+%% LENGTH: 198 words by the counter in verify_paper_en.py, which strips macros
+%% and counts each inline-math group as one token.  The MDPI limit is 200, so
+%% any addition has to be paid for by a deletion.
+
+\subsection{Abstract}
+
+Economic model predictive control (MPC) can coordinate crop-climate requirements
+and resource costs in greenhouse production, but comparing candidate process
+models at crop scale is expensive. We therefore conducted an in silico study using
+the published GreenLight tomato greenhouse model driven by ERA5 weather. Seventy-two
+sparse-identification configurations were screened, and 15 controllers were
+compared over four 60-day test seasons with up to 20 identification replicates.
+Outcome measures were simulated seasonal margin and climate-corridor violations. One-step
+accuracy and multi-step stability ranked the feature libraries oppositely:
+physically motivated features reduced one-step temperature root-mean-square error
+(RMSE) from 1.86 to
+1.68~\textdegree C but increased median 24~h rollout RMSE from 2.67 to
+24.27~\textdegree C. The library selected by multi-step stability achieved the
+highest mean margin ($+4.32$~EUR\,m$^{-2}$), compared with $+3.09$ for the best
+physics-informed variant and $+2.26$ for a tuned agronomic heuristic. Conditioning
+did not explain the non-monotone margin pattern ($+4.32$, $+0.28$, $+2.75$);
+performance instead tracked survival of the direct boiler coefficient after
+sparsification (55, 15, 55~\%). Five controllers remained on the margin--violation
+Pareto front. These results support rollout-based, actuator-aware surrogate
+screening for greenhouse MPC, but establish comparative simulation evidence rather
+than field performance.
+
+\subsection{Keywords}
+
+greenhouse climate control; protected tomato production; economic model predictive
+control; sparse identification of nonlinear dynamics; simulation-based evaluation;
+control-oriented model selection; multi-step prediction error; actuator-pathway survival
+
+%% ===========================================================================
+%% NEW REFERENCES NEEDED: none.  `belsley1980' is now cited, in Finding 3 of the
+%% Conclusions; it is already defined in assemble_paper_en.py and was previously
+%% among the entries defined but never cited, so the bibliography does not change
+%% in size.  If Section 4 later cites it earlier than this section does, the
+%% first-citation ordering of the bibliography moves accordingly -- that is the
+%% assembler's job, not a manual edit.
+%%
+%% An earlier draft of this section attached \cite{ross2011} to the on-policy
+%% re-identification variant in the graphical-abstract caption. That has been
+%% removed. Per REVISION_LOG item G-6 the loop rolls out the learner's own MPC,
+%% appends the visited states to the training set and re-estimates the model;
+%% no expert is queried, so it is neither DAgger nor imitation learning, and
+%% the three imitation-learning citations (ross2011, tagliabue2021, espin2024)
+%% were struck for that reason. Section~2 states this explicitly and
+%% Section~3.7 keeps ross2011 in a single place, solely to DISCLAIM the DAgger
+%% label. Do not reintroduce it here, and do not write "DAgger-style".
+%%
+%% All other citations reuse keys from statya_ru.tex:
+%%   brunton2016, brunton2016c, kaiser2018, fasel2022, yonezawa2026,
+%%   katzin2020, katzin2021, vanlaatum2025, lin2021, mayne2000, morcego2023,
+%%   schulman2017, haarnoja2018, raffin2021, wilcoxon1945, holm1979,
+%%   gevers1993, vandenhof1995, lambert2020, wei2024, jackson2022,
+%%   cortiella2021, balanceguided2026, controlorientedsurvey2025.
+%% ===========================================================================

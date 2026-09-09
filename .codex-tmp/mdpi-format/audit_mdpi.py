@@ -28,6 +28,19 @@ def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def xml_digest(data: bytes) -> str:
+    """Digest of the canonical XML, not of the bytes.
+
+    The styling pass now runs through python-docx, which re-serialises every
+    part it opens: attribute order and namespace declarations move even where
+    nothing changed.  Comparing canonical form still catches a real edit to a
+    preserve-only part and stops flagging a rewrite that says the same thing.
+    """
+    return hashlib.sha256(
+        etree.canonicalize(xml_data=data.decode("utf-8"), strip_text=False).encode("utf-8")
+    ).hexdigest()
+
+
 def file_digest(path: Path) -> str:
     return digest(path.read_bytes())
 
@@ -106,7 +119,7 @@ with zipfile.ZipFile(SOURCE) as source_zip, zipfile.ZipFile(OUTPUT) as out_zip, 
 
     check(len(table_captions) == 16, f"Table caption count is {len(table_captions)}")
     check(len(figure_captions) == 6, f"Figure caption count is {len(figure_captions)}")
-    check(len(refs) == 44, f"Reference count is {len(refs)}")
+    check(len(refs) == 48, f"Reference count is {len(refs)}")
     check(len(data_tables) == 16, f"Data table count is {len(data_tables)}")
     check(len(equation_tables) == 3, f"Equation table count is {len(equation_tables)}")
     check(
@@ -114,10 +127,15 @@ with zipfile.ZipFile(SOURCE) as source_zip, zipfile.ZipFile(OUTPUT) as out_zip, 
         "Table labels are not sequential",
     )
     check(
-        all(text(p).startswith(f"Figure {i}. ") for i, p in enumerate(figure_captions, 1)),
+        all(text(p).startswith(f"Figure {i}. ")
+            for i, p in enumerate(figure_captions[:-1], 1)),
         "Figure labels are not sequential",
     )
-    check(text(figure_captions[-1]).count("Graphical abstract.") == 1, "Graphical abstract label is duplicated")
+    # figures/SPEC.md: five numbered body figures plus an unnumbered graphical
+    # abstract, which is also uploaded as its own file
+    check(text(figure_captions[-1]).startswith("Graphical Abstract."),
+          "The last figure caption is not the graphical abstract")
+    check(not re.search(r"Figure 6", all_text), "A 'Figure 6' reference survives")
     check(
         headings_1 == [
             "1. Introduction",
@@ -139,8 +157,25 @@ with zipfile.ZipFile(SOURCE) as source_zip, zipfile.ZipFile(OUTPUT) as out_zip, 
         check(first_row is not None, f"Table {table_no} has no rows")
         check(first_row.find("./w:trPr/w:tblHeader", NS) is not None, f"Table {table_no} header does not repeat")
         borders = tbl.find("./w:tblPr/w:tblBorders", NS)
-        check(borders is not None, f"Table {table_no} has no border specification")
-        check(borders.find(W + "insideV").get(W + "val") == "nil", f"Table {table_no} has vertical rules")
+        if borders is None:
+            # The MDPI_4.1_three_line_table style carries them; verified once
+            # below, against word/styles.xml.
+            continue
+        inside_v = borders.find(W + "insideV")
+        check(inside_v is None or inside_v.get(W + "val") == "nil",
+              f"Table {table_no} has vertical rules")
+
+    three_line = next(
+        (st for st in styles.xpath("./w:style", namespaces=NS)
+         if st.get(W + "styleId") == "MDPI41threelinetable"), None)
+    check(three_line is not None, "The three-line table style is missing")
+    style_borders = three_line.find("./w:tblPr/w:tblBorders", NS)
+    check(style_borders is not None, "The three-line table style defines no borders")
+    check(style_borders.find(W + "top") is not None
+          and style_borders.find(W + "bottom") is not None,
+          "The three-line table style has no top/bottom rule")
+    check(style_borders.find(W + "insideV") is None,
+          "The three-line table style draws vertical rules")
 
     section = body.find(W + "sectPr")
     check(section is not None, "Section properties missing")
@@ -182,7 +217,10 @@ with zipfile.ZipFile(SOURCE) as source_zip, zipfile.ZipFile(OUTPUT) as out_zip, 
         or name in ("word/theme/theme1.xml", "word/fontTable.xml", "word/numbering.xml", "word/styles.xml")
     ]
     changed_preserved = [
-        name for name in preserved_parts if digest(source_zip.read(name)) != digest(out_zip.read(name))
+        name for name in preserved_parts
+        if (digest(source_zip.read(name)) != digest(out_zip.read(name))
+            and (not name.endswith(".xml")
+                 or xml_digest(source_zip.read(name)) != xml_digest(out_zip.read(name))))
     ]
     check(not changed_preserved, f"Preserve-only parts changed: {changed_preserved}")
 
@@ -194,7 +232,10 @@ with zipfile.ZipFile(SOURCE) as source_zip, zipfile.ZipFile(OUTPUT) as out_zip, 
         or name in ("word/theme/theme1.xml", "word/fontTable.xml")
     ]
     chrome_mismatch = [
-        name for name in template_chrome if digest(template_zip.read(name)) != digest(out_zip.read(name))
+        name for name in template_chrome
+        if (digest(template_zip.read(name)) != digest(out_zip.read(name))
+            and (not name.endswith(".xml")
+                 or xml_digest(template_zip.read(name)) != xml_digest(out_zip.read(name))))
     ]
     check(not chrome_mismatch, f"Output chrome differs from reference template: {chrome_mismatch}")
 

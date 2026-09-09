@@ -41,8 +41,8 @@ Within a GreenLight-based in silico greenhouse testbed, we asked which open-loop
 criterion should select a data-driven surrogate for economic MPC and which model
 property best explains the closed-loop result. Multi-step stability selects the
 leading candidate, while survival of the actuator term through the sparsity
-threshold---rather than conditioning alone---best tracks the non-monotone economic
-outcome (Figure~\ref{fig:graphical-abstract}).
+threshold -- rather than conditioning alone -- best tracks the non-monotone economic
+outcome (Graphical Abstract).
 
 \begin{enumerate}
 
@@ -67,8 +67,8 @@ models in opposite orders.} In the first-order, undenoised block of a
 72-configuration ladder, under two sparse estimators, physically motivated
 features lowered one-step RMSE from $1.86$ to $1.68$~\textdegree C but raised
 the median 24~h rollout RMSE from $2.67$ to $24.27$~\textdegree C. The reversal
-is confined to that block --- pooled over all 72 labels the raw library predicts
-better one step ahead too --- but it reproduces on a held-out year
+is confined to that block -- pooled over all 72 labels the raw library predicts
+better one step ahead too -- but it reproduces on a held-out year
 \cite{lambert2020,wei2024,gevers1993,vandenhof1995,yonezawa2026}.
 
 %% --- Finding 2 ---------------------------------------------------------
@@ -96,7 +96,7 @@ better one step ahead too --- but it reproduces on a held-out year
 simulated closed-loop economics under the benchmarking safeguards.} Across
 fifteen controllers on four test seasons the raw-library ensemble surrogate
 \cite{fasel2022} led with $+4.32$~EUR\,m$^{-2}$, against $+3.09$ for the best
-physics-informed variant (Holm-corrected $p=4.6\times10^{-4}$, family of 15) and
+physics-informed variant (Holm-corrected $p=7.7\times10^{-4}$, family of 15) and
 $+2.26$ for the agronomic heuristic, re-tuned under the reinforcement-learning
 agents' own 16-trial budget ($\Delta=+2.06$, 75 of 80 runs against a
 deterministic reference) \cite{wilcoxon1945,holm1979}. Tuning was worth $+3.49$,
@@ -120,7 +120,7 @@ to baseline tuning and economic weighting.
 %% p = 3.0e-14; phys_ens median +0.971, 67/80, p = 2.5e-9.
 \item \textbf{Physically motivated features can reduce performance non-monotonically,
 and conditioning does not order the economics.} Changing the feature library alone
---- same estimator, threshold and seeds --- the condition number rises
+-- same estimator, threshold and seeds -- the condition number rises
 monotonically, $8.2 \rightarrow 24.5 \rightarrow 53.4$, the fits grow
 \emph{denser} rather than sparser ($20.1 \rightarrow 37.0$ terms), and open-loop
 rollout error rises with them, $2.67 \rightarrow 10.58 \rightarrow
@@ -155,8 +155,8 @@ economics \cite{cortiella2021,balanceguided2026,belsley1980}.
 %%   (run_regen.CROSS_TERM).
 \item \textbf{The closed-loop outcome follows whether the actuator pathway
 survives thresholding.} The direct boiler coefficient survives in $55$, $15$ and
-$55\,\%$ of fits of the three nested libraries --- the ordering of the margins, which
-conditioning does not reproduce --- and in $40\,\%$ of fits of the 17-feature
+$55\,\%$ of fits of the three nested libraries -- the ordering of the margins, which
+conditioning does not reproduce -- and in $40\,\%$ of fits of the 17-feature
 deletion library, whose margin ($+2.11$~EUR\,m$^{-2}$) lands between, again in
 survival order. Reinstating it in the recipe that loses it is
 significant but small and right-skewed: median $+0.21$~EUR\,m$^{-2}$, mean
@@ -199,7 +199,7 @@ loses the term is open, that survival gates the outcome is not.
 \item \textbf{The advantage is neither Pareto-dominant nor unconditional.} The
 margin--violation front holds five of the fifteen controllers, and PPO
 \cite{schulman2017} incurs $1330$ violation steps against the raw library's
-$4130$ at $3.86$~EUR\,m$^{-2}$ less margin --- though two of those points are
+$4130$ at $3.86$~EUR\,m$^{-2}$ less margin -- though two of those points are
 one controller under two thresholds and a third rests partly on seven truncated
 runs. The surrogate has no crop state, so terminal biomass is unpriced; the
 out-of-distribution guard is a negative result (paired mean
@@ -246,14 +246,14 @@ Non-zero terms & 20.1 / 28.2 / 37.0 & as above \\
 \multicolumn{3}{@{}l}{library, zero truncated runs). Only the feature library differs between these three controllers.} \\
 Closed-loop EPI (EUR\,m$^{-2}$) & $+4.32$ / $+0.28$ / $+2.75$ & \texttt{priced\_main/*.csv}, \texttt{phys\_lib/ main\_physlib.csv} \\
 Boiler-term survival$^{b}$ & 0.55 / 0.15 / 0.55 & as above \\
-The same change under STLSQ (EUR\,m$^{-2}$) & $+3.83$ / --- / $+2.48$ & as above \\
+The same change under STLSQ (EUR\,m$^{-2}$) & $+3.83$ / -- / $+2.48$ & as above \\
 \midrule
 \multicolumn{3}{@{}l}{\emph{Four test seasons 2020--2023}, fifteen controllers ($n=80$ unless stated). MPC rows use the priced} \\
 \multicolumn{3}{@{}l}{stage cost; PPO, SAC, the heuristic and the full-model planner have no MPC stage cost and are} \\
 \multicolumn{3}{@{}l}{quoted from the canonical wave.} \\
 Raw-library ensemble MPC (EUR\,m$^{-2}$; violation steps) & $+4.32\pm4.08$; 4130 & \texttt{priced\_main/*.csv} \\
 Best physics-informed MPC (EUR\,m$^{-2}$) & $+3.09\pm2.71$ & \texttt{priced\_main/*.csv} \\
-Raw ensemble vs.\ that variant & $p_{\text{Holm}}=4.6\times10^{-4}$ & recomputed over the family of 15 \\
+Raw ensemble vs.\ that variant & $p_{\text{Holm}}=7.7\times10^{-4}$ & recomputed over the family of 15 \\
 Tuned heuristic (EUR\,m$^{-2}$) & $+2.26$ ($n=4$)$^{a}$ & \texttt{n2\_tune/tune\_rb\_n2.csv} \\
 Stock heuristic (EUR\,m$^{-2}$) & $-1.23$ ($n=4$)$^{a}$ & \texttt{n2\_tune/tune\_rb\_n2.csv} \\
 PPO (EUR\,m$^{-2}$; violation steps) & $+0.45\pm2.97$; 1330 & \texttt{final/main.csv} \\
@@ -286,12 +286,16 @@ is 20 seeds, not 80 runs.
 \end{table}
 
 %% ---------------------------------------------------------------------------
-%% GRAPHICAL ABSTRACT -- slot 6 of the consolidated set, and the only float that is
-%% meant to be UNNUMBERED (figures/SPEC.md).  As written it is a numbered `figure'
-%% sitting in Section 5, so under the standard article class it prints as "Figure 6".
-%% At submission it moves into the MDPI front matter; see MDPI_SUBMISSION.md, which
-%% records the exact change.  Its duplication with Figures 1a and 2 is deliberate and
-%% acceptable for front matter -- it is not a numbered body float.
+%% GRAPHICAL ABSTRACT -- the only float that is UNNUMBERED (figures/SPEC.md: five
+%% numbered body figures plus an unnumbered graphical abstract).  RESOLVED 2026-08-28:
+%% the float carries \captionsetup{labelformat=empty}, so it prints as "Graphical
+%% abstract." and not as "Figure 6", and it carries no \label -- the single mention of
+%% it in the Conclusions names it instead of \ref-ing it.  Before this change the Word
+%% pipeline (format_mdpi_docx.py) already labelled the caption "Graphical Abstract."
+%% and numbered only five figures, so the body text of the DOCX pointed at a
+%% "Figure 6" that no caption defined.  At submission the graphical abstract is also
+%% uploaded as its own file.  Its duplication with Figures 1a and 2 is deliberate and
+%% acceptable for a graphical abstract -- it is not a numbered body float.
 %%
 %% REDRAWN 2026-08-14 -- the caption below and the PDF on disk now agree.
 %% What was wrong: the committed PDF had been generated on 2026-08-13 to the
@@ -344,10 +348,10 @@ is 20 seeds, not 80 runs.
 %%   solver_failures >= max_solver_failures.  Plot mean EPI (y, EUR m^-2)
 %%   against mean violation_steps_total (x), one marker per controller, the five
 %%   front members joined by a step line and the other ten in grey.
+\captionsetup{labelformat=empty}
 \caption{Graphical abstract. (\textbf{a})~Open-loop selection reversal.
 (\textbf{b})~Non-monotone closed-loop economics and boiler-term survival.
 (\textbf{c})~The five-member margin--violation Pareto front.}
-\label{fig:graphical-abstract}
 \end{figure}
 
 %% ===========================================================================

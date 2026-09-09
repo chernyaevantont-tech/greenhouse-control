@@ -78,8 +78,11 @@ def knock_stats(k: dict) -> dict:
     """Wilcoxon signed-rank per effect and objective, plus a Holm adjustment.
 
     THE FAMILY MATTERS AND MUST BE NAMED.  These four tests -- knock-in and
-    knock-out under each stage cost -- are the family adjusted over.  The same
-    raw p becomes 6.4e-4 in a family of two and 1.3e-3 in this family of four.
+    knock-out under each stage cost -- are the family adjusted over.  The priced
+    knock-in's raw p of 5.9e-4 becomes 1.2e-3 in a family of two and 1.8e-3 in
+    this family of four; the default objective's knock-in is 1.3e-3 here.
+    Recomputed 2026-09-02 by verify_prose.check_knockin_prose, which fails if
+    these stop matching Section 4.3.
     """
     raw = {}
     for obj in OBJECTIVES:
@@ -140,11 +143,11 @@ def panel_a(ax, sw: dict) -> dict:
     _lambda_axis(ax, sw[OBJECTIVES[0]]["lam"].to_numpy(float))
     ax.set_ylim(-4.6, 9.6)
     ax.set_ylabel(r"mean EPI (EUR m$^{-2}$), $\pm$1 SD")
-    ax.set_title("economics against the threshold", fontsize=8, pad=4)
-    ax.legend(loc="lower left", fontsize=6.5, labelspacing=0.25,
+    ax.set_title("margin against the threshold", fontsize=8, pad=4)
+    ax.legend(loc="lower left", fontsize=7, labelspacing=0.25,
               handletextpad=0.5, borderaxespad=0.3)
-    ps.annotate_n(ax, f"season {SEASON} only, $n=20$ per level\n"
-                      "levels evenly spaced, not to scale", loc="upper right")
+    # The season, the replicate count and the fact that the levels are evenly spaced
+    # rather than to scale are stated in the caption.
     return out
 
 
@@ -165,7 +168,7 @@ def _lambda_axis(ax, lam: np.ndarray) -> None:
                ls=":", lw=0.8, zorder=1)
     ax.set_xlim(-0.5, n - 0.5)
     ax.set_xticks(np.arange(n))
-    ax.set_xticklabels([f"{v:g}" for v in lam], rotation=90, fontsize=5.8)
+    ax.set_xticklabels([f"{v:g}" for v in lam], rotation=90, fontsize=6.5)
     ax.set_xlabel(r"sparsity threshold $\lambda$")
 
 
@@ -188,11 +191,11 @@ def panel_b(ax, ax_strip, sw: dict, cs: pd.DataFrame) -> dict:
     ax.set_ylim(-0.06, 1.16)
     ax.set_yticks([0.0, 0.25, 0.5, 0.75, 1.0])
     ax.set_ylabel("boiler term kept, fraction of fits")
-    ax.set_title("what the threshold destroys", fontsize=8, pad=4)
+    ax.set_title("boiler-term survival against the threshold", fontsize=8, pad=4)
     mid = 0.5 * (np.searchsorted(lam0, 0.03) + np.searchsorted(lam0, 0.06))
     ax.annotate("collapse", xy=(mid, 1.10), ha="center", va="center",
-                fontsize=6.6, color="#7A6000")
-    ax.legend(loc="lower left", fontsize=6.5, labelspacing=0.25,
+                fontsize=7, color="#7A6000")
+    ax.legend(loc="lower left", fontsize=7, labelspacing=0.25,
               handletextpad=0.5, borderaxespad=0.3)
 
     # --- right-hand strip: the closed-loop controllers on the same y axis ---
@@ -208,13 +211,17 @@ def panel_b(ax, ax_strip, sw: dict, cs: pd.DataFrame) -> dict:
     # fixed library colours of Figure 1 keep their meaning here.
     groups: dict[tuple, list] = {}
     for r in cs.itertuples():
-        groups.setdefault((round(r.survival, 4), r.library or "none"), []).append(r)
+        # `or "none"` was version-dependent: a missing library used to arrive
+        # falsy and now arrives as a float NaN, which is truthy -- it reached
+        # the gid and wrote a bare NaN into fig3_values.json, which is not JSON.
+        lib = r.library if isinstance(r.library, str) and r.library else "none"
+        groups.setdefault((round(r.survival, 4), lib), []).append(r)
     ordered = sorted(groups.items(), key=lambda kv: (kv[0][0], kv[0][1]))
 
     # Push the label blocks apart just enough that none overlaps, then draw a
     # leader from the tick (at its true survival) to the displaced label.  The
     # TICK never moves: only the text does.
-    line_h = 0.055
+    line_h = 0.072
     heights = [line_h * len(rows) for _, rows in ordered]
     ys = [sv for (sv, _), _ in ordered]
     for i in range(1, len(ys)):
@@ -226,19 +233,19 @@ def panel_b(ax, ax_strip, sw: dict, cs: pd.DataFrame) -> dict:
 
     for ((sv, lib), rows), ylab in zip(ordered, ys):
         col = ps.LIB_COLOR.get(lib, "#555555")
-        h = ax_strip.hlines(sv, 0.04, 0.26, color=col, lw=1.8, zorder=4)
+        h = ax_strip.hlines(sv, 0.02, 0.20, color=col, lw=1.8, zorder=4)
         h.set_gid(f"b:ctrl:{sv:.4f}:{lib}")
-        ax_strip.plot([0.26, 0.34], [sv, ylab], color=col, lw=0.5, zorder=3)
-        ax_strip.text(0.37, ylab, "\n".join(_short(r.method) for r in rows),
-                      ha="left", va="center", fontsize=5.7, color=col,
-                      linespacing=1.2)
+        ax_strip.plot([0.20, 0.27], [sv, ylab], color=col, lw=0.5, zorder=3)
+        ax_strip.text(0.30, ylab, "\n".join(_short(r.method) for r in rows),
+                      ha="left", va="center", fontsize=7, color=col,
+                      linespacing=1.25)
         out["controllers"].append({"survival": sv, "library": lib,
                                    "gid": f"b:ctrl:{sv:.4f}:{lib}",
                                    "methods": [r.method for r in rows],
                                    "n_seeds": [r.n_seeds for r in rows],
                                    "epi": [r.epi for r in rows]})
     ax_strip.set_title("controllers", fontsize=7, pad=4)
-    ax_strip.set_xlabel("priced pool,\none fit per seed", fontsize=6.0,
+    ax_strip.set_xlabel("priced pool,\none fit per replicate", fontsize=7,
                         color="#555555", linespacing=1.25)
     return out
 
@@ -296,19 +303,18 @@ def panel_c(ax, k: dict, st: dict) -> dict:
             arrow = dict(arrowstyle="-", lw=0.5, color="#555555",
                          shrinkA=1.0, shrinkB=2.0)
             ax.annotate("median", xy=(i - 0.30, q50), xytext=(-0.58, q50 + 1.7),
-                        fontsize=6.0, color="#555555", ha="left", va="center",
+                        fontsize=7, color="#555555", ha="left", va="center",
                         arrowprops=arrow)
             ax.annotate("mean", xy=(i - 0.05, mean), xytext=(-0.58, mean - 1.7),
-                        fontsize=6.0, color="#555555", ha="left", va="center",
+                        fontsize=7, color="#555555", ha="left", va="center",
                         arrowprops=arrow)
         p_raw = st["raw"][(obj, "knockin")]
         p_adj = st["holm"][(obj, "knockin")]
-        ax.text(0.25 + 0.50 * i, 0.985,
-                f"median {q50:+.2f}\nmean {mean:+.2f}\n"
-                f"{int((v > 0).sum())}/{len(v)} positive\n"
-                f"$p$ = {p_raw:.1e}\n({p_adj:.1e} Holm)",
-                transform=ax.transAxes, ha="center", va="top", fontsize=6.1,
-                color=c, linespacing=1.35)
+        # The median is what the panel is about, and the markers are drawn for it. The
+        # mean, the counts and the two corrected p-values are in the caption and the text,
+        # where they can be read beside the rest of the family.
+        ax.text(0.25 + 0.50 * i, 0.985, f"median {q50:+.2f}",
+                transform=ax.transAxes, ha="center", va="top", fontsize=7, color=c)
         out["groups"].append({"objective": obj, "n": int(len(v)),
                               "median": q50, "mean": mean, "q25": q25, "q75": q75,
                               "positive": int((v > 0).sum()),
@@ -325,18 +331,9 @@ def panel_c(ax, k: dict, st: dict) -> dict:
     ax.set_xticks([0, 1])
     ax.set_xticklabels(["default\nstage cost", "priced\nstage cost"])
     ax.set_ylabel(r"knock-in effect on EPI (EUR m$^{-2}$)")
-    ax.set_title("restoring the term, one replicate at a time", fontsize=8, pad=4)
+    ax.set_title("effect of restoring the term", fontsize=8, pad=4)
 
     kod = out["knockout"]
-    ax.text(0.5, 0.012,
-            "grey lines join the same seed\n"
-            "(one model, two stage costs).\n"
-            f"knock-OUT: median {kod['default']['median']:+.2f} and "
-            f"{kod['priced']['median']:+.2f},\n"
-            f"positive in {kod['default']['positive']}/{kod['default']['n']} and "
-            f"{kod['priced']['positive']}/{kod['priced']['n']} -- mostly already cut",
-            transform=ax.transAxes, ha="center", va="bottom", fontsize=5.7,
-            color="#555555", linespacing=1.35)
     out["stats"]["family"] = st["family"]
     return out
 
@@ -543,7 +540,7 @@ def main() -> int:
     cs = controller_survival()
 
     fig = plt.figure(figsize=(ps.W2, 7.6 * ps.CM))
-    gs = fig.add_gridspec(1, 4, width_ratios=[1.14, 0.98, 0.56, 1.06],
+    gs = fig.add_gridspec(1, 4, width_ratios=[1.06, 0.92, 0.84, 1.00],
                           wspace=0.34, left=0.062, right=0.988,
                           bottom=0.205, top=0.900)
     ax_a = fig.add_subplot(gs[0, 0])

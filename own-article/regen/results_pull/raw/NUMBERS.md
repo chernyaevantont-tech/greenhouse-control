@@ -1,3 +1,14 @@
+> **This is not the manuscript's claim table.** It is generated from the cluster's raw
+> pull, which is kept as a provenance record and is superseded in two ways. Its
+> `ladder.csv` predates a rollout-horizon correction, so its gate counts (30 of 72, frozen
+> recipe failing) differ from the manuscript's (32 of 72, frozen recipe passing), which
+> come from `regen/results/ladder_rerun/`. Its `main.csv` holds no priced wave, so the
+> "cross-season leader" row names the best of the controllers this tree happens to contain
+> rather than the study's leader.
+>
+> The manuscript's claim table is `regen/results/final/NUMBERS.md`.
+> See the section "The two result trees" in `regen/README.md`.
+
 # NUMBERS — every stated result and where it comes from
 
 - config_hash: `637c6b535a9e`

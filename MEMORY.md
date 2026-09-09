@@ -78,3 +78,85 @@ E4 ЗАКРЫТ (2026-07-03, финал): проба щадящего возбу
 
 ## refactor
 Стилистическая переработка own-article/paper/statya_ru.tex под требования российских журналов первого уровня (АиТ) без изменения численных результатов (проверено grep-сверкой: все J, p-значения, счётчики нарушений, корреляции, λ-таблица сохранены дословно). Сделано: (1) удалены маркеры нейросетей — «критически важный»→«существенный для управления», «ключевой»→«основной/существенный», сняты метафоры («погоня», «погубила», «близорукость», «планка», «ловушка разреженности»), самооценки («наиболее весомый результат», «заведомо корректная методика»); (2) обезличены конструкции («мы сводим»→«устранение ... сводит», «зафиксировали»→«была зафиксирована»); (3) англицизмы введены с расшифровкой: SINDy, PPO (proximal policy optimization, проксимальная оптимизация политики), SAC (soft actor-critic), DAgger (dataset aggregation), AUC/ROC, ppm; «онлайн/офлайн» заменены на «в реальном времени»/«заранее обученная», «надзорный модуль»→«модуль диагностики отказов по невязкам», «признаки неуверенности»→«показатели неопределённости»; (4) отрицательные числа в тексте переписаны через «убыток»/«минус» (в таблицах математический минус сохранён); интервалы [300;1600] с точкой с запятой; (5) формулы (1) и (2) оформлены с блоком «где ...» — каждая переменная с новой строки; SINDy-отображение вынесено в выносную формулу (2); (6) ссылки на панели рисунков добавлены в текст: рис. 3(а) в §4.4, рис. 3(б,в) в §4.5, рис. 5(а,б) в §4.6; (7) жирные врезки-заголовки в Обсуждении заменены на \subsection; ячейки табл. 1 переписаны с разговорных («дело в пороге», «служит планкой») на нейтральные, колонка «Что показали данные»→«Результат проверки»; (8) заключение переведено в отчётный стиль прошедшего времени («Выполнено... Установлено... Показано...»); (9) заголовки подразделов: «Механизм: ...»→«Влияние порога разреженности на структуру модели и качество управления», «Онлайн-адаптация»→«Адаптация в реальном времени», «Чувствительность выводов»→«Анализ чувствительности». Аннотация ужата до ~100 слов (требование АиТ). Литература не тронута. Компиляция не проверялась — tectonic/xelatex на машине отсутствуют.
+
+## refactor
+Ревизия пакета данных greenhouse-control-regen-data (own-article/regen) перед депонированием (2026-08-31).
+
+ГЛАВНОЕ: архив нельзя было запустить. regen_config импортирует article_experiment_utils и protocol_config из родительского каталога own-article/, а они в zip не попадали -> ModuleNotFoundError на любом скрипте. Также отсутствовали 22 regen_manifest.json (на них ссылается Data Availability статьи), recipe_frozen_v2.json и results/final/VERIFY.txt. analyze_notuboil.py импортирует _plotstyle из paper/en/figures — тоже вне пакета.
+
+ЧТО СДЕЛАНО:
+1. Добавлен own-article/regen/make_archive.py — состав архива объявлен кодом, а не памятью. Включает: 4 родительских модуля в корень (article_experiment_utils, protocol_config, rostov_soil, make_weather), figures/ (_plotstyle + 6 make_figN + SPEC.md), все .py/.md/.csv/.json + VERIFY.txt. Исключает log_*.txt, k8s/, submit.sh, кэши. Детерминирован (фиксированный timestamp, сортировка) — две сборки дают одинаковый sha256.
+2. _plotstyle.RESULTS больше не зашит на layout репозитория: пробует $REGEN_RESULTS, затем репо, затем соседний regen/results. analyze_notuboil ищет figures/ в двух местах. Проверено: из распакованного архива работают verify_regen, make_tables, analyze_notuboil и make_fig2 (fig2.png побитово совпал с репозиторным).
+3. Язык: 60 строк русских комментариев/строк в 4 модулях regen + 36 в article_experiment_utils/make_weather переведены на английский; INSTRUCTIONS.md (154 строки) переписан по-английски как runbook без личных путей. В коде пакета кириллицы 0.
+4. Удалены личные пути (C:/Users/zergu/..., ../../../greenlight/sindylom/.venv) из README.md и INSTRUCTIONS.md.
+5. make_tables.table_ladder сортировал по float-колонке с точными ничьями (sr3 и constrained дают побитово одинаковые фиты) -> порядок строк ladder.csv менялся между версиями pandas. Добавлен тай-брейк по condition; ladder.csv перегенерирован (значения не изменились, только порядок 27 строк).
+6. README.md: переписаны 5 устаревших разделов — «какая это статья» (указывал на русскую статью для «Автоматики и телемеханики» вместо MDPI Agronomy), acceptance gates (не учитывали разделение solver_aborted/env_terminated, буквы гейтов не совпадали с кодом), known limitations (утверждали, что E4-E7 не посчитаны — в дереве 1800/1800/260/220 строк), smoke-раздел (одноseed-овый +0.046 против полного -0.355), плюс новый раздел «The two result trees» (results_pull/raw содержит adapt/guard на ОДНОМ розыгрыше, 180 строк против 1800 — superseded).
+7. Мелкие lint-правки (F401/F541/B007/UP037). Оставлены сознательно: B905 (strict= требует 3.10+), C408/RET504/E702 (стиль), B023 (ложное срабатывание — замыкания вызываются внутри итерации).
+
+ПРОВЕРЕНО: config_hash 637c6b535a9e воспроизводится; NUMBERS.md и 16 из 17 таблиц пересобираются побитово; analysis_notuboil.md — побитово; VERIFY.txt — совпадает построчно кроме git_sha; 21 манифест, все на одном config_hash, ни одного env-блока.
+
+НЕ СДЕЛАНО: repro.py --selftest не запускался — на машине нет pysindy/gl_gym/torch/casadi. Проверена только аналитическая половина (numpy/pandas/scipy/matplotlib).
+
+## bugfix
+Full table-by-table verification of the MDPI manuscript against own-article/regen/results/. Wrote own-article/paper/en/verify_tables.py; 731 recomputed cells now pass. Ten manuscript corrections, in two classes.
+
+CLASS 1 -- two stale Holm-corrected p-values, both left behind when the declared family grew from 13 to 15 controllers (sindy_mpc_phys and sindy_mpc_phys_ens reaching closed loop):
+
+(a) 01-introduction.tex, raw-library ensemble vs the tuned heuristic: 6.3e-11 -> 8.3e-11. Table 7 already printed 8.3e-11 for the same contrast under the same declared family, so the manuscript disagreed with itself. Table 7 is the correct one: all fourteen of its values reproduce exactly under family=15 step-down with monotone enforcement.
+
+(b) The paired raw_ens-vs-lowthr contrast, quoted in three places (introduction, conclusions, headline table): 4.6e-4 -> 7.7e-4. The provenance comment claimed 4.62e-4 "over the family of 15" and called 7.708e-4 superseded; recomputation shows the reverse. 4.62e-4 reproduces under NEITHER family -- it needs the two full-physics contrasts to be weaker than the dense one, and in the frozen tree they are 3.2e-10 and 2.5e-9 against 1.5e-4. Both families give 7.708e-4, so this contrast did not move at all.
+
+(c) Consequently 04-discussion.tex illustrated "another declaration moves them" with this contrast and with the direction reversed. Replaced with two contrasts that genuinely moved: raw_ens vs the tuned heuristic 6.9e-11 -> 8.3e-11 and lowthr vs it 4.7e-4 -> 7.0e-4, no controller crossing 0.05 (verified both ways).
+
+CLASS 2 -- seven cells rounded to three decimals and then to two, printing a last digit that does not round from the data: tab:unseen dense/2015 +0.55->+0.54; tab:lambda lambda=0.02 SDs 2.01->2.00 and 1.47->1.46; tab:faults deltas 18.29->18.28 and 4.54->4.53; tab:sens 20% mean -8.13->-8.12 (table and the sentence above it); tab:disc-libraries held-out one-step 1.90->1.89 and 1.77->1.76. No claim or ordering changes.
+
+Also reworded the tab:unseen SD footnote: it called 1.42 "across-season spread", but a reader recomputing the SD of the four season means gets 1.62. The entry is the sample SD over the same n=32 rows as every other row of the column; the footnote now says so and keeps the point that none of the dispersion is run-to-run.
+
+Verified-correct and left alone: Table 10's Delta column (difference of printed means, additive in all 13 rows), Table 13's Delta (raw difference), the knock-in p (1.2e-3) and the notuboil p (4.4e-6), the whole Pareto-front paragraph including the truncation caveat (7 of 80 runs, gap 71 -> 26 steps), and every abstract number.
+
+Pitfall worth remembering: `python - <<'PY'` heredocs collapse a doubled backslash, so a non-raw Python string written as Table~\\ref becomes a carriage return and silently fails to match LaTeX. Write patch scripts to the scratchpad with the Write tool and run them by path.
+
+All six figure builders rebuild clean (fig1 48/48, fig3 63/63, fig4 VERIFY OK, fig6 front-has-5 OK). make_docx -> format_mdpi_docx -> audit_mdpi ends AUDIT_OK with the single expected placeholder, the Zenodo DOI for data_location.
+
+## bugfix
+Extended the verification from the 16 tables to the whole manuscript. Wrote own-article/paper/en/verify_prose.py, which anchors each numeric claim on a piece of its own sentence and recomputes it from own-article/regen/results/. Coverage is now complete: of 317 distinct decimals in the running text, 156 also appear in a table cell and 161 are prose-only, and all 161 are recomputed. Totals: 731 table cells + 272 prose values = 1003 recomputed, 0 mismatches.
+
+Manuscript corrections in this pass:
+
+(a) 01-introduction.tex: "physics-library runs that kept it (+2.36)" -> (+2.52). The sentence sets up "the two libraries that keep the term" -- raw and full physics, both at survival 0.55 -- then quotes the physics_no_cross figure (2.365), the library that clause has just excluded. The full physics figure is 2.5163. Both are in Table 11, one cell apart. The claim (survival gates but does not order) is unaffected.
+
+(b) Two more double-rounded values, bringing the session total to ten: the horizon sweep's dispersion at h=8 (0.874585 -> 0.87, was 0.88) and the full-physics replicates that lose the boiler term (+3.09474 -> +3.09, was +3.10).
+
+(c) Two approximations that reproduced from nothing: "violations falling from ~6005 to ~3690" is neither the pooled means of the two controllers (6005.68, 3688.96) nor either controller's own figure; replaced with the pooled means ~6006 and ~3689.
+
+(d) Two labelling clarifications where the number was right but the statistic or the arm was unnamed: the Section 3.1 comparator quotes MEAN rollout RMSE two paragraphs after the section declares the median "the only defensible summary", and the 17-feature sentence quotes the ensemble arm after saying the library was refit at both sparse estimators.
+
+(e) figures/make_fig3.py: knock_stats's docstring quoted "6.4e-4 in a family of two and 1.3e-3 in this family of four" for the priced knock-in; the frozen tree gives 1.2e-3 and 1.8e-3, and 1.3e-3 is the DEFAULT objective's knock-in. Restated with its objective named.
+
+Slices worth remembering, each of which cost a debugging round because the natural guess is wrong:
+  - the horizon-8 comparison is against the ORIGINAL-objective wave (final/main.csv plus n7 for the raw library), not the priced pool;
+  - the planner's twenty 2022 rows are exactly what the solver-abort rule removes, so that sentence must read final/main.csv directly;
+  - "spread across draws within a seed" is a standard deviation, not a range, and the 6x6 wave needs BOTH ea_draws files to reach 36 cells;
+  - the canonical draws wave (final/draws.csv, 20 seeds x 10 draws) gives boiler survival 0.12; the priced main pool gives 0.15 and is a different set of fits;
+  - perturbation levels are compared with a signed-rank test on per-seed means;
+  - "the horizon spans 4.76--5.21" is two SPANS (finer rerun and canonical grid), not two levels;
+  - the observational splits are per CONTROLLER (phys_ens and conf), on per-seed means;
+  - the knock-in's widened family is knock-in and knock-out under each of the two objectives, run as a real Holm family, not a multiply-by-four.
+
+All eight of the first pass's errors were in tables, where the checking was; all four of this pass's were in prose. Nothing was found by inspection that the recomputation did not also find.
+
+## bugfix
+Closed the gap my own coverage metric had hidden. The first two passes measured only tokens matching \d+\.\d+, so every integer-valued claim -- counts, violation totals, corridor bounds, and any mantissa that happens to be an integer -- was outside the measurement while I described the coverage as complete. Two new scans (scratchpad residual_int.py and residual_tab.py) measure integers in prose and every printed number per table.
+
+What the integer scan found, after adding checkers for violations, structural counts, configuration constants and corridor bounds: 101 of 105 distinct prose integers now recomputed. The four that remain are author metadata -- ORCID prefixes, the postcode, the funding agreement number -- which are not computed from anything.
+
+What the per-table scan found, and this is the important part: THREE COLUMNS WERE BEING SKIPPED IN SILENCE, which is worse than a mismatch because a silent skip looks exactly like a pass.
+  - check_lambda looked for the active-term column under four names (n_active_terms, active_terms, n_terms, nnz) and the mechanism frame calls it "nonzero", so `terms` stayed None and all thirteen values of Table 10's second column went unchecked;
+  - check_rbtune guarded the training-J row on blocks named tuned_train/stock_train; the wave names them tune_trial0..16 with trial 0 the hard-coded configuration, so both values went unchecked. Checking them found the eleventh double-rounded number: -1.93647 printed as -1.937, now -1.936;
+  - the raw-minus-physics gap +3.66 -> +1.23, quoted in Tables 1, 16 and A1, was never checked at all. It reproduces, but it is a CONTROLLER contrast (raw ensemble against sindy_mpc_lowthr: +3.6585 and +1.2285), not a library-pool one -- pooling over libraries gives +4.04 and +2.18.
+
+Also found and fixed by the integer scan: the finer rerun's violation mean at threshold 0.20 is 9569.1 and was printed as 9570, in a sentence whose companion value (6166.6 -> 6167) is correctly rounded. The lambda-sweep endpoints nearby ARE fine: they are introduced with "from about" and 3851.4 and 9086.25 do round to the stated 3850 and 9090 at the nearest ten.
+
+Lesson worth keeping: when reporting coverage, state what the metric actually scanned. "All decimals covered" is not "all numbers covered", and the difference hid three unchecked columns for two full passes.
+
+Final state: verify_tables 753 cells, verify_prose 314 values, both zero mismatches. Per-table scan leaves 20 unchecked tokens, of which 17 are years in column headers and 3 are p-value mantissas whose full values are checked. Word rebuilt, AUDIT_OK.

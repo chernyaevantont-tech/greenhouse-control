@@ -36,3 +36,80 @@ E3 регуляторы. oracle-MPC реализован как receding-horizon
 Обнаружены две конфликтующие таблицы E3: (1) e3_main_table.csv + e3_stats_vs_rulebased.csv + e3_pareto_table.csv (коммит 8373f35, 02.07) — их использует статья statya_ru.tex и генератор рисунков make_figures_ru.py; заголовок conf_dagger=5,23±2,40, Δ+0,59, p_Holm=0,26; априорный confirmatory=1,18±4,33; есть oracle 1,99 и nn_mpc −5,09. (2) e3_main_table_20seed.csv + e3_stats_20seed.csv (коммит 2d5eb9a, 03.07, «20-seed regen — E3 headline+Pareto+stats») — новее, но частичные (нет oracle/nn/exploratory); conf_dagger=4,66±3,17, Δ+0,03, p_Holm=0,57; априорный=0,29±3,92. Остальные строки (rule_based, dense, grey_box, ppo, dense_dagger) в обеих совпадают дословно. Регген 03.07 не переключил ни статью, ни рисунки — миграция незавершённая. DECISIONS.md уже фиксирует «2 конфликтующих финала» и что рецепт не заморожен консистентно (working recipe_frozen.json=physics/stlsq/0.1 ≠ snapshot physics_no_cross/ensemble ≠ e3_main_table).
 
 РЕШЕНИЕ (17.07, владелец): каноничным считать ЧИСТЫЙ регген на кластере agroengineer-cluster — один замороженный рецепт, 20 сидов, все 10 регуляторов (вкл. oracle/nn), из одного источника выводятся текст, рисунки и статистика. Это заодно закрывает замечание рецензента 3 (мультисезон: тот же прогон по нескольким погодным годам) и снимает замечание 13 (воспроизводимость/конфликтующие CSV). Следствие: заголовочные числа статьи (5,23 / 1,18 / p=0,26) будут заменены на результат чистого реггена; правки статистики (замеч. 2 TOST, 8 размеры эффекта/медианы, 11 Парето) и заголовочные числовые ячейки ОТЛОЖЕНЫ до реггена. Число-независимые правки (постановка УПМ, масштабирование/библиотека SINDy, переименование J→операционная маржа, ослабление формулировок о причинности/безопасности, явное уравнение температуры, конфиги PRBS/обусловленность/NN, формальные требования) ведутся сейчас. Прежде чем запускать регген — заморозить ОДИН рецепт (устранить рассогласование working≠snapshot из DECISIONS.md).
+
+## Подача в MDPI Agronomy идёт как Word; единый файл авторства authors.json
+РЕШЕНИЕ (2026-08-28).
+
+1) МАРШРУТ ПОДАЧИ — WORD, НЕ LaTeX. Подаём own-article/paper/en/paper_en_mdpi.docx: pandoc собирает paper_en.docx из paper_en.tex с официальным шаблоном mdpi-template/agronomy-template.docx как reference-doc, затем format_mdpi_docx.py раскладывает абзацы по именованным стилям MDPI_*. Обоснование: TeX-дистрибутива на машине нет, LaTeX ни разу не компилировался, а Word-файл вычитан постранично (экспорт через Word 16 COM + растеризация PyMuPDF). LaTeX остаётся источником ИСТИНЫ ПО СОДЕРЖАНИЮ (правим 5 файлов секций + assemble_paper_en.py), но не тем, что загружается. Из трёх почти одинаковых styled-docx оставлен ОДИН — paper_en_mdpi.docx; варианты _simulation и _simulation_short_captions сняты.
+
+2) АВТОРСТВО — ОДИН ФАЙЛ. Добавлены authorship.py + authors.example.json. Пользователь копирует в authors.json и заполняет; из него формируются И блок \author{} в LaTeX, И front matter в Word, поэтому они не могут разойтись. Половинчатый файл отвергается со списком недостающего (не смешиваем реального автора с плейсхолдером). Число авторов любое — MDPI минимума не требует; Word-блок строится из списка, а не из фиксированной двухавторской вёрстки. Всё back matter (8 заявлений в порядке MDPI, включая Supplementary Materials и Acknowledgments) теперь пишет ассемблер, Word-проход только стилизует.
+
+3) ГЕЙТЫ. format_mdpi_docx.validate() — 13 проверок; .codex-tmp/mdpi-format/audit_mdpi.py — пакетный аудит (стили, связи, последовательность подписей, компоненты уравнений, трёхлинейные таблицы с повтором шапки, порядок back matter, геометрия A4, нумерация строк, updateFields, канонический XML колонтитулов/темы/шрифтов против шаблона). Оба зелёные; при заполненном authors.json аудит даёт explicit_placeholders=0 (проверено фиктивными данными, затем удалены).
+
+4) ГРАФИЧЕСКИЙ АБСТРАКТ НЕ НУМЕРУЕТСЯ (как и записано в figures/SPEC.md): пять нумерованных рисунков + graphical abstract. Раньше LaTeX его нумеровал и §5 ссылался \ref, а Word подписывал "Graphical Abstract." — в тексте оставалась ссылка на несуществующий "Figure 6".
+
+5) НОМЕРА ФОРМУЛ НЕ ПИШУТСЯ В САМУ ФОРМУЛУ. LaTeX нумерует сам; в Word клонируется двухъячеечный компонент шаблона (MDPI_3.9_equation | MDPI_3.a_equation_number), номер прижат к правому полю. Уравнение (3) до этого вообще не имело номера.
+
+## Состав авторов статьи MDPI Agronomy (9 человек, ДГТУ) и распределение CRediT
+ДАННЫЕ (2026-08-28), файл own-article/paper/en/authors.json.
+
+Девять авторов, все ДГТУ, четыре подразделения:
+(1) НЦМУ «Агроинженерия будущего» — Наумов И.И. (руководитель НЦМУ), Ляшов М.В. (программист), Черняев А.Т. (программист), Черняева Е.О. (техник), Харина М.С. (программист), Мерзликина А.Е. (инженер);
+(2) каф. «Гидравлика, гидропневмоавтоматика и тепловые процессы» — Килина М.С. (доцент);
+(3) каф. «Кибербезопасность информационных систем» — Жданова М.М. (ст. преподаватель);
+(4) Управление научных исследований — Кулинич М.Н. (инженер).
+
+Инициалы (латиницей, уникальны — коллизия Килина/Харина разведена): I.I.N., M.V.L., A.T.C., M.S.K. (Килина), M.M.Z., E.O.C., M.S.Kh. (Харина), A.E.M., M.N.K.
+
+ПРИНЯТОЕ ДОПУЩЕНИЕ: корреспондирующий автор — Черняев А.Т. (владелец репозитория, исполнитель экспериментов). Если должен быть Наумов — переносится одно поле "corresponding": true.
+
+CRediT предложен ПО ДОЛЖНОСТЯМ и подлежит подтверждению каждым автором: Conceptualization I.I.N.+M.S.K.; methodology M.S.K.+M.V.L.+A.T.C.; software A.T.C.+M.V.L.+M.M.Z.+M.S.Kh.; validation M.V.L.+M.S.K.+M.M.Z.; formal analysis A.T.C.+M.S.K.; investigation A.T.C.+E.O.C.+A.E.M.+M.S.Kh.; resources I.I.N.+A.E.M.+M.N.K.; data curation E.O.C.+M.M.Z.+A.T.C.; writing—original draft A.T.C.; writing—review & editing I.I.N.+M.S.K.+M.V.L.+M.M.Z.; visualization A.T.C.+M.S.Kh.; supervision I.I.N.+M.S.K.; project administration I.I.N.+M.N.K.; funding acquisition I.I.N.+M.N.K.
+
+НЕ ВЫДУМАНО И ОСТАЁТСЯ ОТКРЫТЫМ: ORCID (у корреспондирующего обязателен для MDPI) и институциональные e-mail всех девяти, текст funding (у НЦМУ обычно есть номер соглашения Минобрнауки), acknowledgments, DOI архива данных. Всё это печатается как маркеры [[...]] и перечисляется в выводе assemble_paper_en.py и audit_mdpi.py. Английские написания ФИО и названий подразделений — транслитерация/перевод, требуют подтверждения авторами.
+
+## Every table cell and prose statistic is machine-verified against the results tree
+own-article/paper/en/verify_tables.py recomputes all 16 LaTeX tables (16/16 implemented) plus the Holm-corrected p-values quoted in prose and the Pareto-front paragraph, directly from own-article/regen/results/. Run `python verify_tables.py` from own-article/paper/en; it exits non-zero on any mismatch. 731 cells currently pass with zero mismatches.
+
+Tolerance is half a unit in the last printed digit, with exact half-unit ties admitted (a value of 20.05 printed to one decimal is correct either way). This is deliberately the tightest test the printed precision allows: it is what surfaced eight cells that had been rounded to three decimals and then to two, printing a last digit that does not round from the data.
+
+Two per-table conventions are recorded in the checker rather than guessed at each run: Table 10's Delta column is the difference of the two PRINTED means (all thirteen rows are exactly additive), whereas Table 13's Delta is the raw difference. Table 8's SD column, the deterministic heuristic's row included, is the sample SD over the n=32 rows.
+
+The Holm procedure that reproduces the manuscript is: family size = 15 CONTROLLERS (not the 14 contrasts), step-down, with monotone enforcement. All fourteen printed values of Table 7 reproduce exactly under it and under no other variant tried.
+
+Rationale: figures carried build-failing self-checks but tables did not, so a number could drift in a table or a sentence without anything failing. Two headline p-values had in fact drifted. The checker closes that gap and fails if prose and tables stop agreeing.
+
+## The verifier gates on coverage, not only on agreement
+own-article/paper/en/verify_manuscript.py is the single entry point. It runs verify_tables.py and verify_prose.py, then walks EVERY number the manuscript prints -- in the sixteen tables and in the running text -- and fails if any of them was never claimed by a check.
+
+    python verify_manuscript.py             # agreement and coverage
+    python verify_manuscript.py --list      # what is exempt, and why
+    python verify_manuscript.py --self-test # that the gate can still fail
+
+Why: a checker that silently skips a column looks exactly like one that passes. Three columns went unverified that way for two full passes -- the active-term column of the sparsity table (the frame calls it "nonzero", the checker looked for four other names), the training-score row of the setpoint search (the wave names its blocks tune_trial0..16, the checker looked for tuned_train/stock_train), and the raw-minus-physics gap quoted in three tables, which no checker asked about at all. Agreement checking cannot find these; only coverage can.
+
+Current state: 758 table cells and 322 prose values recomputed, 1929 printed numbers walked, 0 unclaimed, 0 mismatches.
+
+A number may go unclaimed only by matching an entry in EXEMPT, which pairs a pattern with a written reason. The list is deliberately short: season years used as column headers, ORCIDs, the affiliation postcode and street number, and the funding agreement number. Anything else that turns up unclaimed is a hole in the checking, not a fact about the manuscript.
+
+Two implementation points that matter. Scientific notation is collapsed before tokenising, so a p-value written as 6.9e-11 is one number rather than a mantissa and an exponent; and prose checks that compare in scaled units pass `scale=` so the value RECORDED is in the quantity's own units -- recording the bare mantissa would leave the printed number unaccounted for.
+
+--self-test disables each table checker in turn and reports how many numbers only that checker reaches; it fails if any checker compares nothing at all, which is the shape a silent skip takes. Two of the nineteen (tab:defects, tab:headline) contribute no unique coverage, correctly: they are summary tables whose every number restates one verified elsewhere. They still contribute agreement, which is how the stale 6.3e-11 in the Introduction was caught against Table 7.
+
+## MDPI-ревью 2026-09-07: инструменты, конфликт по тире, два блокера
+РЕШЕНИЕ (2026-09-07). Ревью paper_en под MDPI Agronomy. Всё в mdpi-review-output/, оригиналы не перезаписаны.
+
+1) ИНСТРУМЕНТЫ. Поставлены три плагина, все без hooks и без сети: academic-prose@claude-academic-prose (sjmoran), academic-writing-agents@andrehuang-academic-writing-agents (andrehuang), humanizer@humanizer (blader). ОТКЛОНЁН kimhons/humanize: это не плагин (нет .claude-plugin/), ставится только через install.sh, который пишет ГЛОБАЛЬНОЕ always-on правило ~/.claude/rules/10-anti-slop.md на все проекты, и его правило 4 («не более 1 em-dash на абзац») конфликтует и с брифом, и с MDPI. Скоринг избыточен — в проекте уже есть verify_prose.py. K-Dense не ставили: academic-writing-agents уже покрывает peer-review/scientific-writing. `claude plugin install --url <github>` НЕ существует в 2.1.261 — только marketplace add + install, причём имя маркетплейса берётся из его marketplace.json (andrehuang-academic-writing-agents, не academic-writing-agents). Плагины не грузятся в сессии установки — правила применялись чтением SKILL.md из ~/.claude/plugins/cache/.
+
+2) КОНФЛИКТ ТРЕБОВАНИЙ (важно на будущее). MDPI Layout Style Guide §5.3 прямо гласит: «For MDPI papers, em dashes are preferred to colons… We recommend using em dashes sparingly». То есть требование «ноль длинных тире» противоречит house style журнала. В рукописи 0 настоящих `---`, но 132 спейсед-эн-дэша ` -- ` в функции em dash. Исправлены только 6 ПАРНЫХ вставок (сильнейший AI-tell), осталось 118 (~1 на 260 слов). Механически до нуля не гнали осознанно.
+
+3) ДВА БЛОКЕРА ПОДАЧИ, оба — отсутствующие внешние факты, не проблемы текста:
+   C-1 Data Availability без публичного DOI. Депозит Zenodo подготовлен (greenhouse-control-regen-data-v1.0.zip, SHA-256 b767d361…), но НЕ сделан; в файле остаётся красный [[REQUIRED BEFORE SUBMISSION]] на строке 3430 — оставлен намеренно.
+   C-2 «pre-registered» заявлено в 5 местах без ссылки. MDPI: «links to the preregistration must be provided in the manuscript». Либо ссылка, либо переформулировать в «pre-specified».
+
+4) ЧТО ПРАВИЛИ (42 строки, категории language/MDPI/anti-slop; научных и структурных правок ноль): optimizer→optimiser (15 мест в прозе; рукопись в остальном последовательно британская, 60 форм -ise, 0 -ize; `center`×22 — это \centering, ложное срабатывание); 24 числительных ≥10 в середине предложения → цифры по §6.1 (начальные Fifteen/Sixteen/Seventy-two оставлены прописью — так требует MDPI); 6 парных тире. Комментарии %% (провенанс, имена колонок CSV) не трогали.
+
+5) ДОКАЗАТЕЛЬСТВО ЦЕЛОСТНОСТИ. Ни одно число не потеряно и не изменено; ключи цитат 111, \label 50, \ref 93, 16 таблиц / 6 рисунков / 3 формулы / 48 bibitem — идентичны. Единственные добавления — 24 конверсии слово→цифра. verify_manuscript.py зелёный (758 ячеек, 336 значений, 1953 числа, 0 unclaimed).
+
+6) ССЫЛКИ ЧИСТЫЕ. 48/48, порядок = порядок упоминания, 0 цитат после пунктуации. 25 DOI сверены с Crossref чисто; 5 «флагов» оказались артефактами (диакритика LaTeX E{\'c}im-{\DJ}uri{\'c} и W\"achter, MathML в Crossref, online-first дата MDPI у xu2023agronomy, поздний DOI у тезиса vanhenten1994). Реальная одна: openmeteo2023 — Zenodo DOI резолвится в DataCite (Crossref даёт 404 — это НОРМА для Zenodo), но DataCite пишет год 2024, а запись 2023.
+
+7) ГРАБЛИ. assemble_paper_en.py имеет ЖЁСТКО ЗАШИТЫЙ путь вывода и перезаписывает own-article/paper/en/paper_en.tex независимо от рабочего каталога — для ревью копии собирать правкой копии paper_en.tex, а не ассемблером. Bash-инструмент съедает обратные слэши в heredoc и в python -c: скрипты с регексами писать файлами. sed -i портит windows-пути (\U — директива верхнего регистра).

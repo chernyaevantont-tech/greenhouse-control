@@ -146,9 +146,9 @@ def build_model(ctrl: str, pc, train_s, seed: int, fast: bool, draw: int = 0):
                  # N-7: the raw library, which the corrected ladder ranks first on both
                  # pre-registered open-loop metrics. See regen_config.EXT_RECIPES.
                  "sindy_mpc_raw": "raw_stlsq", "sindy_mpc_raw_ens": "raw_ens",
-                 # крайняя точка ряда по обусловленности (kappa 53.4)
+                 # the end of the conditioning series (kappa 53.4)
                  "sindy_mpc_phys": "phys_stlsq", "sindy_mpc_phys_ens": "phys_ens",
-                 # 17 признаков: physics минус t_in*uBoil -- проверка обходного пути
+                 # 17 features: physics minus t_in*uBoil -- the detour test
                  "sindy_mpc_notuboil": "notuboil_stlsq",
                  "sindy_mpc_notuboil_ens": "notuboil_ens"}
     if ctrl in recipe_of:
@@ -216,7 +216,7 @@ def rollout(ctrl: str, model, pc, year: int, seed: int, fast: bool,
                              max_solver_failures=_budget())
     if ctrl == "nn_mpc":
         return U.rollout_mpc_nn(model, cfg, n_days=N, start_date=start, horizon=h,
-                                objective_mode=_OBJECTIVE,   # N-3: те же веса, что у SINDy
+                                objective_mode=_OBJECTIVE,   # N-3: the weights SINDy uses
                                 max_solver_failures=_budget())
     if ctrl in ("ppo", "sac"):
         return U.rollout_rl(model, cfg, n_days=N, start_date=start, label=ctrl)
@@ -653,15 +653,15 @@ def main() -> int:
     pc = C.protocol(args.fast)
     if args.horizon is not None:                      # E-C, see --horizon
         pc = dataclasses.replace(pc, horizon=int(args.horizon))
-    if args.objective is not None:                    # N-3, см. --objective
+    if args.objective is not None:                    # N-3, see --objective
         global _OBJECTIVE
         _OBJECTIVE = str(args.objective)
-        _log(f"целевая функция УПМ: {_OBJECTIVE}")
-    if args.max_solver_failures is not None:          # диагностика, см. --max-solver-failures
+        _log(f"MPC objective: {_OBJECTIVE}")
+    if args.max_solver_failures is not None:          # diagnostic, see --max-solver-failures
         global _BUDGET_OVERRIDE
         _BUDGET_OVERRIDE = int(args.max_solver_failures)
-        _log(f"ВНИМАНИЕ: бюджет отказов решателя переопределён на {_BUDGET_OVERRIDE} "
-             f"(канон {C.MAX_SOLVER_FAILURES}); прогон диагностический, не для публикации")
+        _log(f"WARNING: solver-failure budget overridden to {_BUDGET_OVERRIDE} "
+             f"(canonical {C.MAX_SOLVER_FAILURES}); this run is diagnostic, not publishable")
     econ = P_read_econ()
     seeds = _seeds(args)
     C.write_manifest(out)

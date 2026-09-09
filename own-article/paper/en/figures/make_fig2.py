@@ -78,13 +78,15 @@ OFFSET = {
     # (regen/results/phys_lib/). They sit ~20 violation steps apart at +2.75 and
     # +2.48, so they are labelled on opposite sides to keep both readable.
     "sindy_mpc_phys_ens":     (8.0,   4.0, "left",  "bottom"),
-    "sindy_mpc_phys":         (-8.0, -4.0, "right", "top"),
+    # to the right of its marker: to the left it landed on the label of the
+    # re-identification variant one row below it
+    "sindy_mpc_phys":         (8.0,  -6.0, "left",  "top"),
     "ppo":                    (0.0,   7.0, "center", "bottom"),
     "sac":                    (0.0,  -7.0, "center", "top"),
     "nn_mpc":                 (0.0,  -7.0, "center", "top"),
     "oracle_mpc":             (7.0,  -1.0, "left",  "center"),
     "rule_based":             (-7.0,  0.0, "right", "center"),
-    "rule_based_tuned":       (9.0,  -7.0, "left",  "top"),
+    "rule_based_tuned":       (15.0, -9.0, "left",  "top"),
 }
 
 LABEL_BBOX = dict(facecolor="white", alpha=0.72, edgecolor="none",
@@ -215,7 +217,11 @@ def build():
     tab = assemble()
     caveat = dagger_truncation_caveat()
 
-    fig, ax = ps.new_figure(width=ps.W1, height=9.0)
+    # Drawn at MDPI double-column width: at single-column width the fifteen
+    # controller labels overlapped each other, and the float was scaled up to
+    # 0.85 of the text width anyway -- so the labels were designed at one size
+    # and printed at another.
+    fig, ax = ps.new_figure(width=ps.W2, height=11.0)
 
     # --- dispersion first, so markers sit on top ---------------------------
     for row in tab.itertuples():
@@ -266,15 +272,13 @@ def build():
                 f"letting it land on a default and silently overlap.")
         dx, dy, ha, va = OFFSET[row.method]
         txt = row.short
-        size = 6.0
+        size = 7
         if row.method == "sindy_mpc_lowthr":
-            txt = (f"dense, low thr.\n(one controller, two thresholds:\n"
-                   f"{abs(gap_epi):.4f} EUR m$^{{-2}}$ and "
-                   f"{abs(gap_viol):.0f} steps apart)")
+            # That this marker and `dense` are one controller under two thresholds, and
+            # how far apart they are, is a sentence: it belongs in the caption.
+            txt = "dense, low thr."
         elif row.method == "sindy_mpc_dense_dagger":
             txt = f"{row.short}$^{{\\dagger}}$"
-        elif row.method == "rule_based_tuned":
-            txt = f"{row.short}\ndominated by {row.dominated_by}"
         ax.annotate(txt, (row.viol, row.epi), textcoords="offset points",
                     xytext=(dx, dy), ha=ha, va=va, fontsize=size,
                     color="#222222", zorder=7, linespacing=1.15,
@@ -285,8 +289,8 @@ def build():
     hi_x = float(np.nanmax(tab["viol"] + tab["viol_sd"].fillna(0)))
     lo_y = float(np.nanmin(tab["epi"] - tab["epi_sd"].fillna(0)))
     hi_y = float(np.nanmax(tab["epi"] + tab["epi_sd"].fillna(0)))
-    ax.set_xlim(lo_x - 0.10 * (hi_x - lo_x), hi_x + 0.12 * (hi_x - lo_x))
-    ax.set_ylim(lo_y - 0.28 * (hi_y - lo_y), hi_y + 0.16 * (hi_y - lo_y))
+    ax.set_xlim(lo_x - 0.10 * (hi_x - lo_x), hi_x + 0.20 * (hi_x - lo_x))
+    ax.set_ylim(lo_y - 0.12 * (hi_y - lo_y), hi_y + 0.16 * (hi_y - lo_y))
 
     ax.set_xlabel(f"Mean violation steps per season "
                   f"(of {tab.attrs['steps_expected']})")
@@ -319,7 +323,7 @@ def build():
         f"{caveat['lead_all']:.0f} $\\rightarrow$ "
         f"{caveat['lead_completed']:.0f} steps if dropped"
     )
-    ps.annotate_n(ax, note, loc="lower right")
+    _ = note        # the replicate counts and the truncation caveat are captioned
 
     notes = {"caveat": caveat, "gap_epi": gap_epi, "gap_viol": gap_viol}
     fig.tight_layout()

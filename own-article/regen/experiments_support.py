@@ -18,12 +18,14 @@ dependency one-way at import time.
 """
 from __future__ import annotations
 
-# ВНИМАНИЕ (2026-08-13). Блоки ниже жёстко задавали objective="full" и потому МОЛЧА
-# игнорировали ключ --objective драйвера. Прогон E-E, запущенный с --objective priced,
-# на деле считался на зашитых весах: подтверждено эмпирически -- EPI при h=20 равен 3.86
-# против канонических 3.63 (разница в пределах выборки seed), тогда как блок mechanism,
-# идущий через rollout(), дал рост 3.68 -> 6.58. Теперь все блоки читают R._OBJECTIVE.
-# Следствие: результаты adapt/guard/faults/design в дереве получены на ЗАШИТЫХ весах.
+# WARNING (2026-08-13). The blocks below hard-coded objective="full" and therefore
+# SILENTLY ignored the driver's --objective flag. The E-E wave, launched with
+# --objective priced, was in fact scored on the hard-coded weights: confirmed
+# empirically -- EPI at h=20 is 3.86 against the canonical 3.63 (a difference within
+# seed sampling), while the mechanism block, which goes through rollout(), rose
+# 3.68 -> 6.58. Every block now reads R._OBJECTIVE.
+# Consequence: the adapt/guard/faults/design results in this tree were produced on the
+# HARD-CODED weights.
 
 import time
 from pathlib import Path
@@ -465,30 +467,30 @@ def _year_cfg(pc, year: int):
 
 
 def exp_holdout(args, seeds, pc, econ, out):
-    """B-3: тот же разомкнутый отбор, но метрика считается на ОТЛОЖЕННОМ годе.
+    """B-3: the same open-loop selection, with the metrics computed on a HELD-OUT year.
 
-    Ладдер учит на 2018+2019 и меряет устойчивость на тех же данных
-    (`exp_ladder` -> `_openloop_stability(b, train, ...)`), то есть ВНУТРИВЫБОРОЧНО.
-    Утечки тестовых сезонов при этом нет -- 2020-2023 в отборе не участвуют, -- но
-    заявлять "отбор по многошаговой устойчивости предсказывает замкнутый результат"
-    надёжнее, если порядок библиотек держится и на данных, которых модель не видела.
+    The ladder fits on 2018+2019 and measures stability on those same data
+    (`exp_ladder` -> `_openloop_stability(b, train, ...)`), i.e. IN-SAMPLE. No test season
+    leaks -- 2020-2023 take no part in selection -- but the claim "selection by multi-step
+    stability predicts the closed-loop outcome" is stronger if the ordering of the libraries
+    also holds on data the fit has not seen.
 
-    Здесь: подгонка на ОДНОМ обучающем году, метрики -- на ДРУГОМ, в обе стороны.
-    Всё разомкнуто, замкнутых прогонов нет, поэтому дёшево.
+    Here: fit on ONE training year, metrics on the OTHER, in both directions. Everything is
+    open loop, no closed-loop runs, so it is cheap.
     """
     import run_regen as R
 
     rows, path = [], out / f"holdout_{args.tag}.csv"
     scen = pc.train_scenarios()
     if len(scen) < 2:
-        R._log("нужно >=2 обучающих года")
+        R._log("at least two training years are required")
         return 1
     horizons = C.LADDER_ROLLOUT_HORIZONS_STEPS
     variants = C.LADDER_VARIANTS
     opts = ("stlsq", "ensemble")
 
     for s in seeds:
-        # по одному набору данных на обучающий год
+        # one identification dataset per training year
         data = {}
         for sc in scen:
             cfg = pc.cfg_for(sc, seed=s)
@@ -527,29 +529,30 @@ def exp_holdout(args, seeds, pc, econ, out):
     return 0
 
 
-# N-2 (регистр дефектов, G-4). Эталон на правилах назван в статье «настроенным», и на этом
-# держится весь довод о честности сравнения, — но артефакта настройки нет: уставки зашиты в
-# make_rule_based_controller, тогда как обучаемым регуляторам дан явный бюджет 16 попыток.
-# После N-7 это стало важнее: заголовок работы — «сырой набор обходит всех», а обойти
-# НЕнастроенный эталон куда слабее, чем настроенный.
+# N-2 (defect register, G-4). The paper calls the rule-based reference "tuned", and the
+# whole fairness-of-comparison argument rests on that -- but no tuning artifact exists:
+# the setpoints are hard-coded in make_rule_based_controller, while the learning
+# controllers were given an explicit 16-trial budget. N-7 made this matter more: the
+# headline is that the raw library beats every comparator, and beating an UNtuned
+# reference is a far weaker claim than beating a tuned one.
 #
-# Перебираются экономически значимые уставки; диапазоны агрономически осмысленные, центр —
-# текущее зашитое значение.
+# The search covers the economically significant setpoints; the ranges are agronomically
+# sensible and centred on the value currently hard-coded.
 RB_TUNE_SPACE = {
-    "temp_setpoint_day":   (17.0, 23.0),   # сейчас 19.5
-    "temp_setpoint_night": (14.0, 20.0),   # сейчас 16.5
-    "co2_day":             (400.0, 1200.0),  # сейчас 800
-    "lamp_rad_sum_limit":  (5.0, 25.0),    # сейчас 10
+    "temp_setpoint_day":   (17.0, 23.0),     # hard-coded value: 19.5
+    "temp_setpoint_night": (14.0, 20.0),     # hard-coded value: 16.5
+    "co2_day":             (400.0, 1200.0),  # hard-coded value: 800
+    "lamp_rad_sum_limit":  (5.0, 25.0),      # hard-coded value: 10
 }
-RB_TUNE_TRIALS = 16                        # ровно бюджет RL-регуляторов
+RB_TUNE_TRIALS = 16                          # exactly the RL controllers' budget
 
 
 def exp_tune_rb(args, seeds, pc, econ, out):
-    """N-2: перебор уставок эвристики на ОБУЧАЮЩИХ годах, затем прогон лучшей на тестовых.
+    """N-2: search the heuristic's setpoints on the TRAINING years, best one on the test years.
 
-    Отбор идёт только по 2018-2019, тестовые сезоны 2020-2023 в нём не участвуют, поэтому
-    сравнение остаётся честным. Эвристика детерминирована, так что seed влияет лишь на
-    выбор пробных точек: один прогон на конфигурацию.
+    Selection uses 2018-2019 only; the 2020-2023 test seasons take no part in it, so the
+    comparison stays honest. The heuristic is deterministic, so the seed only decides which
+    trial points are drawn: one run per configuration.
     """
     import run_regen as R
 
@@ -557,7 +560,7 @@ def exp_tune_rb(args, seeds, pc, econ, out):
     rng = np.random.default_rng(20260810)
     trials = [dict(zip(RB_TUNE_SPACE, vals)) for vals in
               zip(*[rng.uniform(lo, hi, RB_TUNE_TRIALS) for lo, hi in RB_TUNE_SPACE.values()])]
-    trials.insert(0, {})                    # нулевая попытка = текущие зашитые уставки
+    trials.insert(0, {})                    # trial zero = the current hard-coded setpoints
 
     def score_on(years, params, tag):
         vals = []
@@ -582,14 +585,14 @@ def exp_tune_rb(args, seeds, pc, econ, out):
         try:
             epi = score_on(train_years, params, f"tune_trial{i}")
         except Exception as exc:                                   # noqa: BLE001
-            R._log(f"попытка {i} FAILED {type(exc).__name__}: {str(exc)[:100]}")
+            R._log(f"trial {i} FAILED {type(exc).__name__}: {str(exc)[:100]}")
             continue
-        R._log(f"попытка {i:2d} обуч.EPI={epi:+.3f} {params}")
+        R._log(f"trial {i:2d} train EPI={epi:+.3f} {params}")
         if epi > best_epi:
             best, best_epi = params, epi
-    R._log(f"ЛУЧШАЯ на обучающих: EPI={best_epi:+.3f} {best}")
+    R._log(f"BEST on the training years: EPI={best_epi:+.3f} {best}")
 
-    # и только теперь — тестовые сезоны, лучшей конфигурацией и исходной, для сравнения
+    # and only now the test seasons, with the best configuration and with the stock one
     score_on(list(C.TEST_YEARS), best or {}, "tuned_test")
     score_on(list(C.TEST_YEARS), {}, "stock_test")
     R._write(rows, path)

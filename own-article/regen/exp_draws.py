@@ -40,8 +40,6 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-import numpy as np
-
 import regen_config as C
 
 
@@ -102,7 +100,7 @@ def exp_draws(args, seeds, pc, econ, out: Path) -> int:
     return 0
 
 
-def summarise(d) -> "object":
+def summarise(d) -> object:
     """Variance decomposition + how often each method would top the field on one run.
 
     Called by make_tables; kept here so the reasoning sits next to the experiment.

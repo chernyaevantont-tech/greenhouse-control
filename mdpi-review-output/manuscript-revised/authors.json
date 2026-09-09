@@ -1,0 +1,121 @@
+{
+  "_README": [
+    "Filled in 2026-08-28 from the list supplied by the corresponding author;",
+    "e-mails and ORCID iDs added 2026-08-31 as supplied.",
+    "Corresponding author: I.I.N. (Naumov), set 2026-09-02 at the authors' request.",
+    "",
+    "Names, positions, affiliations, e-mails and iDs are as given. The English",
+    "forms of the names and of the unit names are transliterations/translations",
+    "and MUST BE CONFIRMED by each author -- a misspelt name is what gets indexed.",
+    "",
+    "No ORCID iD was supplied for M.S.K. (Kilina), M.S.Kh. (Kharina) and M.N.K.",
+    "(Kulinich); their fields are empty and nothing is printed for them. MDPI",
+    "requires an iD for the corresponding author only, and A.T.C. has one, so this",
+    "does not block submission -- MDPI does display an iD for anyone who has one,",
+    "so add them here if they exist.",
+    "",
+    "STILL PENDING, printed as [[...]] markers until supplied:",
+    "  - the DOI of the archived replication tree (data_location).",
+    "  - the DOI of the archived replication tree (data_location).",
+    "author_contributions below is a PROPOSAL derived from the stated positions;",
+    "every author has to confirm the roles attributed to them before submission.",
+    "",
+    "authorship.py refuses this file if a name, initials or affiliation is missing;",
+    "empty strings in the pending fields are allowed and stay visible.",
+    "CRediT role names keep the em dash (writing---original draft preparation): that is the wording the official Agronomy template prescribes. Everywhere else the manuscript uses a spaced en dash."
+  ],
+  "affiliations": [
+    "World-Class Research Centre \"Agroengineering of the Future\", Don State Technical University, 1 Gagarin Square, 344003 Rostov-on-Don, Russia",
+    "Department of Hydraulics, Hydropneumatic Automation and Thermal Processes, Don State Technical University, 1 Gagarin Square, 344003 Rostov-on-Don, Russia",
+    "Department of Cybersecurity of Information Systems, Don State Technical University, 1 Gagarin Square, 344003 Rostov-on-Don, Russia",
+    "Research Administration Office, Don State Technical University, 1 Gagarin Square, 344003 Rostov-on-Don, Russia"
+  ],
+  "authors": [
+    {
+      "name": "Ivan I. Naumov",
+      "initials": "I.I.N.",
+      "position": "Head of the World-Class Research Centre \"Agroengineering of the Future\"",
+      "orcid": "0000-0002-8582-3203",
+      "email": "inaumov@donstu.ru",
+      "affiliation": 1,
+      "corresponding": true
+    },
+    {
+      "name": "Maksim V. Lyashov",
+      "initials": "M.V.L.",
+      "position": "Software engineer, World-Class Research Centre \"Agroengineering of the Future\"",
+      "orcid": "0009-0004-9754-3390",
+      "email": "mlyashov@donstu.ru",
+      "affiliation": 1,
+      "corresponding": false
+    },
+    {
+      "name": "Anton T. Chernyaev",
+      "initials": "A.T.C.",
+      "position": "Software engineer, World-Class Research Centre \"Agroengineering of the Future\"",
+      "orcid": "0009-0001-6836-6522",
+      "email": "atchernyaev@donstu.ru",
+      "affiliation": 1,
+      "corresponding": false
+    },
+    {
+      "name": "Mariya S. Kilina",
+      "initials": "M.S.K.",
+      "position": "Associate Professor, Department of Hydraulics, Hydropneumatic Automation and Thermal Processes",
+      "orcid": "",
+      "email": "Mkilina@donstu.ru",
+      "affiliation": 2,
+      "corresponding": false
+    },
+    {
+      "name": "Marina M. Zhdanova",
+      "initials": "M.M.Z.",
+      "position": "Senior Lecturer, Department of Cybersecurity of Information Systems",
+      "orcid": "0000-0003-1119-5221",
+      "email": "mpismenskova@donstu.ru",
+      "affiliation": 3,
+      "corresponding": false
+    },
+    {
+      "name": "Elena O. Chernyaeva",
+      "initials": "E.O.C.",
+      "position": "Technician, World-Class Research Centre \"Agroengineering of the Future\"",
+      "orcid": "0009-0003-3829-3486",
+      "email": "echernyaeva@donstu.ru",
+      "affiliation": 1,
+      "corresponding": false
+    },
+    {
+      "name": "Marina S. Kharina",
+      "initials": "M.S.Kh.",
+      "position": "Software engineer, World-Class Research Centre \"Agroengineering of the Future\"",
+      "orcid": "",
+      "email": "mharina@donstu.ru",
+      "affiliation": 1,
+      "corresponding": false
+    },
+    {
+      "name": "Angelina E. Merzlikina",
+      "initials": "A.E.M.",
+      "position": "Engineer, World-Class Research Centre \"Agroengineering of the Future\"",
+      "orcid": "0009-0000-5051-346X",
+      "email": "aelevchenko@donstu.ru",
+      "affiliation": 1,
+      "corresponding": false
+    },
+    {
+      "name": "Mariya N. Kulinich",
+      "initials": "M.N.K.",
+      "position": "Engineer, Research Administration Office",
+      "orcid": "",
+      "email": "mkulinich@donstu.ru",
+      "affiliation": 4,
+      "corresponding": false
+    }
+  ],
+  "author_contributions": "Conceptualization, I.I.N. and M.S.K.; methodology, M.S.K., M.V.L. and A.T.C.; software, A.T.C., M.V.L., M.M.Z. and M.S.Kh.; validation, M.V.L., M.S.K. and M.M.Z.; formal analysis, A.T.C. and M.S.K.; investigation, A.T.C., E.O.C., A.E.M. and M.S.Kh.; resources, I.I.N., A.E.M. and M.N.K.; data curation, E.O.C., M.M.Z. and A.T.C.; writing---original draft preparation, A.T.C.; writing---review and editing, I.I.N., M.S.K., M.V.L. and M.M.Z.; visualization, A.T.C. and M.S.Kh.; supervision, I.I.N. and M.S.K.; project administration, I.I.N. and M.N.K.; funding acquisition, I.I.N. and M.N.K. All authors have read and agreed to the published version of the manuscript.",
+  "funding": "This research was funded by the Ministry of Science and Higher Education of the Russian Federation under the Agreement on the provision of a grant from the federal budget in the form of a subsidy for state support of the development programmes of world-class research centres performing research in priority areas of scientific and technological development, agreement no. 075-15-2025-592 of 24 June 2025.",
+  "acknowledgments": "Not applicable.",
+  "conflicts_of_interest": "The authors declare no conflicts of interest.",
+  "data_location": ""
+}

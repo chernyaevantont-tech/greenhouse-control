@@ -154,7 +154,7 @@ def panel_a(ax, lad: pd.DataFrame) -> dict:
     ax.set_yscale("log")
     ax.set_xlabel(r"one-step RMSE of $T_{\mathrm{in}}$ ($^\circ$C)")
     ax.set_ylabel(r"24-h rollout RMSE ($^\circ$C, log)")
-    ax.set_title("prediction criteria disagree", fontsize=8, pad=4)
+    ax.set_title("one-step against multi-step error", fontsize=8, pad=4)
 
     from matplotlib.lines import Line2D
     grey = ps.OKABE_ITO["grey"]
@@ -165,14 +165,14 @@ def panel_a(ax, lad: pd.DataFrame) -> dict:
         Line2D([], [], marker="o", ls="", mfc=grey, mec=grey, ms=4, label="STLSQ"),
         Line2D([], [], marker="s", ls="", mfc=grey, mec=grey, ms=4, label="ensemble"),
         Line2D([], [], marker="o", ls="", mfc="none", mec=grey, ms=4,
-               label=f"open: fails the 0.05 gate ({n_fail}/{len(lad)})"),
+               label="open: fails the divergence gate"),
     ]
-    ax.legend(handles=handles, loc="lower left", ncol=1, fontsize=6.4,
+    ax.legend(handles=handles, loc="lower left", ncol=1, fontsize=7,
               handletextpad=0.4, borderaxespad=0.2, labelspacing=0.22)
 
     ax.set_ylim(top=60.0)
-    ps.annotate_n(ax, "degree 1, undenoised, sparse estimators\n"
-                      "$n=40$ fits per library", loc="upper right")
+    # The fit set and its size are stated in the caption: they are the same for panels
+    # (a) and (b), and repeating them inside the axes cost three lines of 6.4 pt type.
     return {"crosses": crosses, "n_rows": int(len(lad)), "n_gate_fail": n_fail}
 
 
@@ -209,14 +209,14 @@ def panel_b(ax, lad: pd.DataFrame) -> dict:
         p2.set_gid(f"b:pt_rollout:{lib}")
         ax.annotate(rf"$\kappa={k[i]:.1f}$", xy=(k[i], os_mean[i]),
                     xytext=(0, -11), textcoords="offset points",
-                    ha="center", va="top", fontsize=6.5, color=dark)
+                    ha="center", va="top", fontsize=7, color=dark)
 
     ax.set_xscale("log")
     ax2.set_yscale("log")
     ax.set_xlabel(r"condition number $\kappa$ of the feature matrix (log)")
     ax.set_ylabel(r"one-step RMSE ($^\circ$C), mean $\pm$ SD")
     ax2.set_ylabel(r"median 24-h rollout RMSE ($^\circ$C, log)")
-    ax.set_title(r"$\kappa$ orders the OPEN loop", fontsize=8, pad=4)
+    ax.set_title(r"prediction error against $\kappa$", fontsize=8, pad=4)
     ax.set_xticks([8, 16, 32, 64])
     import matplotlib.ticker as mticker
     ax.get_xaxis().set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:g}"))
@@ -269,15 +269,20 @@ def panel_c(ax, m: pd.DataFrame) -> dict:
                         fmt="o", ms=7.0, mfc=c, mec=dark, mew=0.7, color=dark,
                         elinewidth=0.8, capsize=2.0, zorder=6)
         e.lines[0].set_gid(f"c:ens:{r.library}")
-        off = {"raw": (10, 8, "left", "bottom"),
-               "physics_no_cross": (12, 10, "left", "bottom"),
-               "physics": (11, -6, "left", "top"),
-               "physics_no_tuboil": (11, 8, "left", "bottom")}[r.library]
+        # Placement is display-only, but it is not free: the up-right slot put
+        # `physics_no_cross` on the deletion-probe marker and `physics_no_tuboil`
+        # on the raw error bar.  Both now open away from the other four points.
+        off = {"raw": (-8, 3, "right", "bottom"),
+               "physics_no_cross": (-14, -8, "left", "top"),
+               "physics": (11, 8, "left", "bottom"),
+               "physics_no_tuboil": (8, -8, "left", "top")}[r.library]
         ax.annotate(f"{ps.LIB_LABEL[r.library]}\n"
-                    rf"$\kappa={r.kappa:.1f}$,  EPI ${r.epi:+.2f}$",
+                    rf"$\kappa={r.kappa:.1f}$",
                     xy=(r.survival, r.epi), xytext=off[:2],
                     textcoords="offset points", ha=off[2], va=off[3],
-                    fontsize=6.6, color=dark, linespacing=1.3)
+                    fontsize=7, color=dark, linespacing=1.3, zorder=8,
+                    bbox=dict(facecolor="white", alpha=0.82, edgecolor="none",
+                              boxstyle="square,pad=0.15"))
         out["matched"].append({"library": r.library, "method": r.method,
                                "n_runs": r.n_runs, "n_seeds": r.n_seeds,
                                "survival": r.survival, "survival_k": r.survival_k,
@@ -297,10 +302,12 @@ def panel_c(ax, m: pd.DataFrame) -> dict:
 
     ax.axhline(0.0, color="#888888", lw=0.6, zorder=1)
     ax.set_xlim(0.02, 0.99)
-    ax.set_ylim(-1.6, 8.6)
+    # The band above the cloud held the note that is now in the caption; what is left
+    # is room for the four labels and the legend.
+    ax.set_ylim(-2.4, 6.6)
     ax.set_xlabel("boiler term kept, fraction of 20 seeds")
     ax.set_ylabel(r"four-season mean EPI (EUR m$^{-2}$)")
-    ax.set_title("survival orders the CLOSED loop", fontsize=8, pad=4)
+    ax.set_title("margin against boiler-term survival", fontsize=8, pad=4)
 
     from matplotlib.lines import Line2D
     ax.legend(handles=[
@@ -310,14 +317,11 @@ def panel_c(ax, m: pd.DataFrame) -> dict:
                ms=4.6, label="STLSQ, $\\lambda=0.05$ (3 of 4)"),
         Line2D([], [], ls="--", lw=0.9, color=ps.OKABE_ITO["grey"],
                label=r"path in order of rising $\kappa$"),
-    ], loc="lower right", fontsize=6.4, handletextpad=0.5, labelspacing=0.28,
+    ], loc="lower right", fontsize=7, handletextpad=0.5, labelspacing=0.28,
         borderaxespad=0.3)
 
-    ps.annotate_n(ax, "vertical bar: seed-level SE;  horizontal: Wilson 95 %\n"
-                      "the nested three differ in nothing but the library; the\n"
-                      "fourth drops one bilinear term from physics.  Survival\n"
-                      "does not rank controllers that differ in more than that.",
-                  loc="upper left")
+    # Same words, reflowed to three lines: the fourth line reached down into
+    # the raw library's label.
     return out
 
 
@@ -345,7 +349,7 @@ def panel_d(ax, coef: pd.DataFrame, struct: pd.DataFrame) -> dict:
         h = ax.hlines(med, i - 0.28, i + 0.28, color=c, lw=2.2, zorder=5)
         h.set_gid(f"d:median:{lib}")
         ax.annotate(f"kept {len(alive)}/{len(v)}\ncut {len(v) - len(alive)}/{len(v)}",
-                    xy=(i, 0.40), ha="center", va="bottom", fontsize=6.8,
+                    xy=(i, 0.40), ha="center", va="bottom", fontsize=7,
                     color=c, linespacing=1.3)
         out["libraries"].append({
             "library": lib, "n_seeds": int(len(v)),
@@ -365,20 +369,15 @@ def panel_d(ax, coef: pd.DataFrame, struct: pd.DataFrame) -> dict:
     ax.set_xticks(range(3))
     ax.set_xticklabels([f"{ps.LIB_LABEL[l]}\n{int(st.loc[l, 'n_features'])} terms"
                         f"{'  +' + ps.CROSS_TERM if st.loc[l, 'has_cross'] else ''}"
-                        for l in ps.LIB_ORDER], fontsize=6.6)
+                        for l in ps.LIB_ORDER], fontsize=7)
     import matplotlib.ticker as mticker
     ax.set_yticks([0.0, THRESHOLD, 0.1, 0.2, 0.4])
     ax.get_yaxis().set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:g}"))
     ax.set_ylabel(r"$|\xi_{u\mathrm{Boil}}|$ identified (symlog)")
-    ax.set_title("the cut is decided near the threshold", fontsize=8, pad=4)
+    ax.set_title("identified coefficient against the cut", fontsize=8, pad=4)
     ax.annotate(rf"threshold $\lambda={THRESHOLD}$", xy=(-0.50, THRESHOLD),
                 xytext=(0, -4), textcoords="offset points", ha="left",
-                va="top", fontsize=6.6, color=dark)
-    ax.text(0.5, 0.145, "one fit per seed; heavy tick = median of survivors.\n"
-                        "A cut coefficient is written as exactly 0, so its\n"
-                        "pre-threshold size is not recoverable from these files.",
-            transform=ax.transAxes, ha="center", va="center", fontsize=6.4,
-            color="#555555", linespacing=1.35)
+                va="top", fontsize=7, color=dark)
     return out
 
 

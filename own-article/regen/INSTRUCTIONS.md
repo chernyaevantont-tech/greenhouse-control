@@ -1,154 +1,130 @@
-# Добивка регена на домашней машине (Ryzen 9 9950X, 64 ГБ)
+# Recomputing the draw-axis waves (`adapt`, `guard`)
 
-Что осталось посчитать после кластерного прогона: волны **`adapt` (E4)** и **`guard` (E5)**
-с осью бутстрэп-розыгрышей. Всё остальное уже посчитано и лежит в
-`own-article/regen/results_pull/raw/`.
+Most waves in `results/` are deterministic given a seed: `faults`, `design`, the λ sweep and
+the cross block all fit with `stlsq`, which has no bootstrap draw. The two that are not are
+**`adapt` (E4)** and **`guard` (E5)**: both use the `confirmatory` recipe, which is an
+ensemble fit, so every number they produce depends on which bootstrap realisation was drawn.
 
-**Зачем.** Обе волны используют ансамблевый рецепт (`confirmatory`), то есть их числа
-зависят от розыгрыша бутстрэпа. На кластере они гонялись с одним розыгрышем на повтор — а
-эксперимент `draws` показал, что одна реализация промахивается: по conf_dagger она дала
-−0,12 вместо +0,69, то есть ошиблась на +0,81 евро/м² и переставила метод с четвёртого места
-на первое. Пока adapt и guard посчитаны по одной реализации, их числа в статью ставить
-нельзя.
+That axis is not a nicety. The `draws` experiment measured it: on `sindy_mpc_conf_dagger` a
+single realisation gave −0.12 EUR m⁻² where the mean over draws is +0.69 — an error of
++0.81 that moved the method from fourth place to first. Reporting one draw per seed as a
+point estimate is exactly the defect the `draws` wave exists to expose, so these two waves
+are run with `--draws 10`.
 
-Волны `faults`, `design`, λ-развёртка и cross-блок работают на `stlsq` — они детерминированы,
-оси розыгрыша у них нет, перепрогонять не нужно.
+This file is the runbook for reproducing them. The shipped `results/final/adapt.csv` and
+`guard.csv` (1800 rows each) were produced this way, on a 16-core desktop, in about five
+hours.
 
 ---
 
-## 0. Что нужно один раз
+## 0. Environment
 
-Python-окружение с точным стеком (`numpy 1.26.4`, `pysindy 2.1.0`, `casadi`, `do-mpc`,
-`gl_gym 0.3.1`, `torch`). На рабочем ноутбуке это
-`C:/Users/zergu/repos/greenlight/sindylom/.venv`. На домашней машине — либо перенести его,
-либо создать по `own-article/cluster/requirements-cluster.txt`.
-
-Порядок установки важен: `gl_gym` требует `numpy<2.0`, а колесо `pysindy 2.1.0` объявляет
-`numpy>=2.0` (работает и на 1.26.4). Одной командой `pip install -r` резолвер падает.
+The pinned stack is `numpy 1.26.4`, `pysindy 2.1.0`, `casadi`, `do-mpc`, `gl_gym 0.3.1`,
+`torch`. Install order matters: `gl_gym` requires `numpy<2.0` while the `pysindy 2.1.0`
+wheel declares `numpy>=2.0` (it works on 1.26.4), so a single `pip install -r` cannot be
+resolved.
 
 ```bash
 uv venv --python 3.11 .venv-regen
 ```
 
 ```bash
-uv pip install --python .venv-regen -r own-article/cluster/requirements-cluster.txt --no-deps pysindy==2.1.0
+uv pip install --python .venv-regen -r requirements-cluster.txt --no-deps pysindy==2.1.0
 ```
 
-Если проще — соберите так же, как собран рабочий venv, и просто подставьте путь к нему в
-переменную `PY` ниже.
+`requirements-cluster.txt` lives in `own-article/cluster/` in the project repository; it is
+not part of this package.
 
 ---
 
-## 1. Проверка воспроизводимости (обязательно, ~2 минуты)
+## 1. Determinism check (required, ~2 minutes)
 
 ```bash
-cd own-article/regen && python repro.py --selftest
+python repro.py --selftest
 ```
 
-Должно закончиться строкой `fully reproducible` и семью `[PASS]`. Если хоть один `[FAIL]` —
-дальше не идти: окружение недетерминированное, и числа будут негодные. Запишите `env_hash`
-из вывода, он попадёт в провенанс.
+It must end with `fully reproducible` and seven `[PASS]` lines. A single `[FAIL]` means the
+environment is non-deterministic and the numbers it produces are not usable — stop there.
+Record the `env_hash` it prints: it belongs in the provenance of anything computed
+afterwards.
 
 ---
 
-## 2. Смок (~10 минут)
+## 2. Smoke (~10 minutes)
 
 ```bash
-cd own-article/regen && python run_regen.py --experiment adapt --seeds 0 --draws 2 --fast --tag smoke --out ./results/smoke && python run_regen.py --experiment guard --seeds 0 --draws 2 --fast --tag smoke --out ./results/smoke
+python run_regen.py --experiment adapt --seeds 0 --draws 2 --fast --tag smoke --out ./results/smoke && python run_regen.py --experiment guard --seeds 0 --draws 2 --fast --tag smoke --out ./results/smoke
 ```
 
-В логе должны быть строки вида `seed 0 draw 0 …` и `seed 0 draw 1 …` — если колонки `draw`
-нет или розыгрыш только один, цикл не работает и боевой запуск бессмысленен.
+The log must contain both `seed 0 draw 0 …` and `seed 0 draw 1 …`. If there is no `draw`
+column, or only one draw appears, the loop is not running and the full wave would silently
+reproduce the single-realisation defect.
 
 ---
 
-## 3. Боевой запуск (на ночь, ~5–7 часов)
+## 3. Full run (~5–7 hours)
 
-Шардинг по повторам, 16 процессов по числу физических ядер. Каждый прогон однопоточный
-(`OMP_NUM_THREADS=1` выставляется внутри), поэтому параллелизм = число процессов.
+Sharded over the seeds, one process per physical core. Each process is single-threaded
+(`OMP_NUM_THREADS=1` is set internally), so parallelism is the process count.
 
-**Волна `adapt`** — самая дорогая, там EKF:
-
-```bash
-cd own-article/regen && for i in $(seq 0 15); do python run_regen.py --experiment adapt --draws 10 --shard-index $i --num-shards 16 --tag "a$i" --out ./results/raw > ./results/log_a$i.txt 2>&1 & done; wait
-```
-
-**Волна `guard`**, после того как первая закончится:
+`adapt` first — it is the more expensive of the two, because of the EKF:
 
 ```bash
-cd own-article/regen && for i in $(seq 0 15); do python run_regen.py --experiment guard --draws 10 --shard-index $i --num-shards 16 --tag "g$i" --out ./results/raw > ./results/log_g$i.txt 2>&1 & done; wait
+for i in $(seq 0 15); do python run_regen.py --experiment adapt --draws 10 --shard-index $i --num-shards 16 --tag "a$i" --out ./results/raw > ./results/log_a$i.txt 2>&1 & done; wait
 ```
 
-Если хотите одной командой на всю ночь — запустите их последовательно через `&&`, вторая
-стартует сама.
+then `guard`:
 
-### Сколько это займёт
+```bash
+for i in $(seq 0 15); do python run_regen.py --experiment guard --draws 10 --shard-index $i --num-shards 16 --tag "g$i" --out ./results/raw > ./results/log_g$i.txt 2>&1 & done; wait
+```
 
-| волна | объём | CPU-часов | по стене на 16 ядрах |
+Chain them with `&&` to leave both running unattended.
+
+| wave | grid | CPU-hours | wall clock on 16 cores |
 |---|---|---|---|
-| `adapt` | 20 повторов × 10 розыгрышей × 3 сезона × 3 режима | ~50 | ~3,5 ч |
-| `guard` | 20 повторов × 10 розыгрышей × 3 сезона × 2 режима | ~25 | ~1,7 ч |
-| **итого** | | **~75** | **~5 ч**, с хвостом 6–7 |
+| `adapt` | 20 seeds × 10 draws × 3 seasons × 3 modes | ~50 | ~3.5 h |
+| `guard` | 20 seeds × 10 draws × 3 seasons × 2 modes | ~25 | ~1.7 h |
+| **total** | | **~75** | **~5 h**, 6–7 with the tail |
 
-Память: 16 процессов × 1,5–2 ГБ ≈ 32 ГБ, при 64 ГБ идёт свободно. SMT на 28–32 процесса
-сократит до ~4 ч, но EKF местами прожорлив — выигрыш небольшой, риск своп. Берите 16.
+Memory: 16 processes × 1.5–2 GB ≈ 32 GB. SMT at 28–32 processes cuts it to about 4 hours,
+but the EKF is memory-hungry in places, so the gain is small and the swap risk is not worth
+it. Sixteen is the right number.
 
 ---
 
-## 4. Сборка результатов (~2 минуты)
+## 4. Merge and verify (~2 minutes)
 
 ```bash
-cd own-article/regen && python run_regen.py --merge --out ./results/raw && python make_tables.py --out ./results/raw && python verify_regen.py --out ./results/raw
+python run_regen.py --merge --out ./results/raw && python make_tables.py --out ./results/raw && python verify_regen.py --out ./results/raw
 ```
 
-`verify_regen.py` вернёт ненулевой код при блокирующих отказах — это нормально и ожидаемо:
-сейчас блокирует 20 прогонов идеализированного регулятора за сезон 2022, где выборочный
-оптимизатор упёрся в лимит отказов решателя. Решено оставить как есть и оговорить в тексте.
-Смотреть надо на **остальные** гейты и на `NUMBERS.md`.
+`verify_regen.py` exits non-zero on blocking failures. On the shipped tree that is expected
+and explained: the two blocking failures are `oracle_mpc` solver aborts, discussed under
+"Acceptance gates" in `README.md`. What matters is that the *other* gates pass and that
+`NUMBERS.md` regenerates.
 
-Результат: `results/raw/tables/*.csv` и `results/raw/NUMBERS.md` — карта «утверждение →
-значение → файл».
+The deliverables are `results/raw/tables/*.csv` and `results/raw/NUMBERS.md`, the
+claim → value → source-file map.
 
 ---
 
-## 5. Что прислать
+## Troubleshooting
 
-Достаточно двух файлов:
+**`ModuleNotFoundError: gl_gym`** — wrong interpreter. Check that
+`python -c "import gl_gym; print(gl_gym.__version__)"` prints `0.3.1`.
 
-```
-own-article/regen/results/raw/adapt.csv
-own-article/regen/results/raw/guard.csv
-```
+**`load_recipe … refusing to run (D1)`** — the safety catch fired: a recipe reached
+`fit_sindy` without an explicit threshold. `regen_config.py` has been modified or is
+damaged; restore it from the repository.
 
-Или просто закоммитить `results/raw/` целиком.
+**`config_hash` mismatch** — `verify_regen.py` fails the run at `G0`. That is the guard
+against mixing results computed under different configurations: `regen_config.py` changed
+between the two runs being merged.
 
----
+**Out of memory** — reduce the shard count to 8–12. Wall clock grows proportionally and the
+results do not change; sharding only splits the seeds.
 
-## Если что-то пошло не так
-
-**`ModuleNotFoundError: gl_gym`** — не тот интерпретатор. Проверьте, что запускаете из
-активированного окружения, и что `python -c "import gl_gym; print(gl_gym.__version__)"`
-даёт `0.3.1`.
-
-**`load_recipe … refusing to run (D1)`** — сработал предохранитель: рецепт без явного порога.
-Значит `regen_config.py` подменён или повреждён; возьмите версию из репозитория.
-
-**Расходятся `config_hash`** — `verify_regen.py` уронит прогон с `G0`. Это защита от
-смешивания результатов разных конфигураций. Значит `regen_config.py` изменился между
-кластерным прогоном и домашним: сверьте файл с коммитом.
-
-**Процессы съели память** — уменьшите число шардов до 8–12, время вырастет пропорционально,
-результат не изменится (шардинг только делит повторы).
-
-**Прогон прервался** — партишны пишутся инкрементально после каждой строки, так что
-доделывать нужно только упавшие шарды: запустите те же команды с теми же `--shard-index`,
-файлы перезапишутся.
-
----
-
-## Что будет дальше
-
-По этим двум файлам закроются последние два раздела статьи (§4.7 адаптация и страж) с
-интервалами, учитывающими обе оси дисперсии. После этого весь набор результатов
-зафиксирован, и можно писать текст по структуре из
-[`../paper/positioning_v2.md`](../paper/positioning_v2.md).
+**Interrupted run** — partitions are written incrementally after every row, so only the
+failed shards need repeating: re-run them with the same `--shard-index` and the files are
+rewritten.

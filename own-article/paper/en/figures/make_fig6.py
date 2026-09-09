@@ -166,7 +166,7 @@ def draw_reversal(ax, fits, per_config, per_library) -> None:
     mid_y = np.sqrt(a.rollout_median * b.rollout_median)   # log-scale midpoint
     ax.text(mid_x + 0.035, mid_y * 0.62,
             "richer physics library:\nbetter one step, worse rollout",
-            fontsize=6.6, color="#333333", ha="center", va="center",
+            fontsize=7, color="#333333", ha="center", va="center",
             linespacing=1.25)
 
     # -- divergence rate per library.  kappa is deliberately NOT annotated here
@@ -176,7 +176,9 @@ def draw_reversal(ax, fits, per_config, per_library) -> None:
     #    (dx, y-factor, ha).  ``raw`` sits at the right-hand edge with the arrow
     #    caption immediately left of it, so its label is anchored right-and-below
     #    rather than left-and-above like the other two.
-    offsets = {"raw": (0.028, 0.86, "right"),
+    # `raw` sits low and right; its label goes ABOVE the marker now that the legend
+    # occupies the lower-left corner.
+    offsets = {"raw": (0.028, 1.30, "right"),
                "physics_no_cross": (0.014, 1.42, "left"),
                "physics": (0.014, 1.34, "left")}
     for lib in ps.LIB_ORDER:
@@ -185,7 +187,7 @@ def draw_reversal(ax, fits, per_config, per_library) -> None:
         ax.text(r.one_step + (dx if ha == "left" else -dx),
                 r.rollout_median * fy,
                 f"diverged {r.diverged:.3f}",
-                fontsize=6.4, color=ps.LIB_COLOR[lib], ha=ha,
+                fontsize=7, color=ps.LIB_COLOR[lib], ha=ha,
                 va="bottom" if fy >= 1.0 else "top", linespacing=1.2)
 
     # Estimator-marker entries are dropped here: at graphical-abstract size the
@@ -196,8 +198,10 @@ def draw_reversal(ax, fits, per_config, per_library) -> None:
                       markeredgecolor="white", markeredgewidth=0.5,
                       label=ps.LIB_LABEL[l], markersize=4.5)
                for l in ps.LIB_ORDER]
-    ax.legend(handles=handles, loc="upper right", ncol=1, handletextpad=0.4,
-              borderpad=0.25, labelspacing=0.26, fontsize=6.2,
+    # Lower right is the only empty quadrant: the three clouds run from upper left
+    # to lower right, and an upper-right legend lands on the physics markers.
+    ax.legend(handles=handles, loc="lower left", ncol=1, handletextpad=0.4,
+              borderpad=0.25, labelspacing=0.26, fontsize=7,
               framealpha=0.92, edgecolor="#DDDDDD")
 
     ax.set_yscale("log")
@@ -208,11 +212,12 @@ def draw_reversal(ax, fits, per_config, per_library) -> None:
     # wording lives on the numbered Figure 1.
     n_seed = int(per_config["n"].iloc[0])
     ax.annotate_text = None
-    ps.annotate_n(ax,
-                  f"degree-1, undenoised, sparse estimators\n"
-                  f"({len(fits)} fits, {n_seed} seeds/marker); pooled\n"
-                  f"over all 72 labels there is no reversal.",
-                  loc="lower left")
+    # A band under the cloud for the scope note: without it the note lands on
+    # the raw library's divergence label.
+    lo, hi = ax.get_ylim()
+    # Room under the cloud for the legend, which sits at the top of the panel and
+    # would otherwise be drawn across the worst-conditioned library's markers.
+    ax.set_ylim(lo / 2.0, hi)
     ps.panel_label(ax, "a", dx=-0.20)
 
 
@@ -248,16 +253,20 @@ def draw_nonmonotone(ax, one_factor: pd.DataFrame,
     for i, r in enumerate(t.itertuples()):
         ax.scatter([i], [r.epi], s=58, color=ps.LIB_COLOR[r.library],
                    edgecolors="white", linewidths=0.7, zorder=5)
-        ax.annotate(f"{r.epi:+.2f}", (i, r.epi), textcoords="offset points",
-                    xytext=(0, 11), ha="center", fontsize=6.8,
-                    fontweight="bold", color=ps.LIB_COLOR[r.library], zorder=6)
+        # Anchor the value above the top of its own error bar rather than above the
+        # marker: at the middle library the bar is longer than the offset, so a
+        # marker-anchored label was drawn across it.
+        ax.annotate(f"{r.epi:+.2f}", (i, r.epi + r.epi_se_seed),
+                    textcoords="offset points", xytext=(0, 8), ha="center",
+                    fontsize=7, fontweight="bold",
+                    color=ps.LIB_COLOR[r.library], zorder=6)
     ax.axhline(0.0, color="#888888", lw=0.6, ls=(0, (3, 2)), zorder=0)
 
     ax.set_ylabel("mean closed-loop EPI  (EUR m$^{-2}$)")
     ax.set_xticks(x)
     ax.set_xticklabels([f"{SHORT_LIB[r.library]}\n$\\kappa$ = {k:.1f}"
                         for r, k in zip(t.itertuples(), kappa_by_lib)],
-                       fontsize=6.8)
+                       fontsize=7)
     ax.set_xlim(-0.55, len(t) - 0.45)
 
     # -- survival on a twin axis, the series that reproduces the V
@@ -267,22 +276,22 @@ def draw_nonmonotone(ax, one_factor: pd.DataFrame,
              mec=ps.OKABE_ITO["grey"], mew=0.9, zorder=4)
     for i, r in enumerate(t.itertuples()):
         ax2.annotate(f"{r.survival:.2f}", (i, r.survival),
-                     textcoords="offset points", xytext=(0, -13),
-                     ha="center", fontsize=6.4, color="#555555", zorder=6)
+                     textcoords="offset points", xytext=(8, -3),
+                     ha="left", fontsize=7, color="#555555", zorder=6)
     ax2.set_ylabel("boiler-term survival", color="#555555", fontsize=7)
     ax2.set_ylim(-0.08, 1.08)
-    ax2.tick_params(axis="y", colors="#555555", labelsize=6.5)
+    _SURVIVAL_YLIM = ax2.get_ylim()
+    ax2.tick_params(axis="y", colors="#555555", labelsize=7)
+    ax2.set_yticks([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])  # survival is a fraction:
+    #                                                 no ticks outside [0, 1]
 
-    # Headroom below the V so the scope note does not sit on the middle marker.
+    # A little headroom below the V for the survival labels. Both axes open by the
+    # same fraction: expanding only the margin axis draws the survival series through it.
+    frac = 0.18
     lo, hi = ax.get_ylim()
-    ax.set_ylim(lo - 0.42 * (hi - lo), hi)
-    ps.annotate_n(ax,
-                  "one factor: only the library changes. $\\kappa$ rises\n"
-                  "monotonically, margin does not. Survival ranks\n"
-                  "these four because nothing else differs; the 17-term\n"
-                  "probe drops one bilinear term and stays between.\n"
-                  "Survival does not rank the wider controller pool.",
-                  loc="lower left")
+    ax.set_ylim(lo - frac * (hi - lo), hi)
+    lo2, hi2 = _SURVIVAL_YLIM
+    ax2.set_ylim(lo2 - frac * (hi2 - lo2), hi2)
     ps.panel_label(ax, "b", dx=-0.20)
 
 
@@ -325,6 +334,11 @@ def pareto_table() -> pd.DataFrame:
     t["objective"] = np.where(t["method"].isin(a["method"]), "priced", "default")
     return t.sort_values("epi", ascending=False).reset_index(drop=True)
 
+
+#: Labels too wide for the space beside their marker, broken by hand.
+_LABEL_WRAP = {
+    "sindy_mpc_dense_dagger": "SINDy-MPC,\ndense + re-ident.",
+}
 
 #: Label placement, in points, keyed by method.  Display only.
 _LABEL_OFFSET = {
@@ -386,8 +400,11 @@ def draw_pareto(ax, t: pd.DataFrame) -> None:
         if r.method in pair or not r.on_front:
             continue
         dx, dy, ha = _LABEL_OFFSET.get(r.method, (7, 2, "left"))
-        ax.annotate(r.label, (r.viol, r.epi), textcoords="offset points",
-                    xytext=(dx, dy), ha=ha, va="center", fontsize=6.3,
+        # One label is wider than the space left of its marker and ran over the
+        # y axis; it is the only one that needs breaking.
+        label = _LABEL_WRAP.get(r.method, r.label)
+        ax.annotate(label, (r.viol, r.epi), textcoords="offset points",
+                    xytext=(dx, dy), ha=ha, va="center", fontsize=7,
                     color=_color_for(r.method), zorder=6)
     # The "one controller, two thresholds" caveat is NOT annotated here: at this
     # panel width it collides with the raw-ensemble label whichever way it is
@@ -399,12 +416,6 @@ def draw_pareto(ax, t: pd.DataFrame) -> None:
     ax.set_ylabel("mean economic performance index  (EUR m$^{-2}$)")
 
     n_front = int(t["on_front"].sum())
-    ps.annotate_n(ax,
-                  f"{n_front} non-dominated of {len(t)};\n"
-                  f"step line is the achievable\n"
-                  f"frontier. Whiskers $\\pm$1 SD.\n"
-                  f"Replication is unequal.",
-                  loc="lower right")
     ps.panel_label(ax, "c", dx=-0.20)
 
 

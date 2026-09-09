@@ -165,11 +165,11 @@ RAW_ENS = {
 # it would invalidate every already-computed wave (the same convention as ENSEMBLE_DRAWS and
 # LADDER_ROLLOUT_HORIZONS_STEPS). The recipe reaches each result row through the usual
 # `fit_sindy_seeded` RNG key, so provenance stays self-contained.
-# Замыкает ряд по обусловленности. Ладдер даёт kappa 8.2 (raw) -> 24.5 (physics_no_cross)
-# -> 53.4 (physics), но замкнутый регулятор был только у первых двух, поэтому крайняя точка
-# ряда -- худшая по обусловленности библиотека -- в замкнутом контуре не измерялась вовсе.
-# Рецензент спросит об этом первым. Оба варианта -- одношаговое изменение относительно
-# уже измеренных: порог и степень те же, меняется только библиотека.
+# Closes the conditioning series. The ladder gives kappa 8.2 (raw) -> 24.5
+# (physics_no_cross) -> 53.4 (physics), but only the first two ever reached closed loop, so
+# the end of the series -- the worst-conditioned library -- had never been measured there at
+# all. It is the first thing a reviewer asks about. Both variants are a one-step change from
+# what is already measured: same threshold, same degree, only the library moves.
 PHYS_ENS = {
     "feature_variant": "physics",
     "library_degree": 1,
@@ -250,18 +250,20 @@ LADDER_DENOISE = ("none", "savgol", "kalman")
 # Open-loop rollout horizons for the ladder, IN STEPS -- the same defaults the original E2
 # used (`evaluate_sindy`'s `rollout_horizons=(4, 20, 96)`), i.e. 1 h / 5 h / 1 day.
 #
-# The first regen got this wrong and it produced a false alarm worth recording. The paper
-# says the frozen recipe barely diverges "при длине прогноза не менее 3 суток" -- literally
-# "at a forecast length of at least 3 days". That reads as a rollout horizon, so this
+# The first regen got this wrong and it produced a false alarm worth recording. An earlier
+# draft said the frozen recipe barely diverges "at a forecast length of at least 3 days".
+# That reads as a rollout horizon, so this
 # constant was named ..._BUDGETS_DAYS = (1, 3, 7) and fed to evaluate_sindy as horizons of
 # 96/288/672 steps -- up to SEVEN days of free running. Everything diverges over seven days:
 # the frozen recipe scored diverged_frac 0.21 and rollout RMSE 12.4 against the historical
 # E2's 0.0 and 2.76, on an identical fit (28 non-zero terms both times), and the harness
 # duly reported that the pre-registered recipe fails its own gates. It does not.
 #
-# `e2_stability_vs_budget.csv` settles it: `budget_days` there is the TRAINING-DATA budget
-# (1 day -> diverged 0.55, 3 days and up -> 0.0), not a forecast horizon. The manuscript's
-# wording conflates the two and should say "объём обучающих данных", not "длина прогноза".
+# The historical E2 table settles it: `budget_days` there is the TRAINING-DATA budget
+# (1 day -> diverged 0.55, 3 days and up -> 0.0), not a forecast horizon. That table is
+# `../results_e0_e3_final/tables/e2_stability_vs_budget.csv` in the project repository and
+# is NOT part of this package. The manuscript states the quantity in control steps, so the
+# conflation cannot recur there.
 #
 # Deliberately NOT part of `_declared()`/config_hash: it only affects the ladder, and adding
 # it would invalidate the hash of every already-computed wave. The value is recorded per row
@@ -298,10 +300,10 @@ SENS_FRUIT_PRICE = (0.8, 1.6, 3.2)          # EUR/kg, around the nominal 1.6
 SENS_ENERGY_SCALE = (0.5, 1.0, 2.0)         # multiplier on heat/elec/CO2 prices
 SENS_HORIZONS = (8, 12, 20, 30)
 SENS_THRESHOLDS = (0.01, 0.05, 0.1, 0.2)
-# E-E: прежняя сетка (0.1, 0.2, 0.3) при 2 повторах дала немонотонный и огромный
-# разброс -- 0.2 -> -13.41 при СКО 20.4, а 0.3 -> -4.77. Это признак слишком малого
-# числа реализаций шума, а не свойства модели. Сетка мельче, повторов больше.
-# Вне _declared()/config_hash: меняет только объём эксперимента E6.
+# E-E: the earlier grid (0.1, 0.2, 0.3) at 2 repetitions gave a non-monotone and enormous
+# spread -- 0.2 -> -13.41 at SD 20.4, while 0.3 -> -4.77. That is a sign of too few noise
+# realisations, not a property of the model. Finer grid, more repetitions.
+# Outside _declared()/config_hash: it changes only how much of E6 is run.
 SENS_COEF_PERTURB = (0.02, 0.05, 0.10, 0.15, 0.20)
 SENS_PERTURB_REPS = 4
 
@@ -384,7 +386,7 @@ def load_recipe(name: str) -> dict:
 
 # ── Scenario / dataset builders ──────────────────────────────────────────────
 
-def protocol(fast: bool = False) -> "P.ProtocolConfig":
+def protocol(fast: bool = False) -> P.ProtocolConfig:
     """A ProtocolConfig carrying THIS module's constants (not protocol_config's defaults)."""
     pc = P.ProtocolConfig(
         location=LOCATION, season_start_md=SEASON_START_MD,

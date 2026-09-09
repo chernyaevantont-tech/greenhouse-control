@@ -42,11 +42,11 @@
 ## Tables, figures, equations, and lists
 
 - Data tables use the source three-line pattern: top rule, rule under the header, bottom rule; no vertical grid.
-- Table width is 7920 twips for manuscript tables, explicit fixed grid and matching cell widths; first row repeats on page breaks; rows expand automatically.
+- Manuscript tables carry the `MDPI_4.1_three_line_table` style, which supplies the top and bottom rules, the rule under the header and the absence of vertical rules; widths are auto-fitted to the text column. The first row of every data table is marked as a heading row so it repeats on page breaks (four of the sixteen reached the styled file without it before 2026-08-28).
 - Cell margins are small but nonzero; header cells bold and centered; narrative cells left, short numeric cells centered.
 - Captions precede tables and follow figures; keep captions with their table/figure.
 - Figures remain inline, centered, un-stretched, and close to the first citation.
-- Display equations are centered and receive sequential right-aligned numbers `(1)`, `(2)`, `(3)`; replace unresolved `[eq:*]` text with `Equation (n)`.
+- Display equations are centered and receive sequential right-aligned numbers `(1)`, `(2)`, `(3)`, set in the template's own two-cell equation component (`MDPI_3.9_equation` | `MDPI_3.a_equation_number`), cloned out of the reference file. The numbers are never written into the maths. Replace unresolved `[eq:*]` text with `Equation (n)`.
 - Existing real list numbering is preserved and mapped to MDPI list roles where applicable.
 
 ## Content flow and slot map
@@ -56,21 +56,31 @@
 3. Rebuild the author/affiliation/correspondence block using MDPI roles while retaining explicit fill-in placeholders for unavailable personal data.
 4. Keep the single-paragraph abstract (195 words) and seven keywords; apply MDPI roles and separator.
 5. Number Heading 1 sections: 1 Introduction; 2 Materials and Methods; 3 Results; 4 Discussion; 5 Conclusions. Number Heading 2 subsections hierarchically by position.
-6. Add `Table 1.` through `Table 16.` and `Figure 1.` through `Figure 6.` to captions. The sixth image is both the conclusion summary figure and graphical-abstract candidate; label it Figure 6 in the manuscript, with `Graphical Abstract` retained as a short lead-in where appropriate.
+6. Add `Table 1.` through `Table 16.` to captions, and `Figure 1.` through `Figure 5.` to the five numbered body figures. The sixth image is the graphical abstract: its caption is labelled `Graphical Abstract.` and it is **not** numbered (figures/SPEC.md). Nothing in the body may refer to a "Figure 6" — the single mention of it in the Conclusions names it instead.
 7. Keep back matter after Figure 6: Author Contributions, Funding, Institutional Review Board Statement, Informed Consent Statement, Data Availability Statement, Acknowledgments, Conflicts of Interest. Missing facts remain explicit bracketed fields and are not invented.
-8. Format References with the MDPI reference style and real numbering while preserving all 44 entries and DOI hyperlinks.
+8. Format References with the MDPI reference style and real numbering while preserving all 48 entries and DOI hyperlinks.
 
 ## Package preservation
 
 - Preserve source-derived `word/header*.xml`, `word/footer*.xml`, `word/theme/theme1.xml`, `word/fontTable.xml`, relationships to journal logos, footnotes, hyperlinks, comments plumbing, core document text, and all six manuscript figure media.
 - Editable: `word/document.xml`, `word/styles.xml`, `word/numbering.xml`, `word/settings.xml`, `docProps/core.xml`, and only relationships required by existing manuscript content.
-- The existing article package already contains byte-identical template headers, footers, theme, and font table. The edit therefore starts from a copy of the article, verifies those preserve-only hashes against the reference, and patches only editable parts.
+- The styling pass (`own-article/paper/en/format_mdpi_docx.py`) opens the pandoc article with python-docx, which re-serialises every part it touches: attribute order and namespace declarations move even where nothing changed. Preserve-only parts are therefore compared as **canonical XML**, not as bytes — `audit_mdpi.py` still fails on a real edit to a header, footer, theme, font table, numbering or style part, and no longer fails on a rewrite that says the same thing.
 
 ## Fidelity and QA gates
 
 - Retained reference SHA-256 must remain unchanged.
 - Final section geometry, line numbering, logos, header/footer rules, and page fields must match the reference.
 - No paragraph or table may reference an undefined style.
-- All 16 table and six figure captions must carry visible numbered labels.
+- All 16 table captions and the five body-figure captions must carry visible numbered labels; the sixth caption must read `Graphical Abstract.`
 - No unresolved `[eq:*]`, generator debris such as `2-3(lr)4-5`, or internal citation tokens may remain.
 - All final pages must be exported by Microsoft Word, rasterized, and inspected for clipping, overlap, broken tables, missing headers, awkward blank pages, or unreadable figures.
+
+## Revision
+
+- 2026-08-28: the graphical abstract stopped being "Figure 6"; equations moved
+  into the template's equation component and equation (3) was numbered for the
+  first time; header rows were made to repeat; `updateFields` was set; ORCID
+  placeholders were added to the Word front matter; the reference count went
+  44 -> 48; preserve-only parts are compared canonically. `paper_en_mdpi.docx`
+  is the single styled output — the `_simulation` and
+  `_simulation_short_captions` variants are superseded.

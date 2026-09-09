@@ -39,7 +39,14 @@ import pandas as pd
 from scipy import stats
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parent / "paper" / "en" / "figures"))
+# The loading layer lives with the figure scripts: in the repository under
+# paper/en/figures, in the deposit as a sibling `figures/` directory.
+for _figures in (HERE.parent / "paper" / "en" / "figures", HERE.parent / "figures"):
+    if _figures.is_dir():
+        sys.path.insert(0, str(_figures))
+        break
+else:  # pragma: no cover
+    raise RuntimeError("figures/_plotstyle.py not found next to this package")
 import _plotstyle as ps  # noqa: E402
 
 OUT_MD = HERE / "results" / "notuboil" / "analysis_notuboil.md"
@@ -159,7 +166,7 @@ def main() -> None:
     g = pool[pool["method"] == "sindy_mpc_notuboil_ens"]
     k, n, psurv, lo, hi = seed_survival(g)
     w("\n## Verdict against the registered prediction\n")
-    w(f"- Predicted if the detour reading is right: survival ~0.15, EPI ~+0.3.")
+    w("- Predicted if the detour reading is right: survival ~0.15, EPI ~+0.3.")
     w(f"- Measured (ensemble): survival {psurv:.2f} ({k}/{n}, Wilson {lo:.2f}-{hi:.2f}), "
       f"EPI {g['epi'].mean():+.2f} (median {g['epi'].median():+.2f}).")
     w("- The 17-feature library does NOT collapse onto physics_no_cross. "

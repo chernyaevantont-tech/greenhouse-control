@@ -1,9 +1,16 @@
 # What changes at submission to MDPI *Agronomy*
 
-Written 2026-08-14. This file exists because `paper_en.tex` deliberately does **not**
-use `mdpi.cls`: that class is not present on this machine, and a manuscript that cannot
-be compiled is worse than one that compiles in the standard `article` class. Everything
-below is the delta between what is in the tree today and what MDPI needs.
+Written 2026-08-14, **revised 2026-08-28** when the submission route changed.
+
+**The manuscript is submitted as Word.** `own-article/paper/en/paper_en_mdpi.docx`
+is built from the LaTeX source through pandoc against the official Agronomy
+template and then styled paragraph by paragraph into the template's own MDPI
+styles. It has been exported from Word 16 and proof-read page by page. The LaTeX
+remains the content source of truth — the five section files are edited and
+`paper_en.tex` is generated from them — but it is not what is uploaded, and it
+has never been compiled: no TeX distribution exists on this machine. Sections 6
+and the class mapping below are kept only in case a `.tex` submission is ever
+wanted.
 
 Nothing here is a formatting nicety. Items marked **BLOCKER** stop the submission.
 
@@ -17,11 +24,19 @@ five section files and `assemble_paper_en.py`, never `paper_en.tex`.
 ```
 python own-article/paper/en/assemble_paper_en.py   # rebuild paper_en.tex
 python own-article/paper/en/verify_paper_en.py     # structural + terminology check
+python own-article/paper/en/make_docx.py           # pandoc -> paper_en.docx
+python own-article/paper/en/format_mdpi_docx.py    # -> paper_en_mdpi.docx (13 checks)
+python .codex-tmp/mdpi-format/audit_mdpi.py        # package-level gate, ends AUDIT_OK
 ```
 
 `verify_paper_en.py` reports environment balance, dangling `\ref`s, float and citation
 coverage, the abstract word count, and the terminology guard. It is **not** a LaTeX
-compiler — no TeX distribution is installed here. Compile once before submission.
+compiler. `audit_mdpi.py` is the one that speaks for the file actually being
+submitted: caption sequence, equation components, three-line tables with
+repeating headers, back-matter order, A4 geometry, line numbering, field refresh,
+and a canonical-XML comparison against the template's headers, footers, theme and
+fonts. It also prints every `[[...]]` placeholder still in the file — eleven
+today, all of them §1 and §2 items.
 
 ---
 
@@ -30,19 +45,32 @@ compiler — no TeX distribution is installed here. Compile once before submissi
 `assemble_paper_en.py` carries a placeholder author block whose contents are
 `[[...REQUIRED]]` strings in red. **No name, initial, affiliation, e-mail or ORCID has
 been invented anywhere in this manuscript.** That is deliberate and must stay that way
-until a human supplies the real values. The block itself lists the eight items needed;
-the short version:
+until a human supplies the real values.
 
-| # | Item | Where it goes |
-|---|------|---------------|
-| 1 | Full author names, in final author order | `\author{}` |
-| 2 | ORCID iD per author (mandatory for the corresponding author) | `\author{}` |
-| 3 | Full postal affiliation per institution, numbered | `\author{}` footnotes |
-| 4 | Corresponding author + institutional e-mail | `\thanks{}` → MDPI `\corres` |
-| 5 | E-mail of every co-author | MDPI prints these in the affiliation block |
-| 6 | CRediT roles by initials | Author Contributions, back matter |
-| 7 | Funding statement with grant numbers, or "no external funding" | Funding, back matter |
-| 8 | Conflict-of-interest declaration from every author | Conflicts of Interest, back matter |
+**How to supply them:** copy `authors.example.json` to `authors.json`, fill it in, and
+re-run the five commands in §0. `authorship.py` reads that one file and drives both the
+LaTeX author block and the Word front matter, so they cannot drift apart; a half-filled
+file is refused with a list of what is missing. MDPI does not require any particular
+number of authors — one is a valid paper — and the front matter is generated from the
+list, so adding a third author means adding a third entry, not editing two builders.
+Under `mdpi.cls` the class option is `oneauthor` for a single author and `moreauthors`
+otherwise.
+
+The eight items the file asks for:
+
+| # | Item | `authors.json` | Where it goes |
+|---|------|----------------|---------------|
+| 1 | Full author names, in final author order | `authors[].name` | `\author{}` |
+| 2 | ORCID iD per author (mandatory for the corresponding author) | `authors[].orcid` | `\author{}` |
+| 3 | Full postal affiliation per institution, numbered | `affiliations[]` | `\author{}` footnotes |
+| 4 | Corresponding author + institutional e-mail | `authors[].corresponding`, `.email` | `\thanks{}` → MDPI `\corres` |
+| 5 | E-mail of every co-author | `authors[].email` | MDPI prints these in the affiliation block |
+| 6 | CRediT roles by initials | `author_contributions` (`authors[].initials`) | Author Contributions, back matter |
+| 7 | Funding statement with grant numbers, or "no external funding" | `funding` | Funding, back matter |
+| 8 | Conflict-of-interest declaration from every author | `conflicts_of_interest` | Conflicts of Interest, back matter |
+
+Two more the same file carries: `acknowledgments` (or "Not applicable.") and
+`data_location`, the §2 blocker.
 
 Under `mdpi.cls` these become `\Author{}`, `\AuthorNames{}`, `\address{}`, `\corres{}`,
 `\firstnote{}`. The mapping is one-to-one; only the macro names change.
@@ -54,13 +82,18 @@ Under `mdpi.cls` these become `\Author{}`, `\AuthorNames{}`, `\address{}`, `\cor
 The assembler emits an MDPI back-matter block between the Conclusions and the
 bibliography, in MDPI's required order. Under `mdpi.cls` each becomes its own macro:
 
+All eight statements are emitted by the assembler, in MDPI's order, and the Word pass
+only styles them.
+
 | Statement in `paper_en.tex` | `mdpi.cls` macro | State today |
 |---|---|---|
+| Supplementary Materials | `\supplementary{}` | real: *Not applicable* |
 | Author Contributions | `\authorcontributions{}` | **placeholder — BLOCKER** |
 | Funding | `\funding{}` | **placeholder — BLOCKER** |
 | Institutional Review Board Statement | `\institutionalreview{}` | real: *Not applicable* |
 | Informed Consent Statement | `\informedconsent{}` | real: *Not applicable* |
 | Data Availability Statement | `\dataavailability{}` | real, except the public URL/DOI — **BLOCKER** |
+| Acknowledgments | `\acknowledgments{}` | **placeholder** |
 | Conflicts of Interest | `\conflictsofinterest{}` | **placeholder — BLOCKER** |
 
 "Not applicable" is the correct answer for the two ethics statements: this is a
@@ -96,10 +129,10 @@ public, the statement must say so and say why — silence is not an option.
 
 ## 3. Abstract length — within limit, keep it there
 
-MDPI's limit is **200 words**. The abstract measured **198** at the last structural check
-(it was 248 before the mechanism rewrite trimmed it). Two words of headroom is not a
-margin: re-run `verify_paper_en.py` after every edit to the abstract, because the section
-is under active revision and one added clause puts it over.
+MDPI's limit is **200 words**. The abstract measures **188** at the last structural
+check (198 before the *Agronomy* retarget, 248 before the mechanism rewrite). Twelve
+words of headroom is a real margin, but re-run `verify_paper_en.py` after every edit
+to the abstract.
 
 Do **not** cut, in any trim: *"in the first-order, undenoised block under sparse
 estimators"*, *"against three comparators"*, *"deterministic reference"*, or the Pareto
@@ -112,10 +145,12 @@ lists the cheapest 48 words to lose instead.
 ## 4. Bibliography
 
 The manuscript uses a manual `thebibliography` block, emitted by the assembler in
-first-citation order. All 44 entries were verified on 2026-08-14 against Crossref,
+first-citation order. 44 entries were verified on 2026-08-14 against Crossref,
 arXiv, PMLR, dblp or the publisher's landing page; the rules applied — including which
 entries deliberately carry **no** DOI, and the four keys that were renamed so key year
 matches cited year — are recorded in the `FOOTER` comment of `assemble_paper_en.py`.
+Four *Agronomy* entries (`xu2023agronomy`, `wen2022agronomy`, `ecimduric2024`,
+`padillanates2025`) were added at the retarget, so the count is **48**.
 
 If the submission moves to BibTeX (which `mdpi.cls` expects, with `\bibliography{}` and
 the `mdpi` bibliography style):
@@ -134,9 +169,9 @@ on-policy re-identification loop. It is not an attribution and must never become
 
 ## 5. Figures
 
-Six floats: five numbered body figures and the graphical abstract. `figures/SPEC.md` is
-the specification; `figures/_plotstyle.py` owns the dedup key and the solver-abort rule,
-and no figure script reads a CSV directly.
+Six floats: five numbered body figures and an unnumbered graphical abstract.
+`figures/SPEC.md` is the specification; `figures/_plotstyle.py` owns the dedup key and
+the solver-abort rule, and no figure script reads a CSV directly.
 
 | # | Label | File | On disk? |
 |---|-------|------|----------|
@@ -144,24 +179,27 @@ and no figure script reads a CSV directly.
 | 2 | `fig:pareto` | `fig2_pareto_margin_violations.pdf` | yes |
 | 3 | `fig:lambda` | `fig3_lambda_survival_knockin.pdf` | yes |
 | 4 | `fig:perturb` | `fig4_sensitivity_perturbation_prices.pdf` | yes |
-| 5 | `fig:disc-corrections` | `fig5_corrections_waterfall.pdf` | **no — generator writes `fig5.pdf`; rename** |
-| — | `fig:graphical-abstract` | `fig-graphical-abstract.pdf` | yes |
+| 5 | `fig:disc-corrections` | `fig5_corrections_waterfall.pdf` | yes |
+| — | (unnumbered) | `fig-graphical-abstract.pdf` | yes |
 
-Actions at submission:
+State and actions:
 
-1. **Rename `fig5.pdf` → `fig5_corrections_waterfall.pdf`.** The `\includegraphics` path
-   in `04-discussion.tex` already carries the SPEC name; the generator has not caught up.
-2. **The graphical abstract must stop being Figure 6.** It is currently a numbered
-   `figure` environment sitting in Section 5, so it prints as "Figure 6". Under
-   `mdpi.cls` it moves to the front matter, where MDPI wants it and where its
-   duplication with Figures 1a and 2 is expected. If the standard class is kept for any
-   reason, make it unnumbered in place (`\captionsetup{labelformat=empty}` inside the
-   float, or `\includegraphics` with a plain `\centering` paragraph).
-3. Supply **both** the vector PDF and the 600 dpi PNG; MDPI accepts either but asks for
-   ≥1000 dpi bitmap or vector, and the PNGs are already emitted next to each PDF.
-4. Widths are set for MDPI's single (8.5 cm) and double (17.5 cm) column measures. The
-   `\includegraphics[width=...]` values in the sections are relative
-   (`\linewidth` / `\textwidth`) and need no change.
+1. **The graphical abstract is unnumbered** (fixed 2026-08-28). The float carries
+   `\captionsetup{labelformat=empty}` and no `\label`; the one mention of it in the
+   Conclusions names it instead of `\ref`-ing it, and the Word build labels the caption
+   "Graphical Abstract." Before this, the body pointed at a "Figure 6" that no caption
+   defined. Upload `fig-graphical-abstract.pdf` (or its PNG) as the graphical abstract
+   file as well — the submission form asks for it separately.
+2. Supply **both** the vector PDF and the 600 dpi PNG; MDPI accepts either but asks for
+   ≥1000 dpi bitmap or vector, and the PNGs are already emitted next to each PDF. The
+   Word file embeds the PNGs, since Word cannot embed PDF.
+3. Widths are set for MDPI's single (8.5 cm) and double (17.5 cm) column measures, and
+   every figure is now *drawn* at the width it is *printed* at — Figure 2 was widened to
+   17.5 cm on 2026-08-28 for exactly that reason. The `\includegraphics[width=...]`
+   values in the sections are relative (`\linewidth` / `\textwidth`) and need no change.
+4. Annotations no longer sit on the data: corner notes carry a background
+   (`_plotstyle.annotate_n`), and the point labels of Figures 1c, 2, 4, 5 and the
+   graphical abstract were re-placed against Word page proofs.
 
 Four figures were **dropped** during consolidation (ten floats → six):
 `fig01_selection_reversal`, `fig-ladder-scatter`, `fig-methods-design` and
@@ -193,14 +231,33 @@ markers and should disappear with them.
 
 ## 7. Pre-flight checklist
 
-- [ ] Author names, ORCIDs, affiliations, corresponding author and e-mails supplied
-- [ ] Author Contributions written in CRediT roles, initials matching the author block
+Author-supplied, and nothing else can proceed without them:
+
+- [x] Author names and affiliations supplied (nine authors, four DSTU units) —
+      **confirm the transliterated names and the English unit names**
+- [ ] Confirm who is the corresponding author (`A.T.C.` at present)
+- [x] ORCID iD for the corresponding author (MDPI requires it); six of nine
+      supplied — M.S.K., M.S.Kh. and M.N.K. have none, which does not block
+- [x] Institutional e-mail for every author
+- [ ] Author Contributions: a draft by position is in `authors.json`; **every
+      author confirms the roles attributed to them**
 - [ ] Funding statement supplied (or the explicit "no external funding" sentence)
-- [ ] Conflicts of Interest declared by every author
+- [ ] Conflicts of Interest: "The authors declare no conflicts of interest." is
+      in the file — it must be true of every author, or be replaced
+- [ ] Acknowledgments written, or set to "Not applicable."
 - [ ] Replication tree archived, DOI minted, Data Availability statement completed
-- [ ] Abstract still ≤200 words (198 at last check) and no scope qualifier lost
-- [ ] `fig5.pdf` renamed to `fig5_corrections_waterfall.pdf`
-- [ ] Graphical abstract moved to the front matter or made unnumbered
-- [ ] `assemble_paper_en.py` re-run, `verify_paper_en.py` clean apart from intended items
-- [ ] `pdflatex` run at least once on a machine that has a TeX distribution
-- [ ] No `[[...REQUIRED]]` string survives anywhere in the compiled PDF
+
+Mechanical, and done unless noted:
+
+- [x] Abstract ≤200 words (188 at last check) and no scope qualifier lost
+- [x] `fig5.pdf` also written as `fig5_corrections_waterfall.pdf`
+- [x] Graphical abstract unnumbered, in the LaTeX and in the Word build
+- [x] Display equations numbered (1)–(3) at the right margin
+- [x] Every table repeats its header row; page fields refresh on open
+- [x] `assemble_paper_en.py`, `verify_paper_en.py`, `make_docx.py`,
+      `format_mdpi_docx.py` and `audit_mdpi.py` all re-run clean
+- [ ] Close and delete `paper_en_mdpi_simulation_short_captions.docx` (open in Word)
+- [ ] Re-export the `.docx` from Word and re-read the pages after the author fields
+      are filled in — the front matter reflows
+- [ ] No `[[...REQUIRED]]` string survives anywhere in the exported PDF
+- [ ] Only if a `.tex` submission is wanted: `pdflatex` on a machine with TeX

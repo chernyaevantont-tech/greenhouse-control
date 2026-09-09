@@ -14,6 +14,9 @@ def read(n):
     return open(os.path.join(D, n), encoding='utf-8').read()
 
 
+import authorship  # noqa: E402  (needs D/os above)
+
+
 def strip_comments(t):
     lines = []
     for ln in t.split('\n'):
@@ -44,7 +47,7 @@ bodies = [read(SEC[0]), read(SEC[1]), read(SEC[2]), read(SEC[3]), concl]
 
 # ---------------------------------------------------------------- bibliography
 ENTRIES = {
-'katzin2020': r"""Katzin, D.; van Mourik, S.; Kempkes, F.; van Henten, E.J. GreenLight---An open source
+'katzin2020': r"""Katzin, D.; van Mourik, S.; Kempkes, F.; van Henten, E.J. GreenLight -- An open source
 model for greenhouses with supplemental lighting: Evaluation of heat requirements under LED
 and HPS lamps. \textit{Biosyst. Eng.} \textbf{2020}, \textit{194}, 61--81.
 \url{https://doi.org/10.1016/j.biosystemseng.2020.03.010}""",
@@ -112,7 +115,7 @@ Upper Saddle River, NJ, USA, 1999.""",
 'gevers1993': r"""Gevers, M. Towards a joint design of identification and control? In \textit{Essays on
 Control: Perspectives in the Theory and its Applications}; Birkh\"auser: Boston, MA, USA,
 1993; pp. 111--151. \url{https://doi.org/10.1007/978-1-4612-0313-1_5}""",
-'vandenhof1995': r"""Van den Hof, P.M.J.; Schrama, R.J.P. Identification and control---Closed-loop issues.
+'vandenhof1995': r"""Van den Hof, P.M.J.; Schrama, R.J.P. Identification and control -- Closed-loop issues.
 \textit{Automatica} \textbf{1995}, \textit{31}, 1751--1770.
 \url{https://doi.org/10.1016/0005-1098(95)00094-X}""",
 'hjalmarsson2005': r"""Hjalmarsson, H. From experiment design to closed-loop control. \textit{Automatica}
@@ -323,18 +326,7 @@ actuator-pathway survival}
 %% Items 6-8 are back-matter statements and are stubbed at the end of this
 %% file, immediately before the bibliography.
 %% ===========================================================================
-\author{%
-  \textbf{[[AUTHOR 1 -- FULL NAME REQUIRED]]}$^{1,}$%
-  \thanks{Correspondence: \texttt{[[CORRESPONDING AUTHOR E-MAIL REQUIRED]]}}
-  \ \textsuperscript{\textcolor{red}{[[ORCID REQUIRED]]}}
-  \and \textbf{[[AUTHOR 2 -- FULL NAME REQUIRED]]}$^{2}$
-  \ \textsuperscript{\textcolor{red}{[[ORCID REQUIRED]]}}
-  \and \textbf{[[ADD OR DELETE AUTHORS AS REQUIRED]]} \\[4pt]
-  \small $^{1}$[[AFFILIATION 1 REQUIRED: DEPARTMENT, INSTITUTION, STREET,
-  POSTCODE, CITY, COUNTRY; E-MAIL]] \\
-  \small $^{2}$[[AFFILIATION 2 REQUIRED, OR DELETE IF ALL AUTHORS SHARE
-  AFFILIATION 1]]
-}
+@@AUTHORBLOCK@@
 \date{}
 
 \begin{document}
@@ -375,23 +367,11 @@ BACKMATTER = r"""
 \noindent\rule{\textwidth}{0.4pt}
 \small
 
-\noindent\textbf{Author Contributions:}
-\textcolor{red}{[[REQUIRED --- NOT SUPPLIED.]]} State each author's contribution
-by initials using the CRediT taxonomy, e.g.\ ``Conceptualization, X.X. and Y.Y.;
-methodology, X.X.; software, X.X.; validation, X.X., Y.Y. and Z.Z.; formal
-analysis, X.X.; investigation, X.X.; resources, X.X.; data curation, X.X.;
-writing---original draft preparation, X.X.; writing---review and editing, X.X.;
-visualization, X.X.; supervision, X.X.; project administration, X.X.; funding
-acquisition, Y.Y. All authors have read and agreed to the published version of
-the manuscript.'' Initials must match the author block above, and every listed
-author must appear in at least one role.
+\noindent\textbf{Supplementary Materials:} Not applicable.
 
-\noindent\textbf{Funding:}
-\textcolor{red}{[[REQUIRED --- NOT SUPPLIED.]]} Either name every funder with the
-grant number in MDPI's form (``This research was funded by NAME OF FUNDER, grant
-number XXX'') or state exactly ``This research received no external funding''.
-Do not leave this blank: MDPI will not send the manuscript out for review
-without it.
+\noindent\textbf{Author Contributions:} @@AUTHOR_CONTRIBUTIONS@@
+
+\noindent\textbf{Funding:} @@FUNDING@@
 
 \noindent\textbf{Institutional Review Board Statement:} Not applicable. This
 study is a computational study of a greenhouse climate simulator and involves
@@ -417,10 +397,10 @@ eight experiment blocks is run as \texttt{python run\_regen.py --experiment
 --merge --out <dir>} and \texttt{python make\_tables.py --out <dir>} rebuild
 every derived table together with \texttt{NUMBERS.md}, a claim-to-value-to-source
 map that names the file and column behind each reported quantity. \texttt{python
-verify\_regen.py} then applies the acceptance gates---mixed configuration hash,
+verify\_regen.py} then applies the acceptance gates -- mixed configuration hash,
 an incomplete or duplicated run grid, truncated seasons, non-uniform horizon or
 solver budget, a missing sparse coefficient column, an unresolved sparsity
-region or an incomplete ablation block---and exits non-zero if any fails.
+region or an incomplete ablation block -- and exits non-zero if any fails.
 Determinism is checked separately by \texttt{python repro.py --selftest}, which
 executes the pipeline twice under identical seeds and compares SHA-256 digests of
 the training states and actions, the ensemble and STLSQ coefficient matrices, the
@@ -433,18 +413,11 @@ from the Open-Meteo historical archive API \cite{hersbach2020,openmeteo2023}. As
 Section~\ref{sec:repro} states, bit-level reproduction is established within one
 computing environment; the cross-environment case was not measured, and closed-loop
 margins should not be expected to match to the last decimal on a different stack.
-\textcolor{red}{[[REQUIRED BEFORE SUBMISSION: a public, citable location for this
-tree --- a repository URL and an archived release with a DOI (Zenodo, figshare or
-equivalent). MDPI requires a link or an explicit statement of restriction; a path
-inside a private repository is not sufficient.]]}
+@@DATA_LOCATION@@
 
-\noindent\textbf{Conflicts of Interest:}
-\textcolor{red}{[[REQUIRED --- NOT SUPPLIED.]]} Every author must declare. Use
-``The authors declare no conflicts of interest.'' only if that is true of all of
-them; otherwise describe the interest and state the funders' role, or lack of
-role, in the design of the study, in the collection, analyses or interpretation
-of data, in the writing of the manuscript, and in the decision to publish the
-results.
+\noindent\textbf{Acknowledgments:} @@ACKNOWLEDGMENTS@@
+
+\noindent\textbf{Conflicts of Interest:} @@CONFLICTS@@
 
 \normalsize
 \vspace{0.5\baselineskip}
@@ -508,6 +481,68 @@ FOOTER = r"""
 """
 
 
+# ---------------------------------------------------------------------------
+# Author identity.  Nothing here is a real name: these are the strings the
+# manuscript carries until own-article/paper/en/authors.json is filled in, and
+# authorship.py refuses a half-filled file rather than mixing the two.
+# ---------------------------------------------------------------------------
+PLACEHOLDER = {
+    '@@AUTHORBLOCK@@': r"""\author{%
+  \textbf{[[AUTHOR 1 -- FULL NAME REQUIRED]]}$^{1,}$%
+  \thanks{Correspondence: \texttt{[[CORRESPONDING AUTHOR E-MAIL REQUIRED]]}}
+  \ \textsuperscript{\textcolor{red}{[[ORCID REQUIRED]]}}
+  \and \textbf{[[AUTHOR 2 -- FULL NAME REQUIRED]]}$^{2}$
+  \ \textsuperscript{\textcolor{red}{[[ORCID REQUIRED]]}}
+  \and \textbf{[[ADD OR DELETE AUTHORS AS REQUIRED]]} \\[4pt]
+  \small $^{1}$[[AFFILIATION 1 REQUIRED: DEPARTMENT, INSTITUTION, STREET,
+  POSTCODE, CITY, COUNTRY; E-MAIL]] \\
+  \small $^{2}$[[AFFILIATION 2 REQUIRED, OR DELETE IF ALL AUTHORS SHARE
+  AFFILIATION 1]]
+}""",
+
+    '@@AUTHOR_CONTRIBUTIONS@@': r"""\textcolor{red}{[[REQUIRED -- NOT SUPPLIED.]]} State each author's contribution
+by initials using the CRediT taxonomy, e.g.\ ``Conceptualization, X.X. and Y.Y.;
+methodology, X.X.; software, X.X.; validation, X.X., Y.Y. and Z.Z.; formal
+analysis, X.X.; investigation, X.X.; resources, X.X.; data curation, X.X.;
+writing -- original draft preparation, X.X.; writing -- review and editing, X.X.;
+visualization, X.X.; supervision, X.X.; project administration, X.X.; funding
+acquisition, Y.Y. All authors have read and agreed to the published version of
+the manuscript.'' Initials must match the author block above, and every listed
+author must appear in at least one role.""",
+
+    '@@FUNDING@@': r"""\textcolor{red}{[[REQUIRED -- NOT SUPPLIED.]]} Either name every funder with the
+grant number in MDPI's form (``This research was funded by NAME OF FUNDER, grant
+number XXX'') or state exactly ``This research received no external funding''.
+Do not leave this blank: MDPI will not send the manuscript out for review
+without it.""",
+
+    '@@ACKNOWLEDGMENTS@@': r"""\textcolor{red}{[[ACKNOWLEDGMENTS REQUIRED; OTHERWISE STATE `Not applicable.']]}""",
+
+    '@@CONFLICTS@@': r"""\textcolor{red}{[[REQUIRED -- NOT SUPPLIED.]]} Every author must declare. Use
+``The authors declare no conflicts of interest.'' only if that is true of all of
+them; otherwise describe the interest and state the funders' role, or lack of
+role, in the design of the study, in the collection, analyses or interpretation
+of data, in the writing of the manuscript, and in the decision to publish the
+results.""",
+
+    '@@DATA_LOCATION@@': r"""\textcolor{red}{[[REQUIRED BEFORE SUBMISSION: a public, citable location for this
+tree -- a repository URL and an archived release with a DOI (Zenodo, figshare or
+equivalent). MDPI requires a link or an explicit statement of restriction; a path
+inside a private repository is not sufficient.]]}""",
+}
+
+
+def authorship_fields():
+    """PLACEHOLDER, or the real values once authors.json is filled in."""
+    data = authorship.load()
+    if data is None:
+        return dict(PLACEHOLDER), False
+    fields = dict(PLACEHOLDER)
+    fields['@@AUTHORBLOCK@@'] = authorship.latex_author_block(data)
+    fields.update(authorship.latex_fields(data))
+    return fields, True
+
+
 def main():
     head = PREAMBLE.replace('@@ABSTRACT@@', abs_txt).replace('@@KEYWORDS@@', kw_txt)
     parts = [head]
@@ -521,9 +556,14 @@ def main():
     parts.append(bib)
     parts.append('\n\n\\end{document}\n')
     txt = ''.join(parts)
+    fields, real = authorship_fields()
+    for key, value in fields.items():
+        txt = txt.replace(key, value)
     with io.open(OUT, 'w', encoding='utf-8', newline='\n') as f:
         f.write(txt)
     print('wrote', OUT, len(txt), 'chars')
+    print('authorship:', 'authors.json' if real
+          else 'placeholders (no authors.json -- see authors.example.json)')
     print('bibitems:', len(order))
     print('unused entries defined but never cited:', unused)
 

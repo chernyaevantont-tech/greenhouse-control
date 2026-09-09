@@ -1,0 +1,60 @@
+{
+  "_README": [
+    "Copy this file to authors.json and fill it in. Nothing here is a real name.",
+    "Then re-run, from own-article/paper/en:",
+    "  python assemble_paper_en.py && python verify_paper_en.py",
+    "  python make_docx.py && python format_mdpi_docx.py",
+    "  python ../../../.codex-tmp/mdpi-format/audit_mdpi.py",
+    "The audit prints every [[...]] placeholder still in the file; with this file",
+    "filled in and a DOI in data_location, it should print none.",
+    "",
+    "MDPI does not require a particular number of authors: one is a valid paper.",
+    "Every author needs a name, initials, an affiliation, an e-mail and (MDPI",
+    "displays them, and requires one for the corresponding author) an ORCID iD.",
+    "Exactly one author carries \"corresponding\": true.",
+    "\"affiliation\" is the 1-based index into the affiliations list; add one entry",
+    "per distinct institution and give every affiliation at least one author.",
+    "\"initials\" is what the CRediT sentence uses, e.g. A.B. for Anna Behrens.",
+    "author_contributions must name every author in at least one CRediT role and",
+    "end with MDPI's sentence about the published version.",
+    "funding: name every funder with grant numbers, or exactly",
+    "  'This research received no external funding.'",
+    "data_location: the public, citable home of own-article/regen/results -- a",
+    "  repository URL and an archived release with a DOI. MDPI requires a link or",
+    "  an explicit statement of restriction; a private path is not sufficient."
+  ],
+
+  "affiliations": [
+    "Department, Institution, Street, Postcode, City, Country",
+    "Second Department, Second Institution, Street, Postcode, City, Country"
+  ],
+
+  "authors": [
+    {
+      "name": "Given Family",
+      "initials": "G.F.",
+      "orcid": "0000-0000-0000-0000",
+      "email": "given.family@example.edu",
+      "affiliation": 1,
+      "corresponding": true
+    },
+    {
+      "name": "Second Author",
+      "initials": "S.A.",
+      "orcid": "0000-0000-0000-0001",
+      "email": "second.author@example.edu",
+      "affiliation": 2,
+      "corresponding": false
+    }
+  ],
+
+  "author_contributions": "Conceptualization, G.F. and S.A.; methodology, G.F.; software, G.F.; validation, G.F. and S.A.; formal analysis, G.F.; investigation, G.F.; resources, S.A.; data curation, G.F.; writing---original draft preparation, G.F.; writing---review and editing, G.F. and S.A.; visualization, G.F.; supervision, S.A.; project administration, S.A.; funding acquisition, S.A. All authors have read and agreed to the published version of the manuscript.",
+
+  "funding": "This research received no external funding.",
+
+  "acknowledgments": "Not applicable.",
+
+  "conflicts_of_interest": "The authors declare no conflicts of interest.",
+
+  "data_location": "The regeneration tree, the analysis scripts and the derived tables are archived at [ARCHIVE NAME], https://doi.org/10.5281/zenodo.XXXXXXX (accessed on DD Month YYYY)."
+}

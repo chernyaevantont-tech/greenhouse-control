@@ -61,9 +61,9 @@
 monotone in how many are added}
 \label{sec:disc-mechanism}
 
-The physically motivated regressors used here---saturation vapour pressure
+The physically motivated regressors used here -- saturation vapour pressure
 $e_s(T_{\text{in}})$, vapour-pressure deficit $D$ and screen-attenuated
-radiation $I(1-u_{\text{ThScr}})$---are algebraic functions of variables the raw
+radiation $I(1-u_{\text{ThScr}})$ -- are algebraic functions of variables the raw
 library already contains: no new excitation, only smooth near-collinear copies
 of existing columns. Adding them, and then the four bilinear cross terms, raises
 the condition number of the regression monotonically, and open-loop multi-step
@@ -88,10 +88,10 @@ rather than 20 on both), so the two sets of figures must not be mixed within one
 comparison.
 
 The open-loop conditioning pattern does not extend monotonically to closed-loop
-economics. Under the one-factor closed-loop comparison---ensemble optimiser,
+economics. Under the one-factor closed-loop comparison -- ensemble optimiser,
 threshold $0.05$, priced objective, four seasons
 $\times$ 20 replicates, zero truncated runs, the feature library the only thing
-that changes---the three libraries scored $+4.32$ (raw), $+0.28$ (physics without
+that changes -- the three libraries scored $+4.32$ (raw), $+0.28$ (physics without
 cross terms) and $+2.75$~EUR\,m$^{-2}$ (full physics). The series is
 \textbf{non-monotone in $\kappa$}: the worst-conditioned library beats the middle
 one by $+2.47$~EUR\,m$^{-2}$ on average (median $+2.39$, 63 of 80 paired runs,
@@ -124,7 +124,7 @@ however well conditioned the fit that produced it.
 The controlled evidence for that reading is the single-coefficient ablation.
 Reinstating the deleted
 coefficient in the frozen recipe is the only randomised manipulation in the
-mechanism block---library, scalers, every other term and the MPC construction held
+mechanism block -- library, scalers, every other term and the MPC construction held
 fixed, one number changed. Under the priced objective the effect is significant and
 typically small: positive in 16 of 20 replicates, $p=5.9\times10^{-4}$
 ($1.2\times10^{-3}$ after Holm correction over the two knock tests; $1.8\times10^{-3}$
@@ -145,7 +145,7 @@ on economic weighting.
 
 Survival gates the outcome; it does not order it, and two measurements say so.
 Among the two libraries that keep the term, the raw one still wins by
-$+1.56$~EUR\,m$^{-2}$ (median $+0.97$, 67 of 80, $p=2.5\times10^{-9}$)---and it is
+$+1.56$~EUR\,m$^{-2}$ (median $+0.97$, 67 of 80, $p=2.5\times10^{-9}$) -- and it is
 also the one with the better rollout, so the open-loop criterion of
 Section~\ref{sec:disc-rule} separates the two survivors where survival does not.
 And in the decomposition over (library) $\times$ (term retained), the raw library
@@ -154,19 +154,19 @@ And in the decomposition over (library) $\times$ (term retained), the raw librar
 %% 2x2 cells: priced pool, controllers grouped by feature_variant per
 %% regen/regen_config.py.  Survival is constant across the four seasons of a
 %% seed, so the effective n is 19 and 20 seeds, not 76 and 320 runs.
-That split is observational---survival is a property of each fit, not a randomised
-factor, and it is confounded with recipe---so the conservative reading is that
+That split is observational -- survival is a property of each fit, not a randomised
+factor, and it is confounded with recipe -- so the conservative reading is that
 survival marks which fits collapse rather than measuring the whole library effect.
 
 One plausible explanation for why the middle library is worse than \emph{both} of its
 neighbours is that the library without cross terms carries enough collinearity for
-the threshold to destabilise the direct boiler term, but---unlike the full
-library---holds no bilinear $T_{\text{in}}u_{\text{Boil}}$ term able to carry the
+the threshold to destabilise the direct boiler term, but -- unlike the full
+library -- holds no bilinear $T_{\text{in}}u_{\text{Boil}}$ term able to carry the
 heating pathway once the direct term is cut: the worse-conditioned library has a
 detour, the middle one has neither stability nor a detour. Two
 observational figures were consistent with it, and neither is significant: inside
 the full physics library, replicates that lose the direct term score no worse than
-those that keep it ($+3.10$ against $+2.48$~EUR\,m$^{-2}$, 9 and 11 replicates,
+those that keep it ($+3.09$ against $+2.48$~EUR\,m$^{-2}$, 9 and 11 replicates,
 $p=0.25$), whereas inside the library without cross terms losing it costs
 $+2.26$ ($+2.20$ against $-0.06$, 3 and 17 replicates, $p=0.18$).
 %% Mann-Whitney U on per-replicate season means, priced pool as above.  Survival
@@ -175,8 +175,8 @@ $+2.26$ ($+2.20$ against $-0.06$, 3 and 17 replicates, $p=0.18$).
 %% significant and neither factor is randomised.  Do not upgrade to evidence.
 
 \textbf{The term-deletion test rejects this detour explanation.} Deleting exactly the bilinear
-$T_{\text{in}}u_{\text{Boil}}$ feature---the only one of the four cross terms that
-touches the boiler---from the full physics candidate set gives a 17-feature library
+$T_{\text{in}}u_{\text{Boil}}$ feature -- the only one of the four cross terms that
+touches the boiler -- from the full physics candidate set gives a 17-feature library
 that keeps sixteen of eighteen features and essentially all of the conditioning
 ($\kappa = 52.3$ against $53.4$, mean over the 20 refits). Refit at the same
 optimiser and threshold and simulated over four seasons $\times$ 20 replicates in
@@ -194,8 +194,8 @@ one estimator arm suggests the bilinear term shares the threshold's pressure wit
 the direct term rather than replacing it. Which feature, or which correlation
 pattern, makes the threshold sever the direct term in the library without cross
 terms is therefore open. Across four libraries the margin nevertheless continues to track
-survival---$0.15 \rightarrow +0.28$, $0.40 \rightarrow +2.11$,
-$0.55 \rightarrow +2.75$ and $+4.32$~EUR\,m$^{-2}$---while neither conditioning,
+survival -- $0.15 \rightarrow +0.28$, $0.40 \rightarrow +2.11$,
+$0.55 \rightarrow +2.75$ and $+4.32$~EUR\,m$^{-2}$ -- while neither conditioning,
 one-step accuracy nor library size orders them. The cross-term block already
 present in the mechanism experiment could not have substituted for this wave: that
 block edits coefficients on a $\lambda=10^{-6}$ fit in which the direct boiler term
@@ -224,12 +224,12 @@ there, and none of its contrasts reaches significance under either objective.
 Two things follow for practice, and they are different in kind. The first is a
 screening rule: score candidates open-loop on (i) free-running multi-step rollout
 error at a horizon no shorter than the one the model will be used at and (ii) the
-fraction of rollouts that diverge---both computed on the identification data in
-seconds, before any closed-loop season is simulated---and keep one-step error out
+fraction of rollouts that diverge -- both computed on the identification data in
+seconds, before any closed-loop season is simulated -- and keep one-step error out
 of the gate. The condition number belongs in the report as a diagnostic but not in
 the ranking: it predicts (i) and (ii) accurately and closed-loop margin not at all
 (Section~\ref{sec:disc-mechanism}). Ours scored 96 steps (24~h) against a 20-step
-(5~h) control horizon---a stress test rather than a matched one, so the screening
+(5~h) control horizon -- a stress test rather than a matched one, so the screening
 horizon has to be reported with the score. In our ladder the
 raw configuration dominates the frozen physics-informed recipe on all three
 pre-registered axes at once (Section~\ref{sec:res-ladder}), and the two
@@ -245,7 +245,7 @@ one-step accuracy ranks that same winner \emph{last}; but neither open-loop
 criterion reproduces the full closed-loop ordering, because rollout error places
 full physics third where the closed loop places it second. What is established is
 the choice of the top candidate and the rejection of one-step accuracy as a
-selection criterion---not a rank correlation across the series.
+selection criterion -- not a rank correlation across the series.
 %% Ranks over the three libraries, degree-1 undenoised block under the two sparse
 %% estimators (n = 40 fits/library, ladder_rerun*.csv): one-step 1.675 (physics)
 %% < 1.728 (no-cross) < 1.862 (raw); rollout median 2.67 (raw) < 10.58 (no-cross)
@@ -256,8 +256,8 @@ selection criterion---not a rank correlation across the series.
 The second thing that follows is not a ranking but a check, and it is the one the
 new mechanism makes necessary. After sparsification, read the fitted coefficient
 matrix and confirm that every actuator the controller is allowed to move still has
-a surviving path to the states it is meant to move. The check costs nothing---it
-inspects numbers already computed---and it is the variable the closed loop turned
+a surviving path to the states it is meant to move. The check costs nothing -- it
+inspects numbers already computed -- and it is the variable the closed loop turned
 out to be sensitive to, whereas a well-conditioned regression is not a guarantee
 that the check passes and an ill-conditioned one is not a guarantee that it fails.
 When the check does fail, the available responses are a lower threshold, a
@@ -289,9 +289,9 @@ regardless of evaluation year while the physics libraries are year-dependent.
 The third piece of guidance is therefore negative: do not treat a basis function's
 physical motivation as evidence that it belongs in the library. Every feature added
 here is an algebraic function of columns already present, and the two groups in
-which they were added both cost multi-step stability---the three non-cross features
+which they were added both cost multi-step stability -- the three non-cross features
 take rollout error from $3.31$ to $7.11$~\textdegree C, the four cross terms take
-it on to $30.84$---while neither group buys back a closed-loop margin above the raw
+it on to $30.84$ -- while neither group buys back a closed-loop margin above the raw
 library's. Nor does the \emph{count} of added features order the damage: adding
 three is worse in closed loop than adding seven
 (Section~\ref{sec:disc-mechanism}), so a practitioner cannot reason from ``I added
@@ -304,8 +304,8 @@ above. Motivation earns a candidate a place in the ladder, and nothing more.
 \subsection{Sparsity is exonerated}
 \label{sec:disc-sparsity}
 
-The winner is the sparser model on both counts---11 candidate features against
-14, and $19.9$ retained terms against $28.25$---so sparsity cannot be what the
+The winner is the sparser model on both counts -- 11 candidate features against
+14, and $19.9$ retained terms against $28.25$ -- so sparsity cannot be what the
 physics-informed variants lost. Nor is more sparsity better within a library:
 over the sparsity sweep of Table~\ref{tab:lambda} margin falls as terms are
 removed, and violation steps rise with it, from about $3850$ to $9090$ between
@@ -327,8 +327,8 @@ of the three is not the worst; the middle one is.
 %% 6.577 6.575 6.107 6.376 6.414 4.302 4.039 3.592 4.010 3.037 3.113 4.606
 %% 2.433; SD 1.25 1.23 2.52 2.00 1.82 3.51 4.14 2.96 2.37 1.09 0.36 0.93 2.49.
 Term count orders performance in neither direction; the basis does. The two
-raw-library variants---bagged ensemble and plain sequential thresholded least
-squares---cannot be separated in closed loop (median $\Delta=-0.01$, mean
+raw-library variants -- bagged ensemble and plain sequential thresholded least
+squares -- cannot be separated in closed loop (median $\Delta=-0.01$, mean
 $+0.48$~EUR\,m$^{-2}$, $33/80$ wins, $p=0.60$), which locates the effect in the
 library rather than in the estimator. This is a failure to reject, not a
 demonstration of equivalence: the mean gap is not negligible, only too disperse
@@ -345,8 +345,8 @@ the gain from tuning the baseline from the raw-library advantage, and panel~b su
 the effect of price alignment from the raw-minus-physics gap.
 
 Searching the heuristic's four economically relevant setpoints under the budget assigned
-to the reinforcement-learning agents---16 random trials, selection on the training years
-only---is worth
+to the reinforcement-learning agents -- 16 random trials, selection on the training years
+only -- is worth
 $+3.49$~EUR\,m$^{-2}$ and moves the heuristic from last-but-three to seventh of
 fifteen. The apparent advantage of the raw-library controller over it falls
 from $+5.54$ to $+2.06$~EUR\,m$^{-2}$. Thus, the unsearched baseline would overstate the
@@ -391,9 +391,9 @@ economic difference to the surrogate model class.
 \subsection{Relation to prior work}
 \label{sec:disc-related}
 
-The finding instantiates the identification-for-control programme---model
+The finding instantiates the identification-for-control programme -- model
 quality cannot be judged independently of the control task the model
-serves~\cite{gevers1993,vandenhof1995,ljung1999,hjalmarsson2005,controlorientedsurvey2025}---and
+serves~\cite{gevers1993,vandenhof1995,ljung1999,hjalmarsson2005,controlorientedsurvey2025} -- and
 the objective-mismatch literature of model-based reinforcement learning, where
 prediction likelihood is a poor proxy for control
 performance~\cite{lambert2020,wei2024,farahmand2017,jackson2022}. Our
@@ -414,7 +414,7 @@ measurements agree with that literature exactly: $\kappa$ orders multi-step
 stability without exception. What we do \emph{not} find is the further step from
 conditioning to closed-loop economics, where the ordering breaks
 (Section~\ref{sec:disc-mechanism}). The consequence is not that library design
-matters less but that it has to be scored on what the controller actually uses---a
+matters less but that it has to be scored on what the controller actually uses -- a
 point on which library optimisation scored by recursive long-term
 prediction~\cite{yonezawa2026} converges from the opposite direction. Bagged
 ensembling~\cite{fasel2022} changed neither outcome: it is statistically
@@ -466,7 +466,7 @@ weights margin against corridor excursions.
 
 \item \textbf{The MPC objective is necessarily a proxy.} The surrogate carries
 no crop state, so revenue cannot be predicted and terminal biomass cannot be
-priced---structural to the model class, and it blocks the natural terminal-cost
+priced -- structural to the model class, and it blocks the natural terminal-cost
 formulation.
 
 \item \textbf{The tuned-heuristic comparison is not a paired test.} The
@@ -483,15 +483,19 @@ minimum attainable $p$ is $0.125$ and nothing can be significant.
 differ by $0.0066$~EUR\,m$^{-2}$ over four seasons yet separate at $p=0.012$, so
 listing both as front points is an artefact. Effect sizes accompany every
 $p$-value, and Holm corrections are over a declared family of 15
-controllers---another declaration moves them. This is not hypothetical: adding the
+controllers -- another declaration moves them. This is not hypothetical: adding the
 two full-\texttt{physics} controllers enlarged the family from 13 to 15 and moved
-every corrected level in the main comparison, the raw-versus-physics contrast from
-$7.7\times10^{-4}$ to $4.6\times10^{-4}$ among them, without any controller
-crossing $0.05$.
+every corrected level of Table~\ref{tab:wilcoxon} -- the raw-library ensemble against
+the tuned heuristic from $6.9\times10^{-11}$ to $8.3\times10^{-11}$, and the best
+physics-informed variant against it from $4.7\times10^{-4}$ to $7.0\times10^{-4}$ --
+without any controller crossing $0.05$. The paired raw-versus-physics contrast of
+Section~\ref{sec:res-main} is the exception that shows the rule: it sits at
+$7.7\times10^{-4}$ under both families, because enlarging the family moved nothing
+below it.
 
 \item \textbf{Coverage is uneven.} The neural-network MPC has 10 replicates and
 40 runs against 20 and 80 elsewhere, 14 of them terminating early. The oracle
-has no 2022 season---all 20 runs exhausted the solver-failure budget---but that
+has no 2022 season -- all 20 runs exhausted the solver-failure budget -- but that
 is an artefact: at a thousandfold budget the season completes at $-1.12$ and
 $-0.56$~EUR\,m$^{-2}$, so the reported $-2.65$ is a three-season mean and the
 imputed four-season value is $\approx-2.20$. One front member owes part of its
@@ -508,15 +512,15 @@ but the non-monotonicity itself does not exist as a three-point series on that
 axis. Boiler-term survival is \emph{measured, not manipulated}, at library level:
 the libraries differ in the basis, and survival is a downstream property of the
 resulting fits. The only randomised manipulation anywhere in this argument is the
-single-coefficient ablation, whose median effect is $+0.21$~EUR\,m$^{-2}$---so the
+single-coefficient ablation, whose median effect is $+0.21$~EUR\,m$^{-2}$ -- so the
 mechanism is supported by one controlled contrast of modest size plus a library
 pattern that is measured rather than manipulated. A fourth library has already been
-added---the term-deletion probe below---and did not disturb the pattern, but the
+added -- the term-deletion probe below -- and did not disturb the pattern, but the
 pattern remains observational at library level.
 
 \item \textbf{What sets boiler-term survival is unresolved.} The candidate
-structural explanation---that the bilinear $T_{\text{in}}u_{\text{Boil}}$ term is
-what rescues the full physics library---has been tested by deleting exactly that
+structural explanation -- that the bilinear $T_{\text{in}}u_{\text{Boil}}$ term is
+what rescues the full physics library -- has been tested by deleting exactly that
 feature, same optimiser and threshold, four seasons $\times$ 20 replicates in
 closed loop, and is rejected (Section~\ref{sec:disc-mechanism}): the 17-feature
 library keeps the full library's conditioning, open-loop instability and
@@ -544,13 +548,13 @@ price-aligned formulation. Under the default objective, perturbing identified co
 by $\pm15\,\%$ and $\pm20\,\%$
 degrades margin significantly (9 of 10 and 10 of 10 replicates worse, span of
 means $12.2$~EUR\,m$^{-2}$), but as a growing minority of catastrophic runs, not
-a uniform decline---the median at $\pm20\,\%$ is only $-0.31$. This finer grid
+a uniform decline -- the median at $\pm20\,\%$ is only $-0.31$. This finer grid
 stops at $\pm20\,\%$, so the non-monotonicity the coarser canonical grid shows
 at $\pm30\,\%$ is unreproduced rather than refuted.
 
 \item \textbf{The horizon was never tuned for any MPC.} Every MPC improves at
 horizon 8 over horizon 20, by $+0.29$ for the raw library and
-$+1.3\ldots+2.1$ for the physics-informed variants---consistent with rollout error
+$+1.3\ldots+2.1$ for the physics-informed variants -- consistent with rollout error
 compounding inside the prediction horizon, which is the open-loop half of the
 argument and is unaffected by Section~\ref{sec:disc-mechanism}; and an asymmetry
 running against the MPCs, which
@@ -563,7 +567,7 @@ bit-for-bit on one machine. Whether closed-loop margins survive a change of
 machine is \emph{unknown}: every wave reported here ran in one environment, and
 the manifests do not even record which one (Section~\ref{sec:repro}). What is
 measurable in the tree is that closed-loop margins move under changes far
-smaller than a change of platform---the two harnesses score the
+smaller than a change of platform -- the two harnesses score the
 \emph{deterministic} heuristic differently in all four seasons at identical
 configuration hash, by up to $0.038$~EUR\,m$^{-2}$ and monotonically more with
 each season. A controller with no stochastic element reproducing itself only to
@@ -582,7 +586,7 @@ so the results tree and block, not the hash, are the identifying key.
 
 \item \textbf{Negative results stand as such.} The out-of-distribution guard
 does not pay for itself, and the sign of its effect depends on which statistic is
-taken --- mean against median, all pairs against completed seasons
+taken -- mean against median, all pairs against completed seasons
 (Section~\ref{sec:res-safety}). It truncates a left tail rather than raising the
 centre, costs violations, ends $30\,\%$ of its seasons early, and rests on a
 detector barely better than chance; its activation count was never recorded, so
@@ -592,7 +596,7 @@ its seasons terminating early.
 
 \item \textbf{Additional scope limits.} One location, one planting date, one crop model
 and one weather source are represented. The ranking is not price-invariant: two different
-controllers win across a nine-point grid of fruit and energy prices---though
+controllers win across a nine-point grid of fruit and energy prices -- though
 that grid re-scores rather than re-optimises and contains neither raw-library
 controller, so it does not test the ranking reported here.
 %% regen/results/final/tables/sensitivity_prices.csv: fruit_price in
@@ -619,7 +623,7 @@ coefficients after thresholding; $n=40$ per cell (10 replicates $\times$ 2
 sparse estimators $\times$ 2 fit years). $\kappa$ and the term count are
 properties of the fit and so repeat across regimes. The ordering by one-step
 error is the exact inverse of the ordering by every multi-step criterion, in
-both regimes---but only over the two sparse estimators used here; pooled over
+both regimes -- but only over the two sparse estimators used here; pooled over
 all four estimators of the full ladder the one-step ordering is no longer
 strict. The medians overstate the separation: both physics libraries are
 strongly dispersed, and the lower quartile of the no-cross library falls to the
@@ -641,9 +645,9 @@ Physics, no cross terms & 14 & 25.4         & 29.7          & 1.69          & 12
 Physics, full           & 18 & 56.2         & 36.6          & \textbf{1.64} & 21.88 [18.06, 25.58]       & 0.078 \\
 \midrule
 \multicolumn{7}{l}{\emph{Held-out year}} \\
-Raw (physics-free)      & 11 & \textbf{8.2} & \textbf{20.6} & 1.90          & \textbf{2.72} [2.63, 2.84] & \textbf{0.000} \\
+Raw (physics-free)      & 11 & \textbf{8.2} & \textbf{20.6} & 1.89          & \textbf{2.72} [2.63, 2.84] & \textbf{0.000} \\
 Physics, no cross terms & 14 & 25.4         & 29.7          & 1.82          & 15.42 [2.69, 21.13]        & 0.046 \\
-Physics, full           & 18 & 56.2         & 36.6          & \textbf{1.77} & 21.57 [15.56, 31.74]       & 0.086 \\
+Physics, full           & 18 & 56.2         & 36.6          & \textbf{1.76} & 21.57 [15.56, 31.74]       & 0.086 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -725,10 +729,13 @@ Also changed
 %%   Panel (b) raw-minus-physics library gap: start bar at +3.66 (default
 %%     objective), one descending bar labelled "stage cost priced to the
 %%     criterion" (-2.43), end bar at +1.23 (priced); annotate 62/80 wins.
-\caption{Reduction of the headline contrast by two benchmarking safeguards.
-(\textbf{a})~Tuning the agronomic reference. (\textbf{b})~Aligning MPC stage-cost weights
-with evaluation prices. Bars show the contrast before adjustment, the safeguard effect
-and the residual contrast.}
+\caption{Reduction of the headline contrast by two benchmarking safeguards. A positive
+value means the raw library is ahead. Bars show the contrast before adjustment, the effect
+of the safeguard, and the contrast that remains; the open circle is the mean, the heavy rule
+the median, and the whiskers one standard deviation. (\textbf{a})~Tuning the agronomic
+reference; the reference is deterministic, so its counts are one-sample rather than paired.
+(\textbf{b})~Aligning the MPC stage-cost weights with the evaluation prices, paired on
+replicate and test season.}
 \label{fig:disc-corrections}
 \end{figure}
 
