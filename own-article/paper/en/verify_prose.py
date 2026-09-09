@@ -1222,11 +1222,23 @@ def check_constants_prose():
             check("constants", what, float(m.group(i + 1)), anchor2, pat)
 
     # the reward constants live in the environment's own configuration
+    # Ask the active interpreter where gl_gym is installed, so the check runs wherever
+    # the pipeline can run; the literal path below is the one it was first written
+    # against and is kept as a fallback.
+    import importlib.util
+
+    cands = []
+    spec = importlib.util.find_spec("gl_gym")
+    if spec is not None and spec.submodule_search_locations:
+        cands += [Path(p) / "configs" / "envs" / "GreenLightEnv.yml"
+                  for p in spec.submodule_search_locations]
+    cands.append(Path(r"C:\Users\zergu\repos\greenlight\sindylom\.venv\Lib\site-packages"
+                      r"\gl_gym\configs\envs\GreenLightEnv.yml"))
     cfg = None
-    for cand in (Path(r"C:\Users\zergu\repos\greenlight\sindylom\.venv\Lib\site-packages"
-                      r"\gl_gym\configs\envs\GreenLightEnv.yml"),):
+    for cand in cands:
         if cand.exists():
             cfg = cand.read_text(encoding="utf-8")
+            break
     anchor3 = "where $g_k$ is income from modelled fruit dry-matter growth"
     if cfg:
         m = re.search(r"fruit_price:\s*([\d.]+)", cfg)
