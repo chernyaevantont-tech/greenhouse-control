@@ -1,16 +1,12 @@
 """Figure 3 -- Sparsity sweep, boiler-term survival, and the knock-in.
 
-Spec: ``figures/SPEC.md``, section "Figure 3".  Label ``fig:lambda``, lives in
-Section 3.5, 17.5 cm wide.  Referenced from Section 3.5 and, as "Figure 3c",
-from Section 4.1.
+Label ``fig:lambda``, 17.5 cm wide.
 
-This is the figure that now carries the paper's MECHANISM.  Since the full
-``physics`` library reached closed loop (2026-08-13) the closed-loop outcome is
-known to be non-monotone in the condition number, so conditioning cannot be the
-mechanism; what the closed loop tracks is whether the actuator pathway survives
-thresholding.  Panels (a) and (b) show the sparsity threshold destroying that
-pathway, and panel (c) is the controlled single-coefficient intervention that
-makes the link causal rather than correlational.
+The closed-loop outcome is non-monotone in the condition number, so conditioning
+is not the mechanism; what the closed loop tracks is whether the actuator
+pathway survives thresholding.  Panels (a) and (b) show the sparsity threshold
+removing that pathway, and panel (c) is the controlled single-coefficient
+intervention that makes the link causal rather than correlational.
 
   (a)  Mean EPI against the sparsity threshold lambda, one curve per stage cost
        (priced, default), +-1 SD shaded.  13 levels, 20 replicates each,
@@ -24,11 +20,10 @@ makes the link causal rather than correlational.
        joining the same seed, IQR box, MEDIAN AS A HEAVY TICK and mean as an
        open symbol.
 
-RETRACTION GUARD (REVISION_LOG G-6).  The knock-in median under the defective
-objective, +3.05, is a SUPERSEDED magnitude.  It may appear only beside its
-priced replacement, +0.21, which this panel draws next to it.  Under the priced
-objective the mean is nine times the median, so plotting the mean alone would
-restate the retracted number in disguise: the heavy median tick must dominate.
+TWO OBJECTIVES, ALWAYS TOGETHER.  The knock-in median under the default
+objective, +3.05, is superseded by the priced value, +0.21, and panel (c) draws
+the two side by side.  Under the priced objective the mean is nine times the
+median, so the mean is never drawn alone: the heavy median tick dominates.
 
 Every number drawn is computed here from the CSVs under
 ``own-article/regen/results`` through ``_plotstyle``; none is a literal.  After
@@ -81,8 +76,7 @@ def knock_stats(k: dict) -> dict:
     knock-out under each stage cost -- are the family adjusted over.  The priced
     knock-in's raw p of 5.9e-4 becomes 1.2e-3 in a family of two and 1.8e-3 in
     this family of four; the default objective's knock-in is 1.3e-3 here.
-    Recomputed 2026-09-02 by verify_prose.check_knockin_prose, which fails if
-    these stop matching Section 4.3.
+    verify_prose.check_knockin_prose recomputes these against the manuscript.
     """
     raw = {}
     for obj in OBJECTIVES:
@@ -100,11 +94,16 @@ def controller_survival() -> pd.DataFrame:
     """Boiler-term survival of every closed-loop controller, priced objective.
 
     Pools :func:`_plotstyle.load_library_pool`, so the two ``physics``-library
-    controllers measured on 2026-08-13 are included alongside the eight of the
-    main priced comparison.  Survival is a property of the SEED (one fit per
-    seed), so it is computed over seeds, not over the 4x seasons.
+    controllers are included alongside the eight of the main priced comparison.
+    Survival is a property of the SEED (one fit per seed), so it is computed
+    over seeds, not over the 4x seasons.
     """
     pool = ps.load_library_pool()
+    # nn_mpc carries no identified coefficient at all: `xi_uboil` is empty in
+    # every one of its rows. Averaging that to 0.0 would draw it at "no
+    # survival", which is exactly the reading Table 6's note forbids, so it
+    # is excluded from the survival strip as it is from every survival test.
+    pool = pool[pool["method"] != "nn_mpc"]
     rows = []
     for method, g in pool.groupby("method"):
         per_seed = g.groupby("seed")["boiler_alive"].first()
@@ -155,8 +154,9 @@ def _lambda_axis(ax, lam: np.ndarray) -> None:
     """Shared x-axis of panels (a) and (b).
 
     The 13 levels are drawn EVENLY SPACED, not on a log scale.  On a log axis
-    four of the six decades carry a flat plateau and the collapse -- 0.03 to
-    0.06, which is the whole point -- is squeezed into two millimetres.  The
+    four of the six decades carry a flat plateau and the collapse between 0.03
+    and 0.06, the interval the panel exists to show, is squeezed into two
+    millimetres.  The
     axis is labelled with every level, so nothing is hidden; the price is that
     horizontal distance is ordinal, which the label states.
     """
@@ -191,7 +191,9 @@ def panel_b(ax, ax_strip, sw: dict, cs: pd.DataFrame) -> dict:
     ax.set_ylim(-0.06, 1.16)
     ax.set_yticks([0.0, 0.25, 0.5, 0.75, 1.0])
     ax.set_ylabel("boiler term kept, fraction of fits")
-    ax.set_title("boiler-term survival against the threshold", fontsize=8, pad=4)
+    # Shortened: the long centred title ran left past the axes and collided with
+    # the bold "(b)" panel tag. The y axis already says "boiler term kept".
+    ax.set_title("survival against the threshold", fontsize=8, pad=4)
     mid = 0.5 * (np.searchsorted(lam0, 0.03) + np.searchsorted(lam0, 0.06))
     ax.annotate("collapse", xy=(mid, 1.10), ha="center", va="center",
                 fontsize=7, color="#7A6000")
@@ -211,9 +213,8 @@ def panel_b(ax, ax_strip, sw: dict, cs: pd.DataFrame) -> dict:
     # fixed library colours of Figure 1 keep their meaning here.
     groups: dict[tuple, list] = {}
     for r in cs.itertuples():
-        # `or "none"` was version-dependent: a missing library used to arrive
-        # falsy and now arrives as a float NaN, which is truthy -- it reached
-        # the gid and wrote a bare NaN into fig3_values.json, which is not JSON.
+        # a missing library arrives as a float NaN, which is truthy, so `or "none"`
+        # would let a bare NaN reach the gid and the values file; test the type.
         lib = r.library if isinstance(r.library, str) and r.library else "none"
         groups.setdefault((round(r.survival, 4), lib), []).append(r)
     ordered = sorted(groups.items(), key=lambda kv: (kv[0][0], kv[0][1]))
@@ -481,8 +482,8 @@ def selfcheck(values: dict) -> int:
         chk(f"c: knock-out median, {obj}", values["panel_c"]["knockout"][obj]["median"],
             float(np.median(ko)))
 
-    # the median must dominate the mean visually AND the retracted magnitude
-    # may never stand alone: both objectives are on the page.
+    # the median must dominate the mean visually, and the two objectives are
+    # always drawn together.
     meds = {x["objective"]: x["median"] for x in values["panel_c"]["groups"]}
     chk_eq("guard: both objectives drawn, so +3.05 never stands alone",
            sorted(meds), ["default", "priced"])
@@ -495,6 +496,9 @@ def selfcheck(values: dict) -> int:
                       "phys_lib/main_physlib*.csv"])
     cl = cl.drop_duplicates(subset=["method", "seed", "test_year"], keep="first")
     cl = cl[cl["stop_reason"] != "solver_aborted"]
+    # nn_mpc identifies no coefficients, so it has no survival to check; it is
+    # excluded from the strip for the reason Table 6's note gives.
+    cl = cl[cl["method"] != "nn_mpc"]
     want = {}
     for method, gg in cl.groupby("method"):
         want[method] = float((gg.groupby("seed")["xi_uboil"].first().abs() > 0).mean())

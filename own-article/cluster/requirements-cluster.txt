@@ -16,8 +16,7 @@
 # INSTALL ORDER MATTERS: gl_gym requires numpy<2.0 while the pysindy 2.1.0 wheel declares
 # numpy>=2.0 (it runs on 1.26.4 anyway). A single `pip install -r` fails the resolver, so
 # the Dockerfile installs this file WITHOUT pysindy, then `pip install --no-deps pysindy==2.1.0`.
-# Verified 2026-07-17 against ../greenlight/sindylom/.venv; same pins as the repo-root
-# requirements.txt scientific stack (which is the authoritative full-repo manifest).
+# These pins are the stack the study's waves were produced with (see the manuscript, Section 2.9).
 
 numpy==1.26.4          # <2.0 required by gl_gym
 scipy==1.17.1
@@ -34,8 +33,8 @@ do-mpc==5.1.1
 # RL baselines (PPO/SAC) and the NN surrogate
 # torch from PyPI is the CUDA-capable wheel: it runs on CPU nodes AND lets the optional
 # nvidia.com/gpu PPO/SAC pods (see e3-multiseason-job.yaml) use the GPU with the SAME image.
-# For a slim CPU-only image instead, install torch from the CPU index on a host with direct
-# internet (admin-01 Wi-Fi):  pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cpu
+# For a slim CPU-only image instead, install torch from the CPU index on a host with internet
+# access:  pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cpu
 torch==2.11.0
 stable-baselines3==2.9.0
 

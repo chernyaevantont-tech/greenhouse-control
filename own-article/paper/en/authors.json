@@ -116,6 +116,6 @@
   "author_contributions": "Conceptualization, I.I.N. and M.S.K.; methodology, M.S.K., M.V.L. and A.T.C.; software, A.T.C., M.V.L., M.M.Z. and M.S.Kh.; validation, M.V.L., M.S.K. and M.M.Z.; formal analysis, A.T.C. and M.S.K.; investigation, A.T.C., E.O.C., A.E.M. and M.S.Kh.; resources, I.I.N., A.E.M. and M.N.K.; data curation, E.O.C., M.M.Z. and A.T.C.; writing---original draft preparation, A.T.C.; writing---review and editing, I.I.N., M.S.K., M.V.L. and M.M.Z.; visualization, A.T.C. and M.S.Kh.; supervision, I.I.N. and M.S.K.; project administration, I.I.N. and M.N.K.; funding acquisition, I.I.N. and M.N.K. All authors have read and agreed to the published version of the manuscript.",
   "funding": "This research was funded by the Ministry of Science and Higher Education of the Russian Federation under the Agreement on the provision of a grant from the federal budget in the form of a subsidy for state support of the development programmes of world-class research centres performing research in priority areas of scientific and technological development, agreement no. 075-15-2025-592 of 24 June 2025.",
   "acknowledgments": "Not applicable.",
-  "conflicts_of_interest": "The authors declare no conflicts of interest.",
+  "conflicts_of_interest": "The authors declare no conflicts of interest. The funders had no role in the design of the study; in the collection, analyses, or interpretation of data; in the writing of the manuscript; or in the decision to publish the results.",
   "data_location": ""
 }

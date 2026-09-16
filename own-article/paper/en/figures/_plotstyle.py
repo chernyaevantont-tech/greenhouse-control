@@ -1,8 +1,8 @@
 """Shared plotting layer for the figures of the English *Agronomy* manuscript.
 
 Every figure script in this directory imports this module and nothing else that
-touches data.  The point is that the three rules that make the numbers correct
-live in exactly one place:
+touches data, so that the three rules that make the numbers correct live in
+exactly one place:
 
   R1  Every number traces to a file under ``own-article/regen/results``.
       The loaders below take paths only from :data:`RESULTS`; nothing here
@@ -57,9 +57,9 @@ FIGDIR = HERE
 def _find_results() -> Path:
     """The regen results tree: in the repository, in a deposit, or wherever REGEN_RESULTS says.
 
-    The layout used to be hard-coded, so these scripts ran in the checkout and nowhere
-    else -- not even inside the archive built to reproduce the paper, where `figures/` and
-    `regen/` are siblings.
+    In the repository `figures/` sits under `paper/en/` and the results under
+    `own-article/regen/results/`; in the deposit archive `figures/` and `regen/` are
+    siblings.  Both layouts are resolved here.
     """
     env = os.environ.get("REGEN_RESULTS")
     candidates = ([Path(env)] if env else []) + [
@@ -137,7 +137,7 @@ LIB_LABEL = {
     "raw":              "raw",
     "physics_no_cross": "physics, no cross terms",
     "physics":          "physics",
-    "physics_no_tuboil": "physics $-$ $t\\,u_{\\mathrm{Boil}}$",
+    "physics_no_tuboil": "physics $-$ $T_{\\mathrm{in}}u_{\\mathrm{Boil}}$",
 }
 #: Marker per sparse estimator, used wherever the degree-1 block is plotted.
 OPT_MARKER = {"stlsq": "o", "ensemble": "s", "constrained": "^", "sr3": "v"}
@@ -183,9 +183,9 @@ LIBRARY_ONE_FACTOR = {
                  "physics_no_tuboil": "sindy_mpc_notuboil"},
 }
 
-#: Display names.  ``*_dagger`` is a RUN LABEL from the CSVs, never an
-#: imitation-learning claim -- the aggregation loop has no expert and no DAgger
-#: framing (REVISION_LOG G-6).  Render it as "on-policy re-identification".
+#: Display names.  ``*_dagger`` is a RUN LABEL from the CSVs, not an
+#: imitation-learning claim: the aggregation loop queries no expert, so it is
+#: rendered as "on-policy re-identification".
 METHOD_LABEL = {
     "sindy_mpc_raw":          "SINDy-MPC, raw",
     "sindy_mpc_raw_ens":      "SINDy-MPC, raw (ensemble)",
@@ -420,22 +420,20 @@ def load_physlib_pool() -> pd.DataFrame:
 
     ``sindy_mpc_phys`` (STLSQ) and ``sindy_mpc_phys_ens`` (ensemble), both at
     threshold 0.05, 20 seeds x 4 seasons = 160 rows, priced objective, zero
-    truncated runs and zero solver aborts.  Measured 2026-08-13, after the
-    English draft was written.
+    truncated runs and zero solver aborts.
 
     ``phys_lib/main_physchk.csv`` is deliberately NOT loaded: it is a 288-step
     smoke check at horizon 8 (a season is 5760 steps at horizon 20) and pooling
     it would mix two experiments.  The glob ``main_physlib*.csv`` excludes it.
 
     PROVENANCE.  Same ``config_hash`` (637c6b535a9e), objective and horizon as
-    :func:`load_priced_pool`, but a later ``git_sha`` (97b66f9).  The two pools
-    are comparable by configuration; the commit difference is worth a caption
-    line, not a caveat.
+    :func:`load_priced_pool`, but a later ``git_sha`` (97b66f9); the two pools
+    are comparable by configuration.
 
-    WHAT THIS POOL KILLED.  It closes the conditioning series, and the closed-loop
-    EPI turns out to be NON-MONOTONE in kappa (+4.32 / +0.28 / +2.75 for
-    kappa 8.2 / 24.5 / 53.4).  Any figure that presents conditioning as the
-    closed-loop mechanism is wrong (REVISION_LOG 2026-08-13).
+    This pool completes the library series in closed loop, where EPI is
+    NON-MONOTONE in kappa (+4.32 / +0.28 / +2.75 for kappa 8.2 / 24.5 / 53.4):
+    conditioning orders the open-loop metrics, not the closed-loop economics,
+    and no figure may present it as the closed-loop mechanism.
     """
     d = load_runs(["phys_lib/main_physlib*.csv"])
     d.attrs["objective"] = "priced"
@@ -448,13 +446,13 @@ def load_notuboil_pool() -> pd.DataFrame:
 
     ``sindy_mpc_notuboil`` (STLSQ) and ``sindy_mpc_notuboil_ens`` (ensemble),
     threshold 0.05, 20 seeds x 4 seasons = 160 rows, priced objective, zero
-    truncated runs and zero solver aborts.  Measured 2026-08-15, analysed
-    2026-08-18 (``regen/results/notuboil/analysis_notuboil.md``).
+    truncated runs and zero solver aborts; the analysis is
+    ``regen/results/notuboil/analysis_notuboil.md``.
 
     ``notuboil/main_ntbchk.csv`` is deliberately NOT loaded: a 288-step smoke
     file.  The glob ``main_notuboil*.csv`` excludes it.
 
-    RESULT.  The registered prediction of the detour reading was collapse onto
+    RESULT.  The prediction of the detour reading, stated in advance, was collapse onto
     ``physics_no_cross`` (survival ~0.15, EPI ~+0.3).  Measured: survival 0.40,
     EPI +2.11 / +2.28, kappa 52.3 -- the reading is FALSIFIED.  This pool is a
     mechanism probe and must NOT be concatenated into the benchmark pool of
@@ -792,10 +790,10 @@ def knock_effects(objective: str = "priced", test_year: int = IN_DIST_YEAR) -> p
     the same replicate's baseline.
 
     The knock-in MEDIAN is the reported statistic: +3.05 EUR/m2 under the
-    defective objective, +0.21 under the priced one.  +3.05 is a RETRACTED
-    magnitude (REVISION_LOG G-6) and may appear only beside its replacement.
-    Under the priced objective the mean (+1.92) is nine times the median, so
-    quoting the mean restates the retracted number in disguise.
+    default objective, +0.21 under the priced one.  The default-objective value
+    is superseded by the priced one and appears only beside it.  Under the
+    priced objective the mean (+1.92) is nine times the median, so the mean is
+    never quoted without the median.
     """
     d = load_mechanism(objective)
     k = d[(d["block"] == "knock") & (d["test_year"] == test_year)]
@@ -818,9 +816,10 @@ def load_design() -> pd.DataFrame:
     Factors: ``coef_perturb`` (200 rows, 5 levels x 40), ``mpc_horizon``,
     ``stlsq_threshold``.
 
-    MISLABELLED DIRECTORY.  Despite the name, these runs use the ORIGINAL
-    objective -- ``experiments_support.py`` hard-codes ``objective="full"`` in
-    every supporting block.  Never caption them as priced.
+    MISLABELLED DIRECTORY.  Despite the name, these runs use the DEFAULT
+    objective: the supporting blocks of ``experiments_support.py`` scored every
+    rollout on the default weights when this wave was produced.  They are
+    captioned as default-objective results.
     """
     raw = _read_many(["priced_design/design_pricedDesign.csv",
                       "priced_design/design_pricedDesign2.csv"])
@@ -954,8 +953,8 @@ def scatter_by_library(ax, d: pd.DataFrame, x: str, y: str, size=None,
 
     Open faces mark configurations that FAIL the divergence gate
     (``diverged_frac > 0.05``).  That threshold was applied as a hard cut in
-    ``make_tables.py:318`` but declared only qualitatively in the protocol --
-    a deviation from the pre-specified plan that the manuscript reports honestly.
+    ``make_tables.py`` but declared only qualitatively in the protocol, a
+    deviation from the pre-specified plan that the manuscript reports as such.
     """
     for lib in LIB_ORDER:
         sub = d[d["variant"] == lib]
@@ -986,9 +985,9 @@ def strip_with_median_and_mean(ax, groups, values, positions=None, color=None,
                               jitter: float = 0.06, rng_seed: int = 0):
     """Per-run strip plot with a heavy median tick and an OPEN mean symbol.
 
-    The two markers are the point: wherever a mean sits far from its median the
-    effect is a tail, not a shift.  Both the perturbation grid and the knock-in
-    contrast are read this way.
+    Both markers are drawn because their distance carries information: wherever
+    a mean sits far from its median the effect is a tail, not a shift.  Both the
+    perturbation grid and the knock-in contrast are read this way.
     """
     rng = np.random.default_rng(rng_seed)
     positions = list(range(len(groups))) if positions is None else list(positions)

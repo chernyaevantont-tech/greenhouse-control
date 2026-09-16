@@ -1,8 +1,8 @@
 """Acceptance gates for the regeneration. Run BEFORE any number reaches the paper.
 
-Each gate below exists because its absence produced a real defect in the 2026-06/07 state
-(see README "Defect register"). A BLOCKING failure means the run is not publishable; a
-WARNING means a claim in the text has to change, not the data.
+Each gate below guards a way in which a regenerated tree can silently disagree with the
+text that describes it. A BLOCKING failure means the run is not publishable; a WARNING
+means a claim in the text has to change, not the data.
 
     python verify_regen.py --out /results          # or ./results
 
@@ -61,7 +61,7 @@ def _with_stop_reason(d: pd.DataFrame) -> pd.DataFrame:
     """Derive `stop_reason` for runs produced before run_regen.score() recorded it.
 
     The break fires on failure MAX+1 while the last written row still carries MAX, hence
-    `>=`. Keeps the 2026-08-04 output analysable without recomputing 356 CPU-hours.
+    `>=`. Keeps the canonical output analysable without recomputing it.
     """
     if "stop_reason" in d.columns or "truncated" not in d.columns:
         return d
@@ -171,9 +171,8 @@ def check_mechanism(d: pd.DataFrame) -> None:
     knock = d[d.block == "knock"] if "block" in d else d.iloc[0:0]
     cross = d[d.block == "cross"] if "block" in d else d.iloc[0:0]
 
-    # G7 the sweep must resolve the region where the coefficient is already exactly zero.
-    # The 2026-07 grid ENDED at the first such point (lam=0.1) and EPI there was HIGHER than
-    # at lam=0.05, which contradicts the monotonicity the text asserts.
+    # G7 the sweep must resolve the region where the coefficient is already exactly zero:
+    # a grid that ends at the first such point cannot say what happens beyond it.
     if len(lam):
         zero = lam[lam.xi_uboil.abs() < 1e-12]
         gate("G7 lambda sweep resolves xi==0 region", zero.lam.nunique() >= 2,
@@ -200,8 +199,8 @@ def check_mechanism(d: pd.DataFrame) -> None:
             gate("G8 knock-in effect", len(eff) > 0,
                  f"mean {eff.mean():+.3f} EUR/m2, improved {int((eff > 0).sum())}/{len(eff)} seeds")
 
-    # G9 the cross term is not a nuisance: the 2026-07 run showed removing uBoil alone was
-    # WORSE than removing uBoil and t_in*uBoil together.
+    # G9 the cross term is part of the mechanism block: removing uBoil alone and removing
+    # uBoil together with t_in*uBoil are both recorded.
     if len(cross):
         piv = cross.pivot_table(index="seed", columns="condition", values="epi")
         if {"ko_uboil", "ko_both"} <= set(piv.columns):

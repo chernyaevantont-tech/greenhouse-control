@@ -14,6 +14,7 @@ would pass while the claim it belongs to had drifted.
 """
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -132,7 +133,7 @@ def check_ladder_prose():
              & (full["optimizer"] == "stlsq") & (full["denoise"] == "none")]
     b = full[(full["variant"] == "physics_no_cross") & (full["degree"] == 1)
              & (full["optimizer"] == "ensemble") & (full["denoise"] == "none")]
-    anchor = "dominates it simultaneously on all three pre-specified axes"
+    anchor = "dominates it simultaneously on all three applied open-loop axes"
     check("ladder", "comparator rollout (raw)", float(a["rollout_rmse_t_in"].mean()),
           anchor, r"mean rollout RMSE \$(\d+\.\d+)\$")
     check("ladder", "comparator rollout (selected)", float(b["rollout_rmse_t_in"].mean()),
@@ -264,7 +265,7 @@ def check_notuboil_prose():
     # rollout and divergence figures the sentence quotes are the ensemble arm's.
     arm = arm_all[arm_all["optimizer"] == "ensemble"]
     full = ps.load_ladder(optimizers=None)
-    anchor = "simulated over the same four seasons"
+    anchor = "It keeps the full library's conditioning"
     check("notuboil", "notuboil kappa", float(arm_all["kappa"].mean()), anchor,
           r"\\kappa = (\d+\.\d+)\$")
     check("notuboil", "physics kappa", float(full[full.variant == "physics"]["kappa"].mean()),
@@ -397,7 +398,7 @@ def check_levels_prose():
         ("priced retaining", r"average \$\+(\d+\.\d+)\$ EUR", "priced", True),
         ("priced not retaining", r"against \$\+(\d+\.\d+)\$ for levels", "priced", False),
         ("original retaining", r"objective \(\$\+(\d+\.\d+)\$", "default", True),
-        ("original not retaining", r"vs\.\\ \$\+(\d+\.\d+)\$ under the original",
+        ("original not retaining", r"vs\.\\ \$\+(\d+\.\d+)\$ under the default",
          "default", False),
     ]
     for what, pat, objective, retaining in spec:
@@ -620,11 +621,12 @@ def check_guard_prose():
     g = d[d["condition"] == "guarded"]
     pl = d[d["condition"] == "plain"]
 
-    anchor = "the paired mean difference is"
-    check("guard", "guarded mean", -float(g["epi"].mean()), anchor,
+    anchor0 = "Guarded runs average"
+    check("guard", "guarded mean", -float(g["epi"].mean()), anchor0,
           r"average \$-(\d+\.\d+)\$ EUR")
-    check("guard", "unguarded mean", -float(pl["epi"].mean()), anchor,
+    check("guard", "unguarded mean", -float(pl["epi"].mean()), anchor0,
           r"against \$-(\d+\.\d+)\$ unguarded")
+    anchor = "The paired mean difference is"
     delta = _paired(d, "guarded", "plain")
     check("guard", "guard paired mean", -float(delta.mean()), anchor,
           r"difference is \$-(\d+\.\d+)\$")
@@ -653,9 +655,10 @@ def check_guard_prose():
     ka = d[d.condition == "guarded"].set_index(keys)["epi"].loc[ok]
     kb = d[d.condition == "plain"].set_index(keys)["epi"].loc[ok]
     comp = np.asarray(ka - kb, float)
-    check("guard", "completed-season difference", -float(comp.mean()), anchor2,
+    anchor2b = "Restricted to completed seasons"
+    check("guard", "completed-season difference", -float(comp.mean()), anchor2b,
           r"difference is \$-(\d+\.\d+)\$")
-    check("guard", "completed-season p", float(wilcoxon(comp)[1]), anchor2,
+    check("guard", "completed-season p", float(wilcoxon(comp)[1]), anchor2b,
           r"significant \(\$p=(\d+\.\d+)\$\)")
 
     sig = d[d["block"] == "signal"]
@@ -836,11 +839,11 @@ def check_disc_mechanism():
     check("disc-mechanism", "phys_ens over conf, wins", float((d > 0).sum()), anchor,
           r"(\d+) of 80 paired runs", tol=0.0)
 
-    anchor2 = "Among the two libraries that keep the term"
+    anchor2 = "Among the two libraries that keep the term, the raw one"
     e = np.asarray(ps.paired_deltas(pool, "sindy_mpc_raw_ens", "sindy_mpc_phys_ens"), float)
     e = e[~np.isnan(e)]
     check("disc-mechanism", "raw over phys_ens, mean", float(e.mean()), anchor2,
-          r"wins by \$\+(\d+\.\d+)\$")
+          r"ahead by \$\+(\d+\.\d+)\$")
     check("disc-mechanism", "raw over phys_ens, median", float(np.median(e)), anchor2,
           r"median \$\+(\d+\.\d+)\$")
     check("disc-mechanism", "raw over phys_ens, wins", float((e > 0).sum()), anchor2,
@@ -947,7 +950,7 @@ def check_disc_safeguards():
     check("disc-safeguards", "ppo margin shortfall",
           float(raw["epi"].mean() - ppo["epi"].mean()), anchor, r"at \$(\d+\.\d+)\$~EUR")
 
-    anchor2 = "Genuinely paired it collapses to one replicate's four seasons"
+    anchor2 = "paired test collapses to one replicate's four seasons"
     tune = ps.load_heuristic_tuning()
     tuned = tune[tune["block"] == "tuned_test"].set_index("test_year")["epi"]
     r0 = raw[raw["seed"] == 0].set_index("test_year")["epi"]
@@ -1017,7 +1020,7 @@ def check_disc_caveats():
     gap = float(max(abs(a[y] - b[y]) for y in years))
     check("disc-caveats", "largest harness gap", gap, anchor3, r"by up to \$(\d+\.\d+)\$")
 
-    anchor4 = "The extended Kalman filter observer is worse than doing nothing"
+    anchor4 = "The extended Kalman filter observer scores below the static model"
     ad = pd.read_csv(ps.RESULTS / "final" / "adapt.csv")
     ekf = ad[ad["condition"] == "ekf"]
     sta = ad[ad["condition"] == "static"]
@@ -1054,11 +1057,11 @@ def check_intro_prose():
     check("intro", "raw_ens in 2021", -a21, anchor, r"\(\$-(\d+\.\d+)\$ against")
     check("intro", "lowthr in 2021", b21, anchor, r"against \$\+(\d+\.\d+)\$ in 2021")
 
-    anchor2 = "gates the outcome but does not"
+    anchor2 = "Among the two libraries that keep the term the raw one"
     e = np.asarray(ps.paired_deltas(pool, "sindy_mpc_raw_ens", "sindy_mpc_phys_ens"), float)
     e = e[~np.isnan(e)]
     check("intro", "raw over phys_ens", float(e.mean()), anchor2,
-          r"still wins by \$\+(\d+\.\d+)\$")
+          r"still ahead by \$\+(\d+\.\d+)\$")
 
     rawlib = pool[pool["library"] == "raw"]
     physlib = pool[pool["library"] == "physics"]
@@ -1081,12 +1084,35 @@ def check_conclusions_prose():
 
     pool = ps.load_library_pool()
     conf = pool[pool["method"] == "sindy_mpc_conf"]
-    per = conf.groupby("seed")["boiler_alive"].max()
-    keep = conf[conf["seed"].isin(per[per > 0].index)]["epi"]
-    drop = conf[conf["seed"].isin(per[per == 0].index)]["epi"]
-    anchor = "Stratifying that recipe's own fits by survival agrees"
-    check("conclusions", "survival stratification p",
-          float(mannwhitneyu(keep, drop)[1]), anchor, r"significantly \(\$p=(\d+\.\d+)\$\)")
+    # survival is a property of the fit, so the unit is the seed: per-seed four-season
+    # means, 3 replicates that kept the term against 17 that lost it (the run-level split
+    # of 12 against 68 runs is the same 3 and 17 seeds counted four times over)
+    per = conf.groupby("seed").agg(epi=("epi", "mean"), alive=("boiler_alive", "max"))
+    keep = per[per["alive"] > 0]["epi"]
+    drop = per[per["alive"] == 0]["epi"]
+    anchor = "points the same way but is not significant at the level"
+    check("conclusions", "survival stratification p (seed level)",
+          float(mannwhitneyu(keep, drop)[1]), anchor,
+          r"replicates \(\$p=(\d+\.\d+)\$, \d+ against \d+\)")
+    check("conclusions", "replicates that kept the term", float(len(keep)), anchor,
+          r"\$p=\d+\.\d+\$, (\d+) against \d+\)", tol=0.0)
+    check("conclusions", "replicates that lost the term", float(len(drop)), anchor,
+          r"\$p=\d+\.\d+\$, \d+ against (\d+)\)", tol=0.0)
+    cmp("conclusions", "stratification points the same way (kept > lost)",
+        1.0 if float(keep.mean()) > float(drop.mean()) else 0.0, 1.0, 0.0)
+
+    # Finding 2: the two headline contrasts on per-seed means
+    full = full_pool()
+    d = ps.paired_deltas(full, "sindy_mpc_raw_ens", "sindy_mpc_lowthr").groupby(level="seed").mean()
+    tuned = full[full.method == "rule_based_tuned"].groupby("test_year")["epi"].mean()
+    g = full[full.method == "sindy_mpc_raw_ens"]
+    dt = (g["epi"] - g["test_year"].map(tuned)).groupby(g["seed"]).mean()
+    anchor_f2 = "both contrasts hold on per-seed"
+    check("conclusions", "raw vs physics-informed, seeds won", float((d > 0).sum()), anchor_f2,
+          r"\((\d+) of 20 and \d+ of 20", tol=0.0)
+    check("conclusions", "raw vs tuned heuristic, seeds won", float((dt > 0).sum()), anchor_f2,
+          r"\(\d+ of 20 and (\d+) of 20", tol=0.0)
+    cmp("conclusions", "seed counts", float(len(d)), 20.0, 0.0)
 
     d = pd.read_csv(ps.RESULTS / "design_priced_real" / "design_designPriced.csv")
     cp = d[d["factor"] == "coef_perturb"]
@@ -1108,6 +1134,7 @@ def check_conclusions_prose():
 
     g = pd.read_csv(ps.RESULTS / "final" / "guard.csv")
     delta = _paired(g, "guarded", "plain")
+    anchor2 = "The out-of-distribution guard is a negative result"
     check("conclusions", "guard paired mean", -float(delta.mean()), anchor2,
           r"paired mean \$-(\d+\.\d+)\$")
     dv = _paired(g.rename(columns={"epi": "_e", "violation_steps_total": "epi"}),
@@ -1455,6 +1482,25 @@ def check_structural_counts():
           100 * float(orc["season_fraction"].mean()), anchor6,
           r"at about \$(\d+)\\,\\%\$", tol=0.5)
 
+    # Section 2.9: how many wave manifests the tree holds, and how many distinct commits.
+    # These counts collide with other claimed values (20 seeds, 11 features), so the
+    # coverage walk cannot catch them drifting -- a wave added to the tree once moved
+    # both without any check noticing.
+    manifests = sorted(ps.RESULTS.rglob("regen_manifest.json"))
+    shas = {str(json.loads(m.read_text(encoding="utf-8")).get("git_sha")) for m in manifests}
+    anchor7 = "run manifests under"
+    check("counts", "wave manifests in the tree", float(len(manifests)), anchor7,
+          r"absent from all (\d+) run manifests", tol=0.0)
+    anchor8 = "distinct values across those"
+    check("counts", "distinct git_sha across manifests", float(len(shas)), anchor8,
+          r"(\d+) distinct values across those", tol=0.0)
+    check("counts", "manifests counted with the git_sha", float(len(manifests)), anchor8,
+          r"distinct values across those (\d+) manifests", tol=0.0)
+    cmp("counts", "no manifest carries an environment block",
+        float(sum(1 for m in manifests
+                  if {"env", "env_hash", "environment"}
+                  & set(json.loads(m.read_text(encoding="utf-8"))))), 0.0, 0.0)
+
 
 # ---------------------------------------------------------------------------
 # Integer-valued claims: the configuration constants
@@ -1487,6 +1533,63 @@ def check_config_constants():
             check("config", "search generator seed", float(m.group(1)),
                   "drawn i.i.d.\\ uniformly from a fixed generator",
                   r"default\\_rng\((\d+)\)", tol=0.0)
+
+    # Section 2.1: the excitation applied while collecting identification data. The
+    # amplitudes are regen_config constants; the two periods are defaults of the collector
+    # (prbs_period) and of the protocol dataclass (noise_period).
+    utils_src = (HERE.parent.parent / "article_experiment_utils.py").read_text(encoding="utf-8")
+    proto_src = (HERE.parent.parent / "protocol_config.py").read_text(encoding="utf-8")
+    anchor_x = "pseudo-random binary excitation of amplitude"
+    check("config", "PRBS amplitude", float(getattr(C, "PRBS_SCALE", float("nan"))), anchor_x,
+          r"excitation of amplitude (\d+\.\d+)")
+    m = re.search(r"prbs_period: int = (\d+)", utils_src)
+    check("config", "PRBS switching period (steps)", float(m.group(1)) if m else float("nan"),
+          anchor_x, r"redrawn every (\d+) steps \(", tol=0.0)
+    check("config", "PRBS switching period (hours)",
+          float(m.group(1)) * float(C.PERIOD) / 3600 if m else float("nan"),
+          anchor_x, r"steps \((\d+)~h\)", tol=0.0)
+    check("config", "noise amplitude", float(getattr(C, "NOISE_SCALE", float("nan"))), anchor_x,
+          r"standard deviation (\d+\.\d+)")
+    m = re.search(r"noise_period: int = (\d+)", proto_src)
+    check("config", "noise refresh period (steps)", float(m.group(1)) if m else float("nan"),
+          anchor_x, r"redrawn every (\d+) steps, the sum", tol=0.0)
+    check("config", "training steps per season", float(main["steps_expected"].max()),
+          anchor_x, r"trajectories of (\d+) control steps", tol=0.0)
+
+    # Section 2.3: the reinforcement-learning budget, and the reference budget it is set
+    # against -- Table 2 of van Laatum, van Henten & Boersma, GreenLight-Gym
+    # (arXiv:2410.05336): total timesteps 2M for PPO and SAC. The reference value is an
+    # external constant and is recorded here, not derived.
+    anchor_rl = "The training budget of the two agents is also modest"
+    rl_steps = float(getattr(C, "RL_TRAIN_STEPS", float("nan")))
+    s = sentence(anchor_rl)
+    m1 = re.search(r"\$(\d)\\cdot10\^\{(\d)\}\$ environment steps", s)
+    m2 = re.search(r"against the \$(\d)\\cdot10\^\{(\d)\}\$ steps", s)
+    cmp("config", "RL training steps", rl_steps,
+        float(m1.group(1)) * 10 ** float(m1.group(2)) if m1 else float("nan"), 0.0)
+    cmp("config", "GreenLight-Gym reference RL budget (external constant)", 2e6,
+        float(m2.group(1)) * 10 ** float(m2.group(2)) if m2 else float("nan"), 0.0)
+    check("config", "RL budget in seasons", rl_steps / float(main["steps_expected"].max()),
+          anchor_rl, r"about (\d+)\s+seasons", tol=0.5)
+
+    # Section 2.4: the size of the degree-1 candidate set per state equation and in Xi
+    names = ps.library_feature_names()
+    n_feat = {lib: len(v) for lib, v in names.items()}
+    n_feat.setdefault("physics_no_tuboil", n_feat["physics"] - 1)
+    anchor_lib = "each state equation selects from"
+    for i, lib in enumerate(("raw", "physics_no_cross", "physics")):
+        pat = (r"selects from (\d+), \d+ and \d+ columns", r"selects from \d+, (\d+) and \d+ columns",
+               r"selects from \d+, \d+ and (\d+) columns")[i]
+        check("config", f"candidate columns, {lib}", float(1 + 3 + n_feat[lib]), anchor_lib,
+              pat, tol=0.0)
+    check("config", "candidate columns, deletion library",
+          float(1 + 3 + n_feat["physics_no_tuboil"]), anchor_lib,
+          r"\((\d+) for the deletion library\)", tol=0.0)
+    for i, lib in enumerate(("raw", "physics_no_cross", "physics", "physics_no_tuboil")):
+        pat = (r"that is (\d+), \d+, \d+ and \d+ candidate", r"that is \d+, (\d+), \d+ and \d+ candidate",
+               r"that is \d+, \d+, (\d+) and \d+ candidate", r"that is \d+, \d+, \d+ and (\d+) candidate")[i]
+        check("config", f"candidate coefficients, {lib}", float(3 * (1 + 3 + n_feat[lib])),
+              anchor_lib, pat, tol=0.0)
 
 
 # ---------------------------------------------------------------------------
@@ -1534,19 +1637,33 @@ def check_bounds_prose():
 
     # the MPC's own hard bounds, which are tighter at the bottom and looser at the top
     # than the simulator's productive corridor and must not be confused with it
-    anchor5 = "temperature is hard-bounded to"
+    anchor5 = "the temperature bounds"
     lo = re.search(r'mpc\.bounds\["lower", "_x", "t_in"\] = ([\d.]+)', utils)
     hi = re.search(r'mpc\.bounds\["upper", "_x", "t_in"\] = ([\d.]+)', utils)
     vent = re.search(r'mpc\.bounds\["upper", "_u", "uVent"\] = ([\d.]+)', utils)
     if lo and hi and vent:
         check("bounds", "MPC temperature lower bound", float(lo.group(1)), anchor5,
-              r"hard-bounded to \$\[(\d+),", tol=0.0)
+              r"temperature bounds \$\[(\d+),", tol=0.0)
         check("bounds", "MPC temperature upper bound", float(hi.group(1)), anchor5,
-              r"hard-bounded to \$\[\d+,(\d+)\]", tol=0.0)
+              r"temperature bounds \$\[\d+,(\d+)\]", tol=0.0)
         check("bounds", "MPC ventilation upper bound", float(vent.group(1)), anchor5,
-              r"ventilation to \$\[0,(\d+\.\d+)\]")
+              r"ventilation bound \$(\d+\.\d+)\$")
     else:
         cmp("bounds", "MPC bounds not found", 0.0, 1.0, 0.0)
+
+    # the move-suppression weights of Equation (3), read from do-mpc's set_rterm call in
+    # the order the equation states them (boiler, CO2, thermal screen, vent, lamps, blackout)
+    rterm = re.search(r"set_rterm\((.*?)\)", utils, re.S)
+    if rterm:
+        got = {k: float(v) for k, v in re.findall(r"(\w+)=([\d.]+)", rterm.group(1))}
+        order = ("uBoil", "uCO2", "uThScr", "uVent", "uLamp", "uBlScr")
+        anchor6 = "in the actuator order of"
+        for i, name in enumerate(order):
+            pat = r"diag\}\(" + r"\d+," * i + r"(\d+)"
+            check("bounds", f"move-suppression weight {name}", got.get(name, float("nan")),
+                  anchor6, pat, tol=0.0)
+    else:
+        cmp("bounds", "set_rterm block not found", 0.0, 1.0, 0.0)
 
     # outdoor CO2 is a fixed weather column, not a corridor
     weather = (HERE.parent.parent / "make_weather.py").read_text(encoding="utf-8")
@@ -1590,7 +1707,7 @@ def check_association_prose():
     check("association", "physics_no_cross, priced",
           association(priced, "physics_no_cross"), anchor, r"\$p=(\d+\.\d+)\$ priced")
     check("association", "physics_no_cross, original",
-          association(default, "physics_no_cross"), anchor, r"\$p=(\d+\.\d+)\$ original")
+          association(default, "physics_no_cross"), anchor, r"\$p=(\d+\.\d+)\$ default")
     check("association", "raw, priced", association(priced, "raw"), anchor,
           r"raw\} \(\$p=(\d+\.\d+)\$")
     check("association", "raw, original", association(default, "raw"), anchor,
@@ -1653,6 +1770,160 @@ def check_knock_caption():
     check("knockcaption", "knock-out positives as printed",
           float((eff[("priced", "knockout")] > 0).sum()), anchor2,
           r"one positive replicate of (\d+)", group=1, tol=19.5)
+
+
+# ---------------------------------------------------------------------------
+# Section 3.3 -- the headline contrast by season and at seed level, and the seed-level
+# count of controllers separable from the tuned heuristic
+# ---------------------------------------------------------------------------
+
+@passage("seedlevel")
+def check_seed_level_prose():
+    """The seed is the unit at which the surrogates are independent; these sentences
+    restate the run-level results on per-seed four-season means, Holm over the family of
+    15 with monotone enforcement, exactly as the two tables do."""
+    from scipy.stats import wilcoxon
+
+    pool = full_pool()
+
+    def p_of(d):
+        d = np.asarray(d, float)
+        d = d[~np.isnan(d)]
+        return wilcoxon(d)[1] if len(d) > 1 and np.any(d != 0) else 1.0
+
+    # (a) the headline paired contrast raw_ens - lowthr
+    anchor = "is paired on (seed, season)"
+    d = ps.paired_deltas(pool, "sindy_mpc_raw_ens", "sindy_mpc_lowthr")
+    check("seedlevel", "headline paired mean", float(d.mean()), anchor, r"mean \$\+(\d+\.\d+)\$")
+    check("seedlevel", "headline paired median", float(d.median()), anchor,
+          r"median \$\+(\d+\.\d+)\$")
+    check("seedlevel", "headline paired wins", float((d > 0).sum()), anchor,
+          r"ahead in (\d+) of 80 pairs", tol=0.0)
+    check("seedlevel", "headline paired n", float(len(d)), anchor,
+          r"ahead in \d+ of (\d+) pairs", tol=0.0)
+    rp = {}
+    for m in pool["method"].unique():
+        if m != "sindy_mpc_raw_ens":
+            rp[m] = p_of(ps.paired_deltas(pool, "sindy_mpc_raw_ens", m))
+    check("seedlevel", "headline paired p_Holm(15)", _holm(rp, 15)["sindy_mpc_lowthr"],
+          anchor, r"p_\{\\text\{Holm\}\}=(\d+\.\d+)\\times10\^\{-4\}", scale=1e-4)
+
+    anchor2 = "It is not uniform across seasons"
+    by_year = {}
+    for yr in (2020, 2021, 2022, 2023):
+        a = pool[(pool.method == "sindy_mpc_raw_ens") & (pool.test_year == yr)].set_index("seed")["epi"]
+        b = pool[(pool.method == "sindy_mpc_lowthr") & (pool.test_year == yr)].set_index("seed")["epi"]
+        by_year[yr] = (a - b).dropna()
+    check("seedlevel", "2020 wins", float((by_year[2020] > 0).sum()), anchor2,
+          r"leads in all (\d+) replicates in 2020", tol=0.0)
+    cmp("seedlevel", "2023 wins equal 2020 wins", float((by_year[2023] > 0).sum()),
+        float((by_year[2020] > 0).sum()), 0.0)
+    check("seedlevel", "2022 wins", float((by_year[2022] > 0).sum()), anchor2,
+          r"and in (\d+) in 2022", tol=0.0)
+    check("seedlevel", "2021 wins", float((by_year[2021] > 0).sum()), anchor2,
+          r"trails in 2021 \((\d+) of 20", tol=0.0)
+    check("seedlevel", "2021 p", p_of(by_year[2021]), anchor2,
+          r"\$p=(\d+\.\d+)\\times10\^\{-3\}", scale=1e-3)
+
+    anchor3 = "it holds in 16 of 20 replicates"
+    ds = d.groupby(level="seed").mean()
+    rs = {}
+    for m in pool["method"].unique():
+        if m != "sindy_mpc_raw_ens":
+            rs[m] = p_of(ps.paired_deltas(pool, "sindy_mpc_raw_ens", m).groupby(level="seed").mean())
+    check("seedlevel", "headline seed-level wins", float((ds > 0).sum()), anchor3,
+          r"holds in (\d+) of 20 replicates", tol=0.0)
+    check("seedlevel", "headline seed-level n", float(len(ds)), anchor3,
+          r"holds in \d+ of (\d+) replicates", tol=0.0)
+    check("seedlevel", "headline seed-level p_Holm(15)", _holm(rs, 15)["sindy_mpc_lowthr"],
+          anchor3, r"p_\{\\text\{Holm\}\}=(\d+\.\d+)\\times10\^\{-3\}", scale=1e-3)
+
+    # (b) the seed-level count against the tuned heuristic
+    tuned = pool[pool.method == "rule_based_tuned"].groupby("test_year")["epi"].mean()
+    seed_d, seed_p = {}, {}
+    for m in pool["method"].unique():
+        if m == "rule_based_tuned":
+            continue
+        g = pool[pool.method == m]
+        per = (g["epi"] - g["test_year"].map(tuned)).groupby(g["seed"]).mean()
+        seed_d[m] = np.asarray(per, float)
+        seed_p[m] = p_of(per)
+    adj = _holm(seed_p, 15)
+    anchor4 = "On per-seed means the count"
+    check("seedlevel", "raw_ens seed wins", float((seed_d["sindy_mpc_raw_ens"] > 0).sum()),
+          anchor4, r"\((\d+) of 20 and \d+ of 20 seeds", tol=0.0)
+    check("seedlevel", "raw seed wins", float((seed_d["sindy_mpc_raw"] > 0).sum()),
+          anchor4, r"\(\d+ of 20 and (\d+) of 20 seeds", tol=0.0)
+    check("seedlevel", "raw_ens seed p_Holm", adj["sindy_mpc_raw_ens"], anchor4,
+          r"p_\{\\text\{Holm\}\}=(\d+\.\d+)\\times10\^\{-5\}", scale=1e-5)
+    check("seedlevel", "raw seed p_Holm", adj["sindy_mpc_raw"], anchor4,
+          r"10\^\{-5\}\$ and \$(\d+\.\d+)\$\)")
+    check("seedlevel", "lowthr seed wins", float((seed_d["sindy_mpc_lowthr"] > 0).sum()),
+          anchor4, r"\((\d+) of 20 each", tol=0.0)
+    cmp("seedlevel", "dense seed wins equal lowthr's", float((seed_d["sindy_mpc_dense"] > 0).sum()),
+        float((seed_d["sindy_mpc_lowthr"] > 0).sum()), 0.0)
+    check("seedlevel", "lowthr seed p_Holm", adj["sindy_mpc_lowthr"], anchor4,
+          r"of 20 each, \$p_\{\\text\{Holm\}\}=(\d+\.\d+)\$\)")
+    cmp("seedlevel", "dense seed p_Holm equals lowthr's", adj["sindy_mpc_dense"],
+        adj["sindy_mpc_lowthr"], 1e-9)
+    # the two that lose significance below the reference
+    cmp("seedlevel", "conf not significant at seed level",
+        1.0 if adj["sindy_mpc_conf"] > 0.05 else 0.0, 1.0, 0.0)
+    cmp("seedlevel", "dense_dagger not significant at seed level",
+        1.0 if adj["sindy_mpc_dense_dagger"] > 0.05 else 0.0, 1.0, 0.0)
+    cmp("seedlevel", "phys_ens, phys, conf_dagger not significant at seed level",
+        float(sum(adj[m] > 0.05 for m in ("sindy_mpc_phys_ens", "sindy_mpc_phys",
+                                          "sindy_mpc_conf_dagger"))), 3.0, 0.0)
+
+
+# ---------------------------------------------------------------------------
+# Section 3.5 -- Figure 1d: how far the surviving boiler coefficients sit above the cut
+# ---------------------------------------------------------------------------
+
+@passage("paneld")
+def check_panel_d_prose():
+    """Surviving |xi_uBoil| per library, ensemble arm of the one-factor set. Only survivors
+    are observable: a cut coefficient is stored as exactly zero."""
+    coef = ps.boiler_coefficients("ensemble")
+    alive = {lib: np.sort(coef[(coef["library"] == lib) & coef["alive"]]["abs_xi"].to_numpy(float))
+             for lib in ("raw", "physics_no_cross", "physics")}
+    total = {lib: int((coef["library"] == lib).sum()) for lib in alive}
+    anchor = "Where the direct boiler coefficient survives"
+    check("paneld", "raw survivors, low", float(alive["raw"].min()), anchor,
+          r"lies between \$(\d+\.\d+)\$ and \$\d+\.\d+\$ in the raw")
+    check("paneld", "raw survivors, high", float(alive["raw"].max()), anchor,
+          r"lies between \$\d+\.\d+\$ and \$(\d+\.\d+)\$ in the raw")
+    check("paneld", "raw survivors, median", float(np.median(alive["raw"])), anchor,
+          r"in the raw library \(median \$(\d+\.\d+)\$")
+    check("paneld", "raw survivors, count", float(len(alive["raw"])), anchor,
+          r"in the raw library \(median \$\d+\.\d+\$, (\d+) of 20", tol=0.0)
+    cmp("paneld", "raw replicates", float(total["raw"]), 20.0, 0.0)
+    check("paneld", "no-cross survivors, low", float(alive["physics_no_cross"].min()), anchor,
+          r"and between \$(\d+\.\d+)\$ and \$\d+\.\d+\$ in the library without")
+    check("paneld", "no-cross survivors, high", float(alive["physics_no_cross"].max()), anchor,
+          r"and between \$\d+\.\d+\$ and \$(\d+\.\d+)\$ in the library without")
+    check("paneld", "no-cross survivors, median", float(np.median(alive["physics_no_cross"])),
+          anchor, r"without cross terms \(median \$(\d+\.\d+)\$")
+    check("paneld", "no-cross survivors, count", float(len(alive["physics_no_cross"])), anchor,
+          r"without cross terms \(median \$\d+\.\d+\$, (\d+) of 20", tol=0.0)
+    ph = alive["physics"]
+    check("paneld", "physics survivors, count", float(len(ph)), anchor,
+          r"\d+ of its (\d+) survivors", tol=0.0)
+    check("paneld", "physics survivors, low group", float(((ph >= 0.05) & (ph < 0.07)).sum()),
+          anchor, r"(\d+) of its \d+ survivors lie between \$0\.05\$ and \$0\.07\$", tol=0.0)
+    check("paneld", "physics survivors, high group", float(((ph >= 0.14) & (ph < 0.20)).sum()),
+          anchor, r"and (\d+) between \$0\.14\$ and \$0\.19\$", tol=0.0)
+    check("paneld", "physics survivors, high group ceiling", float(ph.max()), anchor,
+          r"between \$0\.14\$ and \$(\d+\.\d+)\$")
+    check("paneld", "physics survivors, median", float(np.median(ph)), anchor,
+          r"\$0\.19\$ \(median \$(\d+\.\d+)\$\)")
+    anchor2 = "so the survival gap between them"
+    check("paneld", "raw survivors restated", float(len(alive["raw"])), anchor2,
+          r"\((\d+) against \d+ of 20\)", tol=0.0)
+    check("paneld", "no-cross survivors restated", float(len(alive["physics_no_cross"])), anchor2,
+          r"\(\d+ against (\d+) of 20\)", tol=0.0)
+    cmp("paneld", "every raw and no-cross survivor is below 0.10",
+        float(max(alive["raw"].max(), alive["physics_no_cross"].max()) < 0.10), 1.0, 0.0)
 
 
 def main() -> int:

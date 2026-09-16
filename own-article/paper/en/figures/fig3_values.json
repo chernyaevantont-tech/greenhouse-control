@@ -287,20 +287,6 @@
     },
     "controllers": [
       {
-        "survival": 0.0,
-        "library": "none",
-        "gid": "b:ctrl:0.0000:none",
-        "methods": [
-          "nn_mpc"
-        ],
-        "n_seeds": [
-          10
-        ],
-        "epi": [
-          -3.818470238845088
-        ]
-      },
-      {
         "survival": 0.15,
         "library": "physics_no_cross",
         "gid": "b:ctrl:0.1500:physics_no_cross",
@@ -666,9 +652,6 @@
           0.0,
           0.0
         ]
-      },
-      "b:ctrl:0.0000:none": {
-        "y": 0.0
       },
       "b:ctrl:0.1500:physics_no_cross": {
         "y": 0.15

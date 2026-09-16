@@ -1,20 +1,18 @@
-"""Unified runner for the article regeneration (regen-v2).
+"""Driver of the article regeneration (regen-v2).
 
-ONE driver produces EVERY number in the paper, from ONE config (`regen_config.py`), into
-ONE output tree. The 2026-07 state had four runners writing four mutually inconsistent
-headline tables; this replaces that.
+One driver produces every number in the paper, from one configuration (`regen_config.py`),
+into one output tree, so that no two tables can come from runners that disagree.
 
 Experiments
   main       10 controllers x 4 test years x 20 seeds  (the headline table, multi-season)
   mechanism  lambda sweep + single-coefficient knock-out/knock-in + cross-term interaction
   parity     oracle horizon sweep + action-replay model-error decomposition
 
-Compute is NOT reimplemented: every rollout calls the already-validated
-`article_experiment_utils` API. What this driver owns is the parts that were inconsistent:
-recipe (with an explicit threshold), horizon, solver budget, train years, seed set, and a
-provenance stamp on every row.
+Compute is not reimplemented: every rollout calls the `article_experiment_utils` API. What
+this driver owns is the recipe (with an explicit threshold), the horizon, the solver budget,
+the training years, the seed set, and a provenance stamp on every row.
 
-Sharding: round-robin by seed, matching the existing cluster harness
+Sharding: round-robin by seed, as the cluster jobs expect
 (``--shard-index $JOB_COMPLETION_INDEX --num-shards N --seeds-all 0,...,19``).
 
 Examples
@@ -48,12 +46,10 @@ import pandas as pd  # noqa: E402
 import article_experiment_utils as U  # noqa: E402
 import e3_dagger_compare as D  # noqa: E402
 import regen_config as C  # noqa: E402
-# Coefficient surgery is NOT reimplemented here: run_knockout_ablation already ships a
-# validated shim (`_CoefOverride` + `_term_index` + `_variant_bundle`) that edits the
-# coefficient matrix without touching pysindy internals and without deep-copying a fitted
-# model. build_mpc_controller only reads `bundle.model.coefficients()`, which is exactly
-# what that shim overrides. Reused verbatim so the intervention is identical to the
-# 2026-07 knockout run and differences between the two are data, not implementation.
+# Coefficient edits reuse run_knockout_ablation's shim (`_CoefOverride` + `_term_index` +
+# `_variant_bundle`), which edits the coefficient matrix without touching pysindy internals
+# and without deep-copying a fitted model; build_mpc_controller reads only
+# `bundle.model.coefficients()`, which is what the shim overrides.
 import run_knockout_ablation as K  # noqa: E402
 import repro  # noqa: E402
 
@@ -75,9 +71,9 @@ import repro  # noqa: E402
 # dispersion (+-4.33 EUR/m2 on a mean of 1.18): that spread is a mixture of
 # boiler-survived and boiler-dropped draws.
 #
-# Fixed HERE rather than in article_experiment_utils so the shared module keeps behaving
-# as the 2026-07 runs did (their numbers stay interpretable); the regen pins the global RNG
-# from the run coordinates before every fit and records the value it used.
+# Pinned here rather than in article_experiment_utils so the shared module's behaviour is
+# unchanged for its other callers; the regen pins the global RNG from the run coordinates
+# before every fit and records the value it used.
 
 def pin_rng(*parts) -> int:
     """Seed every global RNG from the run coordinates. Returns the seed for the record.
@@ -106,10 +102,8 @@ def fit_sindy_seeded(data, pc, *, seed: int, label: str, recipe: dict, draw: int
     # it every number already computed.
     #
     # Why this exists: for `optimizer="ensemble"` the bagging draw is a variance component
-    # of the same order as the seed-to-seed variance, and both the 2026-07 run and the first
-    # regen collapsed it to ONE realisation per seed reported as a point estimate. That is
-    # how the same pipeline produced "+2.43, first in all four seasons" and "-0.12, fourth".
-    # Sweeping `draw` turns it into a measured axis instead of an unstated one.
+    # of the same order as the seed-to-seed variance. A single realisation per seed reports
+    # one draw as if it were the method; sweeping `draw` turns the draw into a measured axis.
     parts = [C.REGEN_ID, "fit", label, key, seed] + ([draw] if draw else [])
     rs = pin_rng(*parts)
     b = U.fit_sindy(data, period=float(pc.period),
@@ -140,11 +134,11 @@ def build_model(ctrl: str, pc, train_s, seed: int, fast: bool, draw: int = 0):
     DAgger row moved so much more between runs than any single-fit controller.
     """
     recipe_of = {"sindy_mpc_conf": "confirmatory", "sindy_mpc_dense": "dense",
-                 # `sindy_mpc_lowthr` was `grey_box_mpc`. Same estimator as `dense`, only
-                 # threshold 1e-6. NOT a first-principles model -- README G-1.
+                 # `sindy_mpc_lowthr`: the same estimator as `dense` at threshold 1e-6,
+                 # not a first-principles model (regen_config.build_true_greybox).
                  "sindy_mpc_lowthr": "lowthr",
-                 # N-7: the raw library, which the corrected ladder ranks first on both
-                 # pre-registered open-loop metrics. See regen_config.EXT_RECIPES.
+                 # the raw library, which the ladder ranks first on both pre-specified
+                 # open-loop metrics. See regen_config.EXT_RECIPES.
                  "sindy_mpc_raw": "raw_stlsq", "sindy_mpc_raw_ens": "raw_ens",
                  # the end of the conditioning series (kappa 53.4)
                  "sindy_mpc_phys": "phys_stlsq", "sindy_mpc_phys_ens": "phys_ens",
@@ -257,7 +251,7 @@ def score(df: pd.DataFrame, econ, pc) -> dict:
     #                   loses the rest of the season -- and dropping it flatters exactly
     #                   the controllers that wreck the house. Keep.
     #
-    # Measured on the 2026-08-04 run: 20 oracle seasons in 2022 hit the solver budget,
+    # Measured on the canonical main wave: 20 oracle seasons in 2022 hit the solver budget,
     # while 42 others (31 of them nn_mpc) were ended by the simulator with zero solver
     # failures. Dropping all 62 removed 31 of nn_mpc's 80 seasons -- survivorship bias of
     # the exact kind this paper criticises elsewhere.
@@ -329,7 +323,7 @@ def exp_mechanism(args, seeds, pc, econ, out: Path) -> int:
                   model that has it, knock-in from a model that lacks it. This, not the
                   lambda sweep, is what licenses a causal claim.
       cross       the same on the `physics` library, separating uBoil from the bilinear
-                  t_in*uBoil term, which the 2026-07 run showed carries part of the effect.
+                  t_in*uBoil term.
     """
     rows, path = [], out / f"mechanism_{args.tag}.csv"
     year = C.IN_DIST_YEAR
@@ -408,7 +402,7 @@ def exp_parity(args, seeds, pc, econ, out: Path) -> int:
 
     horizon  the SAME oracle at several horizons, so "short-horizon greed" is measured.
     replay   one-step vs free-run surrogate error on the oracle's own action sequence,
-             which separates model error from optimiser error (reviewer item #6).
+             which separates model error from optimiser error.
     """
     rows, path = [], out / f"parity_{args.tag}.csv"
     year = C.IN_DIST_YEAR
@@ -477,8 +471,8 @@ def _with_uboil(bundle, uboil: float | None, cross: float | None = None, label: 
     """`bundle` with ONLY the uBoil->t_in (and optionally t_uBoil->t_in) coefficient set.
 
     Everything else -- library, scalers, other terms, MPC construction -- is untouched. That
-    single-factor property is what licenses a causal reading, and is exactly what the lambda
-    sweep lacks (there the surviving-term count moves 54 -> 20 at the same time).
+    single-factor property is what licenses a causal reading; the lambda sweep lacks it
+    (there the surviving-term count moves 54 -> 20 at the same time).
 
     Passing None leaves a term alone, so ko_uboil / ko_cross / ko_both are all expressible.
     """

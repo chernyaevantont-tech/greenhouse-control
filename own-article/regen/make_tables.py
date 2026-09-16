@@ -1,21 +1,22 @@
-"""Every number the paper states, derived from the merged regen output. One lineage.
+"""Derived tables of a merged regeneration tree.
 
-Run after `run_regen.py --merge`. Reads only `<out>/{main,mechanism,parity,ladder,adapt,
-guard,faults,design}.csv` and writes `<out>/tables/*.csv` plus `NUMBERS.md`, which maps
-each claim in the manuscript to the file, column and row it comes from. That mapping is
-the actual deliverable: it is what makes "confidence in the numbers" checkable rather than
-asserted.
+Run after `run_regen.py --merge`. Reads `<out>/{main,mechanism,parity,ladder,adapt,guard,
+faults,design}.csv` and writes `<out>/tables/*.csv` plus `<out>/tables/SUMMARY.md`, a short
+summary of that tree (leader, test types, gate counts, draw-axis statistics).
 
-Statistical choices worth stating, because the 2026-07 analysis got two of them wrong:
+The summary describes the tree it was computed from. The manuscript's claim map, with
+every stated quantity recomputed and traced to its file, is `results/final/NUMBERS.md`,
+written from the manuscript's own verification checks (`paper/en/make_numbers_md.py`).
 
-* The rule-based reference is DETERMINISTIC on a fixed season (epi_std == 0 in every year).
-  A "paired Wilcoxon by seed" against it is arithmetically a ONE-SAMPLE signed-rank test of
-  the contender against a constant; pairing removes no variance. This module detects the
-  zero-variance case and labels the test accordingly (`test_type` column) instead of
-  reporting it as paired.
+Two statistical conventions:
+
+* The rule-based reference is deterministic on a fixed season (epi_std == 0 in every year).
+  A paired signed-rank test by seed against it is arithmetically a one-sample test of the
+  contender against a constant; pairing removes no variance. The zero-variance case is
+  detected and the test labelled accordingly (`test_type` column).
 * Four seasons is a small sample for a season-level claim. The cross-season mean is
-  therefore reported with a bootstrap interval over SEASONS, and the headline is the
-  per-season win count, not the interval.
+  reported with a bootstrap interval over seasons, and the headline is the per-season win
+  count rather than the interval.
 
 Prices: `epi_metrics` reads the simulator's per-step profit, so prices cannot be varied
 inside a rollout. They are re-derived exactly from the recorded physical quantities
@@ -113,7 +114,7 @@ def _usable(d: pd.DataFrame) -> pd.DataFrame:
     greenhouse somewhere GreenLight will not continue from, and the truncated EPI is what
     the grower actually gets. Excluding it would drop 31 of nn_mpc's 80 seasons and flatter
     precisely the controller that wrecks the house. Only a solver abort, where the
-    controller never produced an action, is genuinely uninformative.
+    controller never produced an action, carries no information.
 
     `stop_reason` is written by run_regen.score(); it is derived here for runs produced
     before that column existed, so old output stays analysable.
@@ -143,7 +144,7 @@ def table_main(d: pd.DataFrame, tdir: Path, claims: list) -> None:
               .agg(mean_over_seasons=("epi_mean", "mean"),
                    worst_season=("epi_mean", "min"), seasons=("epi_mean", "size"))
               .reset_index())
-    # Bootstrap over SEASONS (n=4): the honest interval for a cross-season statement.
+    # Bootstrap over seasons (n=4): the interval that matches a cross-season statement.
     cis = {}
     for m, g in by_year.groupby("method"):
         cis[m] = _boot_ci(g.epi_mean.to_numpy())
@@ -429,7 +430,10 @@ def main() -> int:
 
     man = out / "regen_manifest.json"
     meta = json.loads(man.read_text(encoding="utf-8")) if man.exists() else {}
-    lines = ["# NUMBERS — every stated result and where it comes from", "",
+    lines = ["# SUMMARY — derived statistics of this results tree", "",
+             "This file summarises the tree it was generated from. It is not the manuscript's",
+             "claim map; that is `results/final/NUMBERS.md`, generated from the manuscript's",
+             "verification checks (`paper/en/make_numbers_md.py`).", "",
              f"- config_hash: `{meta.get('config_hash', C.config_hash())}`",
              f"- git_sha: `{meta.get('git_sha', C.git_sha())}`",
              f"- env_hash: `{(meta.get('env') or {}).get('env_hash', 'n/a')}`", "",
@@ -439,10 +443,10 @@ def main() -> int:
     lines += ["", "Regenerate with:", "",
               "```bash", "python run_regen.py --merge --out <out> && python make_tables.py --out <out>",
               "```", ""]
-    (out / "NUMBERS.md").write_text("\n".join(lines), encoding="utf-8")
+    (tdir / "SUMMARY.md").write_text("\n".join(lines), encoding="utf-8")
 
     print(f"wrote {len(list(tdir.glob('*.csv')))} tables -> {tdir}")
-    print(f"wrote {out / 'NUMBERS.md'} ({len(claims)} claims)")
+    print(f"wrote {tdir / 'SUMMARY.md'} ({len(claims)} rows)")
     for c, v, _src in claims:
         print(f"  - {c}: {v}")
     return 0

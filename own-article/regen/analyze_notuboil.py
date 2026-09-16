@@ -1,12 +1,12 @@
 """Analysis of the 17-feature library wave (``notuboil/``) -- the falsifiable
 test of the bilinear-detour reading.
 
-The detour reading (manuscript, 2026-08-14 assembly) says ``physics_no_cross``
+The detour reading says ``physics_no_cross``
 is the worst library because the sparsity threshold severs the direct boiler
 term and -- unlike the full ``physics`` library -- it holds no bilinear
 ``t_in*uBoil`` term able to carry the heating pathway instead.
 
-PREDICTION registered in ``regen_config.py`` (NOTUBOIL_*): deleting that one
+PREDICTION stated in advance in ``regen_config.py`` (NOTUBOIL_*): deleting that one
 feature collapses the library onto ``physics_no_cross`` -- boiler survival near
 15 %, EPI near +0.3 -- not onto ``physics`` (~55 %, ~+2.75).
 
@@ -26,7 +26,7 @@ Seed-level survival compared by exact McNemar (binomial on discordant pairs).
 
 Writes ``results/notuboil/analysis_notuboil.md`` and prints it.
 
-Run:  .venv-regen/Scripts/python.exe own-article/regen/analyze_notuboil.py
+Run:  python analyze_notuboil.py
 """
 
 from __future__ import annotations
@@ -162,10 +162,10 @@ def main() -> None:
         w("\nReference (canonical ladder, 20 seeds): raw 8.21/2.67/0.000; "
           "physics_no_cross 24.52/10.58/0.020; physics 53.43/24.27/0.076.")
 
-    # ── Verdict against the registered prediction ───────────────────────────
+    # ── Verdict against the prediction stated in advance ───────────────────────────
     g = pool[pool["method"] == "sindy_mpc_notuboil_ens"]
     k, n, psurv, lo, hi = seed_survival(g)
-    w("\n## Verdict against the registered prediction\n")
+    w("\n## Verdict against the prediction stated in advance\n")
     w("- Predicted if the detour reading is right: survival ~0.15, EPI ~+0.3.")
     w(f"- Measured (ensemble): survival {psurv:.2f} ({k}/{n}, Wilson {lo:.2f}-{hi:.2f}), "
       f"EPI {g['epi'].mean():+.2f} (median {g['epi'].median():+.2f}).")

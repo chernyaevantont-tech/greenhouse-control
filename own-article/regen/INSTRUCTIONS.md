@@ -102,10 +102,10 @@ python run_regen.py --merge --out ./results/raw && python make_tables.py --out .
 `verify_regen.py` exits non-zero on blocking failures. On the shipped tree that is expected
 and explained: the two blocking failures are `oracle_mpc` solver aborts, discussed under
 "Acceptance gates" in `README.md`. What matters is that the *other* gates pass and that
-`NUMBERS.md` regenerates.
+`tables/SUMMARY.md` regenerates.
 
-The deliverables are `results/raw/tables/*.csv` and `results/raw/NUMBERS.md`, the
-claim → value → source-file map.
+The deliverables are `results/raw/tables/*.csv` and `results/raw/tables/SUMMARY.md`, the
+derived summary of that tree.
 
 ---
 

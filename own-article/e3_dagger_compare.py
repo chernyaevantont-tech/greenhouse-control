@@ -35,7 +35,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import article_experiment_utils as U  # noqa: E402
 import protocol_config as P  # noqa: E402
 
-# Confirmatory (frozen, pre-registered) vs dense (boiler-preserving) recipes.
+# Confirmatory (frozen, pre-specified) vs dense (boiler-preserving) recipes.
 CONF = dict(feature_variant="physics_no_cross", library_degree=1, optimizer="ensemble", denoise="none")
 DENSE = dict(feature_variant="physics_no_cross", library_degree=1, optimizer="stlsq", threshold=1e-3)
 

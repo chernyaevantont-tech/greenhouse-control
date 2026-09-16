@@ -1,8 +1,7 @@
 """Figure 2 -- Pareto plane: economic margin against constraint pressure.
 
-Spec: ``figures/SPEC.md``, section "Figure 2".  Single panel, MDPI single
-column (8.5 cm).  Mean EPI (y) against mean ``violation_steps_total`` (x), one
-marker per controller, SD bars where the replication is genuinely > 4, the
+Single panel.  Mean EPI (y) against mean ``violation_steps_total`` (x), one
+marker per controller, SD bars where the replication exceeds 4 runs, the
 non-dominated set joined by a staircase, everything else grey, the tuned
 heuristic labelled as dominated.
 
@@ -74,9 +73,9 @@ OFFSET = {
     "sindy_mpc_dense_dagger": (0.0,  -7.0, "center", "top"),
     "sindy_mpc_conf_dagger":  (-6.0,  4.0, "right", "bottom"),
     "sindy_mpc_conf":         (0.0,  -7.0, "center", "top"),
-    # The two full-`physics` controllers entered the comparison on 2026-08-14
-    # (regen/results/phys_lib/). They sit ~20 violation steps apart at +2.75 and
-    # +2.48, so they are labelled on opposite sides to keep both readable.
+    # The two full-`physics` controllers (regen/results/phys_lib/) sit ~20
+    # violation steps apart at +2.75 and +2.48, so they are labelled on opposite
+    # sides to keep both readable.
     "sindy_mpc_phys_ens":     (8.0,   4.0, "left",  "bottom"),
     # to the right of its marker: to the left it landed on the label of the
     # re-identification variant one row below it
@@ -89,8 +88,8 @@ OFFSET = {
     "rule_based_tuned":       (15.0, -9.0, "left",  "top"),
 }
 
-LABEL_BBOX = dict(facecolor="white", alpha=0.72, edgecolor="none",
-                  boxstyle="square,pad=0.12")
+LABEL_BBOX = dict(facecolor="white", alpha=0.92, edgecolor="none",
+                  boxstyle="square,pad=0.18")
 
 
 # ---------------------------------------------------------------------------
@@ -124,7 +123,7 @@ def _replication(pool: pd.DataFrame) -> dict:
 
 
 def assemble() -> pd.DataFrame:
-    """Build the 13-controller comparison table from the three harnesses."""
+    """Build the controller comparison table from the three result pools."""
     priced = ps.load_library_pool()
     default = ps.load_default_main()
     tune = ps.load_heuristic_tuning()
@@ -292,9 +291,9 @@ def build():
     ax.set_xlim(lo_x - 0.10 * (hi_x - lo_x), hi_x + 0.20 * (hi_x - lo_x))
     ax.set_ylim(lo_y - 0.12 * (hi_y - lo_y), hi_y + 0.16 * (hi_y - lo_y))
 
-    ax.set_xlabel(f"Mean violation steps per season "
-                  f"(of {tab.attrs['steps_expected']})")
-    ax.set_ylabel("Mean economic performance index (EUR m$^{-2}$)")
+    ax.set_xlabel("Mean violation variable-steps per season "
+                  "(sum over T, CO$_2$, RH)")
+    ax.set_ylabel("Mean economic performance indicator (EUR m$^{-2}$)")
 
     handles = [Line2D([], [], ls="", marker=HARNESS_MARKER[h],
                       color="#555555", markersize=4, label=HARNESS_LEGEND[h])

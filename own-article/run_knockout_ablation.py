@@ -1,4 +1,4 @@
-"""Boiler knock-out / knock-in ablation (reviewer item #1).
+"""Boiler knock-out / knock-in ablation.
 
 Causal test of the central methodological finding: the frozen confirmatory recipe
 (``physics_no_cross`` + ensemble threshold) drops the small-magnitude but
@@ -12,8 +12,7 @@ test season fixed and change ONLY that one coefficient, three ways per seed:
              the physical boiler gain the sparse recipe discarded.
 
 Because baseline/knockout/knockin differ in a SINGLE scalar, the EPI/violation deltas are
-a clean paired ablation (same seed, same everything else) -- the knock-out/knock-in design
-the reviewer asked for.
+a clean paired ablation (same seed, same everything else).
 
 Interaction check (physics library): ``physics_no_cross`` has no temperature x boiler cross
 term by construction, so the paired term t*uBoil cannot be probed there. We therefore ALSO

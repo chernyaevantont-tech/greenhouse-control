@@ -6,10 +6,12 @@
 > "cross-season leader" row names the best of the controllers this tree happens to contain
 > rather than the study's leader.
 >
-> The manuscript's claim table is `regen/results/final/NUMBERS.md`.
+> The manuscript's claim map is `regen/results/final/NUMBERS.md`, generated from the
+> manuscript's own verification checks; this file was written by `make_tables.py` from the
+> raw pull and summarises that tree only.
 > See the section "The two result trees" in `regen/README.md`.
 
-# NUMBERS — every stated result and where it comes from
+# SUMMARY — derived statistics of the raw cluster pull
 
 - config_hash: `637c6b535a9e`
 - git_sha: `unknown`

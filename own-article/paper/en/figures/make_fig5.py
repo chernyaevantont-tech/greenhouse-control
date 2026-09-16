@@ -21,7 +21,7 @@ the dedup key and the solver-abort rule -- and nothing is hard-coded.  The
 literals in this docstring are documentation of the expected result; the script
 asserts against its own recomputation, not against them.
 
-TEST TYPE, which the caption must respect (SPEC.md, Figure 5):
+TEST TYPE, which the caption respects:
   * Panel (a): both heuristics are DETERMINISTIC (one run per season, n = 4).
     The 76/80 and 75/80 counts are one-sample comparisons of 80 controller runs
     against a per-season constant.  Never call them paired.
@@ -50,7 +50,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _plotstyle as ps  # noqa: E402
 
 STEM = "fig5"
-STEM_SPEC = "fig5_corrections_waterfall"   # the name 04-discussion.tex cites
+STEM_SPEC = "fig5_corrections_waterfall"   # the descriptive name the manuscript cites
 JITTER = 0.085
 BAR_W = 0.60
 RNG_SEED = 11
@@ -261,8 +261,8 @@ def main() -> int:
 
     fig.tight_layout()
     # Two stems, as in make_fig1.py / make_fig6.py: the manuscript cites the
-    # descriptive SPEC.md name, while the short name keeps the slot ordering
-    # legible on disk. Both are written so 04-discussion.tex resolves.
+    # descriptive name, while the short name keeps the slot ordering legible on
+    # disk. Both are written.
     paths = []
     for stem in (STEM, STEM_SPEC):
         paths += ps.finish(fig, stem)

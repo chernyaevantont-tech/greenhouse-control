@@ -44,7 +44,7 @@ Rows loaded: library pool 760, notuboil 160 (raw 160, dedup 160, after abort fil
 
 Reference (canonical ladder, 20 seeds): raw 8.21/2.67/0.000; physics_no_cross 24.52/10.58/0.020; physics 53.43/24.27/0.076.
 
-## Verdict against the registered prediction
+## Verdict against the prediction stated in advance
 
 - Predicted if the detour reading is right: survival ~0.15, EPI ~+0.3.
 - Measured (ensemble): survival 0.40 (8/20, Wilson 0.22-0.61), EPI +2.11 (median +2.72).

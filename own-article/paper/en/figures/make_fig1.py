@@ -1,11 +1,7 @@
 """Figure 1 -- Selection reversal and the survival of the actuator pathway.
 
-REBUILT 2026-08-14.  The previous version of this figure carried the
-conditioning thesis: kappa as *the* mechanism, monotone in the closed loop.
-The full ``physics`` library reached closed loop on 2026-08-13
-(``regen/results/phys_lib/``) and that thesis is false.  With the threshold,
-the degree and the optimiser all held fixed and ONLY the feature library
-changing, the closed-loop series is NON-MONOTONE in kappa:
+With the threshold, the degree and the estimator held fixed and ONLY the feature
+library changing, the closed-loop series is NON-MONOTONE in kappa:
 
     library             kappa   24-h rollout    EPI      boiler term kept
     raw                   8.2        2.67      +4.32          55 %
@@ -14,29 +10,25 @@ changing, the closed-loop series is NON-MONOTONE in kappa:
 
 The worst-conditioned library beats the middle one tenfold.  What the closed
 loop tracks is whether the ACTUATOR PATHWAY survives thresholding, not how
-well the feature matrix is conditioned.  Conditioning still predicts open-loop
-multi-step stability cleanly -- that part is kept, in panel (b), and labelled
-as what it is.
+well the feature matrix is conditioned.  Conditioning predicts open-loop
+multi-step stability, which panel (b) shows, and nothing more.
 
   (a)  The reversal, as raw data.  One-step RMSE of ``t_in`` (linear x) against
        24-h rollout RMSE (log y), one marker per fit.  Colour = library,
        marker = sparse estimator, OPEN FACE = fails the 0.05 divergence gate.
-       Median + IQR cross per library.  Unchanged in substance: this result is
-       untouched by the correction.
-  (b)  What conditioning DOES buy.  kappa (log x) against one-step RMSE (left)
-       and median 24-h rollout RMSE (right, log).  Monotone, clean, open loop.
-  (c)  THE CORRECTION.  Closed-loop EPI against boiler-term survival for all
-       three libraries under the matched recipe (ensemble, threshold 0.05,
-       degree 1, no denoising).  Each point carries its kappa, and the grey
-       path joins the points IN ORDER OF INCREASING KAPPA so the reader sees
-       conditioning order them wrongly.  Open markers repeat the comparison
-       under STLSQ.
-  (d)  Why ``physics_no_cross`` is the one that fails.  Identified boiler
-       coefficient per seed against the 0.05 cut, symlog so a cut coefficient
-       sits at exactly 0.  Its estimate is the smallest of the three and falls
-       below the cut in 17 of 20 seeds; the full library, which is the only one
-       carrying the bilinear ``t_uBoil`` detour, puts half its survivors at
-       roughly three times the cut.
+       Median + IQR cross per library.
+  (b)  What conditioning predicts.  kappa (log x) against one-step RMSE (left)
+       and median 24-h rollout RMSE (right, log): monotone, open loop.
+  (c)  Closed-loop EPI against boiler-term survival for the three libraries
+       under the matched recipe (ensemble, threshold 0.05, degree 1, no
+       denoising) plus the 17-feature deletion probe.  Each point carries its
+       kappa, and the grey path joins the points IN ORDER OF INCREASING KAPPA,
+       which is not the EPI order.  Open markers repeat the comparison under
+       STLSQ.
+  (d)  Identified boiler coefficient per seed against the 0.05 cut, symlog so a
+       cut coefficient sits at exactly 0.  Only survivors are observable (a cut
+       coefficient is stored as zero); the panel shows how far the survivors of
+       each library sit above the cut.
 
 Every number drawn is computed here from the CSVs under
 ``own-article/regen/results`` through ``_plotstyle``; none is a literal.  After
@@ -368,7 +360,7 @@ def panel_d(ax, coef: pd.DataFrame, struct: pd.DataFrame) -> dict:
     ax.set_xlim(-0.55, 2.55)
     ax.set_xticks(range(3))
     ax.set_xticklabels([f"{ps.LIB_LABEL[l]}\n{int(st.loc[l, 'n_features'])} terms"
-                        f"{'  +' + ps.CROSS_TERM if st.loc[l, 'has_cross'] else ''}"
+                        f"{'  + $T_{{\\mathrm{{in}}}}u_{{\\mathrm{{Boil}}}}$' if st.loc[l, 'has_cross'] else ''}"
                         for l in ps.LIB_ORDER], fontsize=7)
     import matplotlib.ticker as mticker
     ax.set_yticks([0.0, THRESHOLD, 0.1, 0.2, 0.4])
@@ -550,7 +542,7 @@ def selfcheck(values: dict) -> int:
         chk(f"c: STLSQ replicate for {lib}", [drawn["x"][0], drawn["y"][0]],
             [float((g.groupby("seed")["xi_uboil"].first().abs() > 0).mean()),
              float(g["epi"].mean())])
-    # the point of the panel: kappa order is NOT the EPI order
+    # the claim of the panel: kappa order is NOT the EPI order
     kappa_order = [l for _, l in sorted(zip(kap, ps.LIB_ORDER))]
     chk_eq("c: EPI is NOT monotone along rising kappa",
            bool(np.all(np.diff([epis[l] for l in kappa_order]) < 0)), False)
@@ -648,7 +640,6 @@ def main() -> int:
     values = {
         "figure": "Figure 1 -- selection reversal and survival of the actuator pathway",
         "label": "fig:kappa",
-        "rebuilt": "2026-08-14; supersedes the conditioning-mechanism version",
         "sources": {
             "ladder": lad.attrs.get("source_files"),
             "ladder_rows_before_dedup": int(lad.attrs.get("rows_before_dedup", -1)),

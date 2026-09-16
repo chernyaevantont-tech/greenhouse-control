@@ -8,8 +8,11 @@ One file goes up. Everything below is the metadata form, filled in, ready to cop
 greenhouse-control-regen-data-v1.0.zip
 ```
 
-At the repository root. 5.99 MB, 629 entries, SHA-256
-`a7a05906faf9e2857c6573a28e4f8143b2c4a01b1bac32effe67c48dfca5c5c1`.
+At the repository root. 5.99 MB, 630 entries, SHA-256
+`89504527cae5c44851a897557b05b6821f1edfcd6ad187ad69dcb31ee6bd070c` (rebuilt 2026-09-16
+after the text audit of the archive: `results/final/NUMBERS.md` regenerated from the
+manuscript's own checks, `figures/SPEC.md` and the cluster plan taken out, working notes
+removed from the script headers).
 
 Nothing else is deposited: not the manuscript (MDPI publishes it), not the cover letter,
 not the repository. Rebuild the archive with `python own-article/regen/make_archive.py`;
@@ -75,17 +78,22 @@ priced_design directory as misnamed for the same reason.
 
 Every wave was produced under a single frozen configuration whose hash, 637c6b535a9e, is
 written into every result row and into each wave's regen_manifest.json together with the git
-commit. results/final/NUMBERS.md maps each claim in the manuscript to the file and column it
-is computed from.
+commit. results/final/NUMBERS.md lists every quantity the manuscript states, with the value
+recomputed from this tree and the files it is computed from.
 
 The study is computational: the controlled object is the GreenLight tomato greenhouse model
 as packaged in gl_gym 0.3.1, driven by ERA5-derived weather retrieved from the Open-Meteo
 historical archive for Rostov-on-Don. No greenhouse sensor records, plant measurements or
 harvested-yield observations were collected.
 
-Bit-level reproduction is established within one computing environment; no wave records an
-environment fingerprint, so cross-environment agreement is unmeasured. README.txt in the
-archive states the limits, the acceptance-gate failures the tree ships with and why they are
+The waves were produced in two computing environments, a Linux container on a compute
+cluster (python:3.11-slim) for the canonical default-objective blocks and a workstation
+(Python 3.14) for every later wave; the image field of every result row records
+which, and requirements-cluster.txt at the archive root carries the package versions common
+to both. Bit-level reproduction is established within one computing environment; no wave was
+re-executed in the other and no manifest records an environment fingerprint, so
+cross-environment agreement of any single wave is unmeasured. README.txt in the archive
+states the limits, the acceptance-gate failures the tree ships with and why they are
 expected, and which two files are superseded by later waves.
 
 Funding: this research was funded by the Ministry of Science and Higher Education of the

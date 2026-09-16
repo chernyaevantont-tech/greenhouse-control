@@ -1,7 +1,7 @@
 """Reproducibility control for the regeneration.
 
-The 2026-07 stack had two unseeded random sources, both on controllers the paper draws
-conclusions from:
+Two random sources in the compute stack are unseeded unless this module seeds them, both
+on controllers the paper draws conclusions from:
 
   R1  `pysindy.EnsembleOptimizer` (2.1.0) takes no random_state and resamples via
       `np.random.choice` -- the GLOBAL legacy NumPy RNG, which nothing ever seeded. The
@@ -156,9 +156,9 @@ def selftest(fast: bool = True) -> int:
         # reproducibility claim was unsupported for two of its ten controllers. SB3 takes an
         # explicit `seed=`, but its env resets, action sampling and torch init are separate
         # streams, and whether they land identically had to be measured rather than assumed.
-        # Measured 2026-09-02 on env_hash 173131a17717: both policy digests match across two
-        # runs, at this branch's fast-mode training budget. Still off by default, because
-        # training is the expensive part of the self-test.
+        # Measured on the pinned stack: both policy digests match across two runs at the
+        # self-test's fast-mode training budget. Still off by default, because training is
+        # the expensive part of the self-test.
         if RL_IN_SELFTEST:
             for algo in ("ppo", "sac"):
                 seed_everything(0)

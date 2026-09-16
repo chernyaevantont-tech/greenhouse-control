@@ -6,22 +6,16 @@ Why this experiment exists
 averages the resulting coefficient sets. WHICH resample you get is random, and in pysindy
 2.1.0 `EnsembleOptimizer` exposes no `random_state` -- it draws from the global NumPy RNG.
 
-Both the 2026-07 run and the first regen took ONE realisation per seed and reported it as
-the method's performance. On identical data, five refits gave
+A single fit is therefore one random realisation. On identical data, five refits gave
 
     xi(uBoil->t_in) = 0.0605 / 0.0280 / 0.0264 / 0.0000 / 0.0274
 
-i.e. the control-critical boiler term vanishes in roughly one refit in five. The DAgger
-variants are hit hardest because `dagger_final` refits four times (initial + 3 aggregation
-rounds), so each round is an independent lottery on whether the term survives. That is how
-one pipeline on one dataset produced "+2.43 EUR/m2, first in all four seasons" and
-"-0.12 EUR/m2, fourth of ten" -- the difference was the draw, not the method.
-
-Reporting a point estimate over an unstated variance component is the defect. The remedy is
-not "make it deterministic and hope" -- the regen is already deterministic, and -0.12 is an
-UNBIASED estimate of the mean over draws (each seed's draw is uncorrelated with outcome).
-Sweeping the draw does not move that mean; it measures the spread around it and turns
-"we got +2.43 once" into a probability.
+i.e. the control-critical boiler term vanishes in roughly one refit in five. The
+re-identification variants are affected most because `dagger_final` refits four times
+(initial + 3 aggregation rounds), so each round is an independent draw on whether the term
+survives. A single realisation per seed reported as the method's performance therefore
+carries an unstated variance component; the regen is deterministic given the seed, and the
+mean over draws is unbiased, but only a sweep over draws measures the spread around it.
 
 What it produces
 ----------------
@@ -32,7 +26,7 @@ each only as a control that the axis really is flat for them.
 
 The analysis this enables, which the single-draw protocol cannot support:
   * variance decomposition: how much of the spread is data (seed) vs bootstrap (draw);
-  * P(this method leads the field on a single run) -- how lucky 2026-07 was, as a number;
+  * P(this method leads the field on a single run), which a single draw cannot give;
   * intervals on the DAgger repair effect that account for both axes.
 """
 from __future__ import annotations
@@ -46,13 +40,10 @@ import regen_config as C
 # Controllers whose fit actually has a draw axis. The STLSQ ones are carried at a single
 # draw as a negative control: their spread across draws must be exactly zero.
 #
-# `sindy_mpc_raw_ens` added 2026-08-10 (E-A). It is ensemble-based, so it carries the same
-# lottery, and after N-7 it is the HEADLINE controller (+4.07 EUR/m2, first in all four
-# seasons). Reporting it as a point estimate over an unmeasured draw axis would repeat
-# exactly the defect this experiment exists to fix -- and it is the same defect that
-# produced "+2.43, first in all four seasons" for a controller whose true mean is -0.12.
-# `sindy_mpc_raw` (STLSQ, same library) is the matched control: if the raw library's
-# advantage is real it must show up at zero draw spread too.
+# `sindy_mpc_raw_ens` is ensemble-based, so it carries the same draw axis, and it is the
+# headline controller; reporting it as a point estimate over an unmeasured draw axis would
+# leave that axis unstated. `sindy_mpc_raw` (STLSQ, same library) is the matched control:
+# if the raw library's advantage is real it must show up at zero draw spread too.
 DRAW_CONTROLLERS = ("sindy_mpc_conf", "sindy_mpc_conf_dagger", "sindy_mpc_raw_ens")
 CONTROL_CONTROLLERS = ("sindy_mpc_dense", "sindy_mpc_raw")
 

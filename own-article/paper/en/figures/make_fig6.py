@@ -3,18 +3,13 @@
 Plan slot 6 is ``fig-graphical-abstract`` (five numbered body figures plus this
 one).
 
-REDRAWN 2026-08-14 TO A THREE-PANEL SPECIFICATION.  The previous version had two
-panels and encoded kappa as marker area in panel (a), because the paper's
-mechanism was then ill-conditioning.  That mechanism is RETRACTED: the full
-``physics`` library reached closed loop and the closed-loop series in kappa is
-non-monotone (+4.32 / +0.28 / +2.75 EUR m^-2 against kappa 8.2 / 24.5 / 53.4).
-The committed PDF therefore contradicted the caption in
-``05-conclusions-abstract.tex``, which had already been rewritten to three
-panels.  Current specification, taken from that caption's comment block:
+Three panels.  The closed-loop series in kappa is non-monotone (+4.32 / +0.28 /
++2.75 EUR m^-2 against kappa 8.2 / 24.5 / 53.4), so kappa is not encoded as a
+marker property anywhere; it appears only on the x axis of panel (b), where it
+is shown NOT to predict the economics.
 
     (a) The selection reversal: one-step RMSE (x) against median 24-h rollout
-        RMSE (y, log).  Marker area is NO LONGER kappa -- kappa now belongs in
-        panel (b), where it is shown NOT to predict the economics.
+        RMSE (y, log).
     (b) The non-monotonicity and what tracks it: three libraries on the x axis
         in kappa order, closed-loop EPI tracing a V against a monotone kappa,
         with boiler-term survival overlaid reproducing the V.  This panel is the
@@ -31,10 +26,10 @@ Nothing is hardcoded: every plotted coordinate, whisker, area, arrow endpoint
 and annotation number is reduced from the CSVs inside this script, through the
 loaders in ``_plotstyle`` (which own the dedup key and the solver-abort rule).
 
-TWO DELIBERATE DEPARTURES FROM THE SPEC WORDING, both recorded in the reply:
+TWO CHOICES ABOUT DISPERSION:
 
-  1. Panel (b) is "stripped of error bars" in the spec.  Thin +/-1 SD whiskers
-     are drawn anyway, in light grey behind the markers.  The panel's claim is
+  1. Panel (b) carries thin +/-1 SD whiskers in light grey behind the markers,
+     although a graphical abstract could omit them.  The panel's claim is
      that the raw-library advantage is *not* Pareto-dominant, and the SD on
      ``sindy_mpc_raw_ens`` (4.08 EUR/m2 about a 4.32 mean) is what makes the
      conservative reading legible.  They are subordinate, not prominent.
@@ -48,12 +43,11 @@ does NOT rank the wider controller pool: ``sindy_mpc_conf_dagger`` survives
 at 0.85 and scores +1.66, below ``sindy_mpc_raw_ens`` at 0.55.  The panel says
 so on its face.  The fourth x tick is the 17-feature term-deletion probe
 (``physics_no_tuboil``): the bilinear-detour reading it tested is FALSIFIED
-(2026-08-18, ``regen/results/notuboil/``) -- the probe keeps physics-level
-kappa, open-loop instability and closed-loop EPI instead of collapsing onto
-``physics_no_cross`` -- and it is drawn precisely so the figure cannot keep
-telling the detour story.
+(``regen/results/notuboil/``) -- the probe keeps physics-level kappa, open-loop
+instability and closed-loop EPI instead of collapsing onto ``physics_no_cross``
+-- and it is drawn so that the figure cannot tell the detour story.
 
-SCOPE GUARD (SPEC.md, Figure 1).  The reversal shown in (a) holds in the
+SCOPE GUARD.  The reversal shown in (a) holds in the
 degree-1, undenoised block under sparse estimators only -- 2 of 72
 configurations per library.  Pooled over all 72 labels the raw library has the
 best mean one-step RMSE and there is no reversal.  The panel says so on its
@@ -164,10 +158,14 @@ def draw_reversal(ax, fits, per_config, per_library) -> None:
                 zorder=6)
     mid_x = 0.5 * (a.one_step + b.one_step)
     mid_y = np.sqrt(a.rollout_median * b.rollout_median)   # log-scale midpoint
-    ax.text(mid_x + 0.035, mid_y * 0.62,
+    # Raised and shifted left: with an opaque halo this box would otherwise
+    # overlap the `raw` divergence label sitting above the right-hand cluster.
+    ax.text(mid_x + 0.008, mid_y * 0.78,
             "richer physics library:\nbetter one step, worse rollout",
             fontsize=7, color="#333333", ha="center", va="center",
-            linespacing=1.25)
+            linespacing=1.25, zorder=7,
+            bbox=dict(facecolor="white", alpha=0.88, edgecolor="none",
+                      boxstyle="square,pad=0.15"))
 
     # -- divergence rate per library.  kappa is deliberately NOT annotated here
     #    any more: it is the subject of panel (b) and repeating it beside the
@@ -188,7 +186,8 @@ def draw_reversal(ax, fits, per_config, per_library) -> None:
                 r.rollout_median * fy,
                 f"diverged {r.diverged:.3f}",
                 fontsize=7, color=ps.LIB_COLOR[lib], ha=ha,
-                va="bottom" if fy >= 1.0 else "top", linespacing=1.2)
+                va="bottom" if fy >= 1.0 else "top", linespacing=1.2,
+                zorder=6, bbox=dict(facecolor="white", alpha=0.88, edgecolor="none", boxstyle="square,pad=0.15"))
 
     # Estimator-marker entries are dropped here: at graphical-abstract size the
     # square/circle distinction is not resolvable and the panel's claim does not
@@ -405,15 +404,16 @@ def draw_pareto(ax, t: pd.DataFrame) -> None:
         label = _LABEL_WRAP.get(r.method, r.label)
         ax.annotate(label, (r.viol, r.epi), textcoords="offset points",
                     xytext=(dx, dy), ha=ha, va="center", fontsize=7,
-                    color=_color_for(r.method), zorder=6)
+                    color=_color_for(r.method), zorder=6,
+                    bbox=dict(facecolor="white", alpha=0.88, edgecolor="none", boxstyle="square,pad=0.15"))
     # The "one controller, two thresholds" caveat is NOT annotated here: at this
     # panel width it collides with the raw-ensemble label whichever way it is
     # placed. It is stated in Figure 2's caption, in Section 3.3 and in the
     # limitations, so the caveat is not lost -- only this rendering of it.
     _ = (d_row, l_row)
 
-    ax.set_xlabel("mean violation steps per season")
-    ax.set_ylabel("mean economic performance index  (EUR m$^{-2}$)")
+    ax.set_xlabel("mean violation variable-steps per season (T, CO$_2$, RH summed)")
+    ax.set_ylabel("mean economic performance indicator  (EUR m$^{-2}$)")
 
     n_front = int(t["on_front"].sum())
     ps.panel_label(ax, "c", dx=-0.20)

@@ -7,7 +7,7 @@ identical across the 20 seeds and both sparse estimators to three decimals --
 so one seed's training data is enough, with the other three libraries fitted
 alongside as a check against the canonical 8.21 / 24.52 / 53.43.
 
-Run:  ../.venv-regen/Scripts/python.exe kappa_notuboil.py
+Run:  python kappa_notuboil.py
 """
 
 from __future__ import annotations

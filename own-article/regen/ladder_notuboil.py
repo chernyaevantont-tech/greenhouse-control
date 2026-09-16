@@ -8,7 +8,7 @@ horizons -- the same recipe slice the ladder cells use.
 
 Writes ``results/notuboil/ladder_notuboil.csv`` (incremental, resumable).
 
-Run:  ../.venv-regen/Scripts/python.exe ladder_notuboil.py
+Run:  python ladder_notuboil.py
 """
 
 from __future__ import annotations

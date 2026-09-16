@@ -73,7 +73,7 @@ cultivation based on two-time-scale decomposition: A simulation study in Lhasa.
 'wen2022agronomy': r"""Wen, X.; Xu, L.; Wei, R. Research on control strategy of light and CO$_2$ in blueberry
 greenhouse based on coordinated optimization model. \textit{Agronomy} \textbf{2022},
 \textit{12}, 2988. \url{https://doi.org/10.3390/agronomy12122988}""",
-'ecimduric2024': r"""E{\'c}im-{\DJ}uri{\'c}, O.; Milanovi{\'c}, M.; Dimitrijevi{\'c}-Petrovi{\'c}, A.;
+'ecimduric2024': r"""E{\'c}im-Đuri{\'c}, O.; Milanovi{\'c}, M.; Dimitrijevi{\'c}-Petrovi{\'c}, A.;
 Mileusni{\'c}, Z.; Dragi{\v{c}}evi{\'c}, A.; Miodragovi{\'c}, R. Prediction of greenhouse
 microclimatic parameters using building transient simulation and artificial neural networks.
 \textit{Agronomy} \textbf{2024}, \textit{14}, 1147.
@@ -381,39 +381,20 @@ neither humans nor animals.
 \noindent\textbf{Informed Consent Statement:} Not applicable.
 
 \noindent\textbf{Data Availability Statement:}
-All quantities reported in this article are computed from the per-run result
-tables of the study's regeneration tree (\texttt{own-article/regen/results/} in
-the project repository), which contains one row per (controller, seed, test
-season) together with the seasonal margin, constraint-violation counts, solver
-diagnostics and the identified sparse coefficients. Every wave reported here was
-produced under a single frozen configuration whose hash,
-\texttt{637c6b535a9e}, is written into every result row and into the
-\texttt{regen\_manifest.json} of each wave alongside the git commit of the code
-that generated it; the manifest also records the seeds, test years, horizon,
-solver-failure budget, season length and the four identification recipes, so a
-wave can be identified without reference to this text. The experiments are
-regenerated with the single driver in \texttt{own-article/regen/}: each of the
-eight experiment blocks is run as \texttt{python run\_regen.py --experiment
-<block> --seeds <list> --out <dir>}, after which \texttt{python run\_regen.py
---merge --out <dir>} and \texttt{python make\_tables.py --out <dir>} rebuild
-every derived table together with \texttt{NUMBERS.md}, a claim-to-value-to-source
-map that names the file and column behind each reported quantity. \texttt{python
-verify\_regen.py} then applies the acceptance gates -- mixed configuration hash,
-an incomplete or duplicated run grid, truncated seasons, non-uniform horizon or
-solver budget, a missing sparse coefficient column, an unresolved sparsity
-region or an incomplete ablation block -- and exits non-zero if any fails.
-Determinism is checked separately by \texttt{python repro.py --selftest}, which
-executes the pipeline twice under identical seeds and compares SHA-256 digests of
-the training states and actions, the ensemble and STLSQ coefficient matrices, the
-neural-network weights, and the closed-loop trajectory and margin; all seven
-digests agree on the pinned stack, and all nine with the two reinforcement-learning
-policies included. Reproduction additionally requires the GreenLight tomato
+Every quantity reported in this article is computed from per-run result tables (one
+row per controller, seed and test season, carrying the seasonal margin, the
+constraint-violation counts, the solver diagnostics and the identified sparse
+coefficients) produced under a single frozen configuration whose hash,
+\texttt{637c6b535a9e}, is written into every row and into the manifest of each wave
+together with the git commit of the generating code. The archived replication package
+contains these tables, the experiment driver and its acceptance gates, the determinism
+self-test, the pre-specified experiment protocol, the figure scripts, the pinned software
+versions and a claim-to-file map (\texttt{NUMBERS.md}) naming the file and column behind
+each reported quantity. Reproduction additionally requires the GreenLight tomato
 greenhouse model as packaged in \texttt{gl\_gym}~0.3.1 \cite{katzin2020,vanlaatum2025}
-and the ERA5-derived weather described in Section~\ref{sec:sim}, retrieved
-from the Open-Meteo historical archive API \cite{hersbach2020,openmeteo2023}. As
-Section~\ref{sec:repro} states, bit-level reproduction is established within one
-computing environment; the cross-environment case was not measured, and closed-loop
-margins should not be expected to match to the last decimal on a different stack.
+and the ERA5-derived weather of Section~\ref{sec:sim}, retrieved from the Open-Meteo
+historical archive API \cite{hersbach2020,openmeteo2023}. Bit-level reproduction is
+established within one computing environment only (Section~\ref{sec:repro}).
 @@DATA_LOCATION@@
 
 \noindent\textbf{Acknowledgments:} @@ACKNOWLEDGMENTS@@

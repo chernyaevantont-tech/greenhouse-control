@@ -843,7 +843,7 @@ class WeatherForecastTVP:
 
         def tvp_fun(t_now):
             # do-mpc may pass t_now as a scalar, ndarray, or casadi DM depending on the
-            # build -- extract a Python scalar robustly (int(array) errors on some builds).
+            # build -- extract a Python scalar (int(array) errors on some builds).
             t_scalar = float(np.asarray(t_now).reshape(-1)[0])
             k_start = int(t_scalar / period)
             for k in range(horizon):

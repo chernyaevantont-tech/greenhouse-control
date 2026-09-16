@@ -12,15 +12,15 @@ containing the variable costs of heating, supplementary lighting and CO$_2$ enri
 These inputs affect crop growth and resource use simultaneously, so a control strategy
 should be judged agronomically and economically rather than by setpoint tracking alone
 \cite{katzin2020,katzin2021}. Economic model predictive control (MPC) provides that
-framework: inputs are optimised over a finite horizon subject to temperature, humidity and
-CO$_2$ constraints \cite{vanhenten1994,mayne2000,rawlings2012,lin2021}.
+framework by optimising the inputs over a finite horizon subject to temperature, humidity
+and CO$_2$ constraints \cite{vanhenten1994,mayne2000,rawlings2012,lin2021}.
 
 Simulation-based greenhouse studies are established in this application area. Xu et al.\
 used a greenhouse--crop model to compare open- and closed-loop optimal control and to
 estimate lettuce yield and profit in an explicitly computational study
 \cite{xu2023agronomy}. Wen et al.\ combined measured blueberry photosynthesis with an SVR
 model and simulated multi-objective light--CO$_2$ regulation
-\cite{wen2022agronomy}, while E{\'c}im-{\DJ}uri{\'c} et al.\ coupled a TRNSYS greenhouse
+\cite{wen2022agronomy}, while E{\'c}im-Đuri{\'c} et al.\ coupled a TRNSYS greenhouse
 model to an artificial neural network and anchored the thermal model to measured
 temperatures \cite{ecimduric2024}. These examples show both the value and the evidential
 limit of simulation: virtual experiments can isolate controller and model-design effects,
@@ -28,7 +28,7 @@ but field performance requires empirical anchoring. The present study is deliber
 the simulation-only end of that spectrum. It uses the independently published GreenLight
 tomato model and recorded weather forcing, but introduces no new greenhouse, plant or
 actuator measurements. Its claims are therefore comparative statements inside a defined
-virtual testbed, not demonstrations of commercial greenhouse performance.
+virtual testbed and do not demonstrate commercial greenhouse performance.
 
 MPC requires a process model, and calibrating a detailed mechanistic greenhouse model for
 every site is laborious. A surrogate identified from simulated or measured trajectories
@@ -48,15 +48,15 @@ surrogate hyperparameters are commonly selected by one-step prediction accuracy
 also gives the best controller. Table~\ref{tab:defects} states the safeguards used here
 and quantifies sensitivity to removing them.
 
-The third assumption is precisely what identification-for-control research warns against:
-a model should be judged by the loop it closes, not by open-loop fit alone
+Identification-for-control research warns against the third assumption, because a model
+should be judged by the closed-loop behaviour it produces in addition to its open-loop fit
 \cite{ljung1999,gevers1993,vandenhof1995}. In model-based reinforcement learning the same
 problem is termed objective mismatch: predictive accuracy can be a poor proxy for
 control performance \cite{lambert2020,jackson2022,farahmand2017}, and recent surveys show
 that it remains relevant for modern data-driven surrogates
 \cite{wei2024,controlorientedsurvey2025}. Exhaustive closed-loop screening is expensive
 even in simulation because it requires a solver and a full cropping season per candidate.
-The practical question is therefore narrower: if a greenhouse surrogate must be selected
+The practical question is therefore narrower. If a greenhouse surrogate must be selected
 open loop, which inexpensive criterion best anticipates seasonal closed-loop economics?
 
 A related question concerns feature-library design. Physically motivated basis functions
@@ -71,7 +71,7 @@ assume, whether physically motivated features improve a control-oriented surroga
 \centering
 \caption{Three benchmarking risks, the safeguards used in this study and the measured
 sensitivity to removing each safeguard. All monetary values are simulated seasonal margin
-in EUR~m$^{-2}$ unless stated otherwise.}
+in EUR\,m$^{-2}$ unless stated otherwise.}
 \label{tab:defects}
 \begin{tabular}{p{0.20\textwidth}p{0.30\textwidth}p{0.38\textwidth}}
 \toprule
@@ -82,8 +82,8 @@ The agronomic rule-based reference is tuned on the training seasons only, by a 1
 random search -- the same trial budget the reinforcement-learning agents receive &
 Tuning lifts the heuristic from $-1.23$ to $+2.26$ (gain $+3.49$), so every advantage
 measured against the untuned reference is overstated by that amount. The tuned heuristic
-buys the gain with constraint pressure (2813 to 4339 violation steps) and is itself off
-the Pareto front \\
+obtains the gain at the cost of higher constraint pressure (2813 to 4339 violation steps)
+and is itself off the Pareto front \\
 \addlinespace
 Objective mismatch: tracking error reported instead of margin, or MPC actuator weights
 that are inconsistent with the prices used for evaluation &
@@ -137,11 +137,10 @@ with median 24-h rollout RMSE $24.27$~$^\circ$C rather than $2.67$~$^\circ$C \\
 We address both questions in a controlled in silico experiment using the published
 GreenLight tomato model \cite{katzin2020,vanlaatum2025}, ERA5-derived weather for one
 location and a 15-min control step. Candidate surrogates were identified on two training
-seasons, and fifteen controllers were evaluated -- nine SINDy-MPC variants, a
-neural-network MPC, two deep reinforcement-learning agents
-\cite{schulman2017,haarnoja2018,raffin2021},
-a full-simulator-model MPC and the rule-based heuristic in both
-its stock and tuned configurations -- over four held-out test seasons. A season
+seasons, and 15 controllers were evaluated over four held-out test seasons: nine
+SINDy-MPC variants, a neural-network MPC, two deep reinforcement-learning agents
+\cite{schulman2017,haarnoja2018,raffin2021}, a full-simulator-model MPC and the
+rule-based heuristic in both its stock and tuned configurations. A season
 here is the 60-day window from 1 March, and the outcome is model-derived margin per square
 metre of greenhouse floor area. Each learned controller was run at 20 identification
 replicates per season (10 for
@@ -149,14 +148,15 @@ the neural-network MPC); the heuristic is deterministic and was run once per sea
 the full-simulator-model MPC returned only three of the four seasons, its 2022 runs having
 exhausted the solver-failure budget. Comparisons use non-parametric signed-rank tests with
 Holm correction \cite{wilcoxon1945,holm1979,demsar2006}; against the deterministic
-heuristic the test is one-sample against a constant rather than genuinely paired. The
-contributions are four.
+heuristic the test is a one-sample signed-rank test against a constant and is therefore
+not a paired test. The study makes four contributions.
 
-\textbf{(i) One-step accuracy and multi-step stability rank candidate libraries in
-opposite orders, and the closed-loop ordering follows the multi-step one.} The
+(i) One-step accuracy and multi-step stability rank candidate libraries in
+opposite orders, and the closed-loop winner is the library that multi-step stability
+selects; neither criterion reproduces the full closed-loop ordering
+(Section~\ref{sec:disc-rule}). The
 identification ladder evaluated 72 labelled configurations, covering 54 distinct fits --
-two of the optimizer labels turn out to be bit-identical. Within its degree-1 block --
-the degree-2 candidates are all non-embeddable in the MPC solver -- the library with the
+two of the optimiser labels turn out to be bit-identical. Within its degree-1 block (the degree-2 candidates are all non-embeddable in the MPC solver), the library with the
 best one-step accuracy is the worst on every multi-step metric. Taking the undenoised
 cells under the two sparse estimators ($n = 40$ fits per library), adding physically
 motivated features improves
@@ -164,91 +164,93 @@ one-step RMSE from $1.86$ to $1.68$~$^\circ$C while degrading the median 24-h ro
 from $2.67$ to $24.27$~$^\circ$C, raising the regression condition number from $8.2$ to
 $53.4$ and the divergence rate from $0.000$ to $0.076$ (Figure~\ref{fig:kappa});
 withholding only the bilinear cross terms recovers part of the loss but not the ordering
-(rollout $10.58$~$^\circ$C, $\kappa = 24.5$). In closed loop, a raw, physics-free library
--- also the sparsest of the three -- attains the best
-four-season mean margin of the fifteen controllers, $+4.32$~EUR~m$^{-2}$ against $+3.09$
+(rollout $10.58$~$^\circ$C, $\kappa = 24.5$). In closed loop, the controller built on a raw, physics-free library, also the sparsest of
+the three, attains the best four-season mean margin of the 15 controllers, $+4.32$~EUR\,m$^{-2}$ against $+3.09$
 for the best physics-informed variant, ahead in 62 of 80 season~$\times$~replicate pairs
 ($p_{\mathrm{Holm}} = 7.7 \times 10^{-4}$, family of 15). The gap is small against the
-run-to-run spread -- standard deviations $4.08$ and $2.71$ for a difference of $1.23$ --
-and it reverses in one of the four seasons ($-1.56$ against $+0.27$ in 2021). The library
+run-to-run spread (standard deviations $4.08$ and $2.71$ for a difference of $1.23$), and it reverses in one of the four seasons ($-1.56$ against $+0.27$ in 2021). The library
 ordering holds again on four seasons never used at any stage of model or controller
 development (four controllers, eight replicates, default objective). Within this virtual
 testbed, physical motivation alone is therefore not sufficient evidence that a basis
 function belongs in the control-oriented library.
 
-\textbf{(ii) The effect of physically motivated features is non-monotone.} All three
+(ii) The effect of physically motivated features is non-monotone. All three
 libraries were carried into closed loop under a
 strict one-factor design -- same estimator, same sparsity threshold, same seeds, same
 priced objective, four seasons $\times$ 20 replicates, zero truncated runs, the library
 the only thing that changes. Open-loop degradation is monotone in the number of physics
 features: $\kappa = 8.2 \rightarrow 24.5 \rightarrow 53.4$ and median rollout
 $2.67 \rightarrow 10.58 \rightarrow 24.27$~$^\circ$C. Closed-loop margin is not:
-$+4.32 \rightarrow +0.28 \rightarrow +2.75$~EUR~m$^{-2}$. The worst-conditioned library
-beats the middle one by $+2.47$ on average (median $+2.39$, 63 of 80 paired runs,
+$+4.32 \rightarrow +0.28 \rightarrow +2.75$~EUR\,m$^{-2}$. The worst-conditioned library
+exceeds the middle one by $+2.47$ on average (median $+2.39$, 63 of 80 paired runs,
 $p = 1.3\times10^{-8}$), in each of the four seasons taken separately. Under the second
 sparse estimator only the two endpoints exist as closed-loop controllers ($+3.83$ raw,
 $+2.48$ full physics), so the raw-over-physics direction replicates there but the
 three-point non-monotonicity rests on one estimator. Conditioning therefore predicts
-open-loop multi-step stability cleanly but is not a sufficient explanation of closed-loop
+open-loop multi-step stability but is not a sufficient explanation of closed-loop
 economics; contribution~(iv) identifies the controller-facing quantity that better tracks
 the outcome.
 
-\textbf{(iii) Benchmarking safeguards materially change the apparent effect size.}
+(iii) Benchmarking safeguards change the apparent effect size.
 Against the tuned heuristic the raw-library controller is better by
-$+2.06$~EUR~m$^{-2}$, ahead in 75 of 80 season~$\times$~replicate comparisons
+$+2.06$~EUR\,m$^{-2}$, ahead in 75 of 80 season~$\times$~replicate comparisons
 ($p_{\mathrm{Holm}} = 8.3 \times 10^{-11}$, Holm correction over a family of 15). Three
-further SINDy-MPC variants also clear
-the tuned heuristic significantly, by smaller margins ($+1.57$, $+0.83$, $+0.82$), and the
-two full-\texttt{physics} controllers are ahead of it in point estimate without being
-separable from it: the raw library is first, not alone. Against the unsearched reference
-the same advantage would read $+5.54$, demonstrating the sensitivity of the headline
-comparison to baseline tuning. Aligning actuator weights with the evaluation price vector
+further SINDy-MPC variants are also significantly better than the tuned heuristic at run
+level, by smaller margins ($+1.57$, $+0.83$, $+0.82$); on per-seed means, the unit at
+which the identified surrogates are independent, only the two raw-library controllers
+remain separable from it (Section~\ref{sec:res-main}). The two full-\texttt{physics}
+controllers are ahead of it in point estimate, although they are not statistically
+separable from it. Against the unsearched reference the same advantage would read
+$+5.54$, so the size of the main comparison depends on how the baseline is tuned.
+Aligning actuator weights with the evaluation price vector
 likewise reduces the raw-minus-physics gap from $+3.66$ to $+1.23$
 (Table~\ref{tab:defects}, row 2).
 
-\textbf{(iv) What the closed-loop outcome does track is survival of the actuator
-pathway through the sparsity threshold.} Across the one-factor triple, the direct boiler
+(iv) The closed-loop outcome tracks survival of the actuator pathway through the
+sparsity threshold. Across the one-factor triple, the direct boiler
 coefficient $\xi_{u\mathrm{Boil}}$ is retained in 11 of 20 identification replicates with
 the raw library, 11 of 20 with full physics and 3 of 20 with physics-without-cross-terms
 -- $55\,\%$, $55\,\%$, $15\,\%$, which is the margin ordering and not the $\kappa$
 ordering. A surrogate whose boiler column has been thresholded away cannot be steered
-with the boiler, however accurate it is one step ahead and however well conditioned the
-fit that produced it. The controlled evidence is a single-coefficient ablation, the only
+with the boiler, regardless of its one-step accuracy or of the conditioning of the fit
+that produced it. The controlled evidence is a single-coefficient ablation, the only
 randomised manipulation in the mechanism block: reinstating the deleted coefficient in
 the frozen recipe, with the library, the scalers, every other term and the MPC
 construction held fixed, is positive in 16 of 20 replicates
 ($p_{\mathrm{Holm}} = 1.2 \times 10^{-3}$ over the two knock tests) with median
-$+0.21$~EUR~m$^{-2}$ and mean
-$+1.92$ -- significant, typically small and heavily right-skewed -- while the
-complementary knock-out is null. We are explicit about the limits of this account.
-Survival gates the outcome but does not order it: among the two libraries
-that keep the term the raw one still wins by $+1.56$~EUR~m$^{-2}$, and raw-library runs
-that lost the term still average $+3.48$, above physics-library runs that kept it
-($+2.52$). The obvious structural account of why the middle library is the worst --
-that it carries enough collinearity for the threshold to destabilise the direct boiler
-term but, unlike full physics, has no bilinear $T_{\mathrm{in}}u_{\mathrm{Boil}}$ term to
-carry the heating pathway once the direct one is cut -- has been tested and rejected:
-deleting exactly that one feature from the full library leaves conditioning
-($\kappa = 52.3$), open-loop instability and closed-loop margin ($+2.11$~EUR~m$^{-2}$,
-$p_{\mathrm{Holm}} = 4.4 \times 10^{-6}$ above the middle library) at the full library's
-level, with survival at $40\,\%$ -- nowhere near the collapse a bilinear bypass predicts
-(Sections~\ref{sec:res-mech} and~\ref{sec:discussion}). Why one library loses the term is
-thus unresolved; that survival gates the outcome is not.
+$+0.21$~EUR\,m$^{-2}$ and mean
+$+1.92$ (significant, typically small and heavily right-skewed), while the
+complementary knock-out is null. Survival of the term is a precondition for the outcome
+but does not order the libraries.
+Among the two libraries that keep the term the raw one is still ahead by
+$+1.56$~EUR\,m$^{-2}$, and raw-library runs that lost the term still average $+3.48$,
+above physics-library runs that kept it ($+2.52$). One candidate explanation of why the
+middle library is the worst is a bilinear detour, in which the full library retains its
+heating pathway through the $T_{\mathrm{in}}u_{\mathrm{Boil}}$ term once the direct
+boiler term is cut and the middle library, lacking that term, does not. This explanation
+was tested by deleting exactly that one feature from the full library and was rejected,
+because conditioning ($\kappa = 52.3$), open-loop instability and closed-loop margin
+($+2.11$~EUR\,m$^{-2}$, $p_{\mathrm{Holm}} = 4.4 \times 10^{-6}$ above the middle library)
+remain at the full library's level, with survival at $40\,\%$, far from the collapse a
+bilinear detour predicts (Sections~\ref{sec:res-mech} and~\ref{sec:discussion}). The ablation therefore establishes that the outcome depends
+on survival of the term, although the reason why one library loses the term remains
+unresolved.
 
-What this does not show is equally explicit. The advantage is not Pareto-dominant: the
-front holds five points, and the PPO agent attains far fewer constraint violations
-($1330$ against $4130$ steps per season) at a lower margin. The surrogate carries no crop
-state, so the MPC objective is necessarily a proxy and terminal biomass cannot be priced.
-The mechanism experiments are single-season and replication is unequal across controllers.
-The non-monotonicity rests on the middle library, which reaches closed loop under one
-estimator only, and survival is measured rather than manipulated at library level -- the
-ablation is the only randomised contrast anywhere in the mechanism, and the term-deletion
-test that removed the detour explanation is, like the library comparison itself, a
-controlled structural comparison rather than a randomised one.
+The results are limited in several respects. The advantage is not Pareto-dominant,
+because the front holds five points and the proximal policy optimisation (PPO) agent
+attains far fewer constraint violations ($1330$ against $4130$ steps per season) at a
+lower margin. The surrogate carries no crop state, so the MPC objective is necessarily a
+proxy and terminal biomass cannot be priced. The mechanism experiments are single-season
+and replication is unequal across controllers. The non-monotonicity rests on the middle
+library, which reaches closed loop under one estimator only. Survival is measured at
+library level and is not manipulated; apart from the ablation, the mechanism evidence,
+including the term-deletion test that rejected the detour explanation, consists of
+controlled structural comparisons without randomisation.
 All results are simulation-only, for one location and one planting date, and
 reproducibility is established within one computing environment only. Consequently, the
-reported margins and rankings are comparative computational evidence, not estimates of
-field-scale benefit or recommendations for direct commercial deployment.
+reported margins and rankings are comparative computational evidence; they neither
+estimate field-scale benefit nor constitute recommendations for direct commercial
+deployment.
 The remainder of
 the paper is organised as follows. Section~\ref{sec:methods} describes the controlled
 object, the economic criterion, the data, the controllers and the identification
@@ -318,7 +320,7 @@ the implications and the limits; Section~\ref{sec:conclusions} concludes.
 %%         four, which is why "in each of the four seasons taken separately" is safe here.
 %%         STLSQ ARM IS TWO POINTS ONLY: sindy_mpc_raw +3.8333 and sindy_mpc_phys +2.4762.
 %%         There is NO physics_no_cross controller at stlsq/0.05 -- DENSE sits at 1e-3 and
-%%         LOWTHR at 1e-6 (regen_config.py) -- so the non-monotonicity CANNOT be restated
+%%         LOWTHR at 1e-6 (regen_config.py), so the non-monotonicity CANNOT be restated
 %%         as a three-point series on that estimator. Do not widen this claim.
 %%      (iv) Survival 11/20, 3/20, 11/20 = 0.55 / 0.15 / 0.55, computed per SEED from
 %%         xi_uboil in the same pool (survival is a property of the fit and is constant

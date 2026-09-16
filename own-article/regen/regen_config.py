@@ -1,31 +1,21 @@
-"""Single source of truth for the article regeneration (regen-v2).
+"""Frozen configuration of the article's regeneration (regen-v2).
 
-EVERY number that ends up in the paper must come from a run configured by THIS module.
-Nothing here falls back silently: a missing or inconsistent input raises.
+Every number the manuscript states comes from a run configured by this module, and every
+constant that can change a number is declared here and enters the configuration hash: the
+season, the control step, the horizon, the solver-failure budget, the seed set, the
+train/test split and the identification recipes (each with an explicit sparsity
+threshold). A missing or inconsistent input raises rather than falling back to a default.
 
-Why this file exists
---------------------
-The 2026-06/07 results were produced by several runners that disagreed with each other
-and with the protocol text (see ../regen/README.md, "Defect register"). The most
-damaging disagreements were:
+Five choices are made explicit here because they can change a headline number: the
+sparsity threshold is part of every recipe; the frozen recipe is read from its json and
+never from a built-in fallback; identification data are aggregated over both training
+years; every solver-based controller shares one solver-failure budget, and exhausting it
+is a recorded, gating outcome; and every predictive controller, the full-model planner
+included, runs at one horizon, with the planner's horizon dependence measured in a
+separate sweep.
 
-  D1  the sparsity threshold -- the paper's central hyper-parameter -- was NOT part of
-      the frozen recipe. `protocol_config.CANONICAL_RECIPE` has no `threshold` key, so
-      the confirmatory model silently used `article_experiment_utils.fit_sindy`'s
-      function default (0.05). Here it is explicit and hashed.
-  D2  `protocol_config.load_frozen_recipe()` fell back to a hard-coded dict when the
-      json was missing. In a container that is a silent provenance break. Here: raise.
-  D3  TRAIN was declared {2018, 2019} but every runner used `train_scenarios()[0]`,
-      i.e. 2018 only. Here: both years, aggregated.
-  D4  solver-failure budgets differed 10x by controller (SINDy/grey 100, NN-MPC and
-      oracle 10), which truncated exactly the two controllers the paper calls worst.
-      Here: one budget for everyone, and truncation is a recorded, gating outcome.
-  D5  the oracle ran at horizon 12 while every surrogate MPC ran at 20, so "model
-      fidelity" and "horizon" were confounded. Here: one horizon for everyone, plus an
-      explicit oracle-horizon sweep so the effect is measured instead of assumed.
-
-Import contract: this module only *declares*. Compute lives in the already-validated
-`article_experiment_utils` API; `run_regen.py` is the thin driver.
+Import contract: this module only *declares*. Compute lives in the
+`article_experiment_utils` API; `run_regen.py` is the driver.
 """
 from __future__ import annotations
 
@@ -71,20 +61,18 @@ DAGGER_EPISODE_DAYS = 5
 
 ORACLE_CEM = dict(n_samples=48, n_iters=2, elite_frac=0.2, sample_std=0.3)
 
-# Measures D5 instead of assuming it away. Cost is ~linear in the horizon; from the
-# 2026-08-03 smoke (3-day season, 32 samples): h=12 -> 185 s, h=20 -> 271 s, i.e. about
-# (56 + 10.75*h) seconds. Scaling to the real season (x20 steps, x1.5 samples) gives
-# roughly 1.5 h at h=12, 2.3 h at h=20, 4.8 h at h=48 and 9.1 h at h=96 PER SEED -- so the
-# full sweep on all 20 seeds would cost more than the entire main table. It is a
-# sensitivity analysis, not a headline, so it runs on a fixed 5-seed subset; the h=20 point
-# that establishes parity with the surrogate MPC is covered on ALL seeds by the main table.
+# The planner's horizon dependence, measured rather than assumed. Cost is roughly linear in
+# the horizon (about 56 + 10.75*h seconds on a 3-day smoke season with 32 samples), i.e.
+# roughly 1.5 h at h=12, 2.3 h at h=20, 4.8 h at h=48 and 9.1 h at h=96 per seed on a full
+# season, so the sweep on all 20 seeds would cost more than the entire main table. It is a
+# sensitivity analysis, not a headline, and runs on a fixed 5-seed subset; the h=20 point
+# that establishes parity with the surrogate MPC is covered on all seeds by the main table.
 ORACLE_HORIZON_SWEEP = (12, 20, 48, 96)
 ORACLE_SWEEP_SEEDS = (0, 1, 2, 3, 4)
 
-# λ sweep for the mechanism experiment. Denser than the 8-point 2026-07 grid around the
-# collapse AND past it: the old grid's last point (λ=0.1, boiler coefficient exactly 0)
-# had HIGHER EPI than λ=0.05, which contradicts the paper's monotonicity claim. The
-# sweep must resolve that region rather than end there.
+# λ sweep for the mechanism experiment: dense around the region where the boiler term is
+# lost (0.03-0.06) and extended well past it, so that the loss of the term and what happens
+# beyond it are both resolved rather than bracketed.
 LAMBDA_GRID = (1e-6, 1e-3, 1e-2, 2e-2, 3e-2, 4e-2, 5e-2, 6e-2, 7e-2, 8e-2, 1e-1,
                1.5e-1, 2e-1)
 
@@ -104,9 +92,9 @@ DENSE = {
     "denoise": "none",
     "threshold": 1e-3,
 }
-# Was called `grey_box_mpc` and described in the paper as a "reduced first-principles
-# grey-box model". It is not: it is THIS SAME estimator at threshold 1e-6. Renamed so the
-# regen cannot reproduce that claim by accident. See README "G-1" and build_true_greybox().
+# The same estimator as DENSE at threshold 1e-6, i.e. the least sparse member of the
+# family. It is a data-driven fit, not a reduced first-principles model, and its label
+# says so; see build_true_greybox() for what a first-principles grey box would require.
 LOWTHR = {
     "feature_variant": "physics_no_cross",
     "library_degree": 1,
@@ -127,24 +115,20 @@ CROSS = {
 
 RECIPES = {"confirmatory": CONFIRMATORY, "dense": DENSE, "lowthr": LOWTHR, "cross": CROSS}
 
-# ── N-7: the recipe the pre-registered criterion actually selects ─────────────
-# The ladder, re-run with the corrected step horizons (2026-08-10), ranks the RAW library
-# first on both pre-registered open-loop metrics and the frozen physics_no_cross recipe far
-# behind, on identical fits (seeds 0/1 agree):
+# ── The recipe the pre-specified open-loop criterion actually selects ─────────
+# At the step-indexed rollout horizons the ladder ranks the RAW library first on both
+# pre-specified open-loop metrics, far ahead of the frozen physics_no_cross recipe on
+# identical fits:
 #
 #     raw/d1/stlsq/none                  rollout RMSE  2.62   diverged 0.0000
 #     physics_no_cross/d1/ensemble/none  rollout RMSE 11.04   diverged 0.0167   <- frozen
 #
-# The frozen recipe DOES pass the divergence gate (0.017 <= 0.05); the earlier claim that it
-# failed its own gate came from the stale pre-fix ladder and is retracted. What survives is
-# the 4.2x rollout gap -- and the manuscript asserts the opposite, that the raw library lost
-# on open-loop metrics (statya_ru.tex:336). No controller in the main table uses `raw`, so
-# the closed-loop consequence has never been measured. That is what these two recipes are for.
-#
-# Threshold is held at CONFIRMATORY's 0.05 so the ONLY thing that changes is the library.
-# `_stlsq` is the ladder's top-ranked entry and is deterministic; `_ens` is the exact
-# one-factor change from the confirmatory recipe and keeps the bootstrap-draw lottery, so the
-# pair also separates "library" from "optimizer".
+# The frozen recipe passes the divergence gate (0.017 <= 0.05); what separates the two is
+# the 4.2x rollout gap. These two recipes carry the raw library into closed loop, where its
+# consequence is measured. Threshold is held at CONFIRMATORY's 0.05 so the only thing that
+# changes is the library. `_stlsq` is the ladder's top-ranked entry and is deterministic;
+# `_ens` is the exact one-factor change from the confirmatory recipe and keeps the bootstrap
+# draw, so the pair also separates "library" from "estimator".
 RAW_STLSQ = {
     "feature_variant": "raw",
     "library_degree": 1,
@@ -165,11 +149,10 @@ RAW_ENS = {
 # it would invalidate every already-computed wave (the same convention as ENSEMBLE_DRAWS and
 # LADDER_ROLLOUT_HORIZONS_STEPS). The recipe reaches each result row through the usual
 # `fit_sindy_seeded` RNG key, so provenance stays self-contained.
-# Closes the conditioning series. The ladder gives kappa 8.2 (raw) -> 24.5
-# (physics_no_cross) -> 53.4 (physics), but only the first two ever reached closed loop, so
-# the end of the series -- the worst-conditioned library -- had never been measured there at
-# all. It is the first thing a reviewer asks about. Both variants are a one-step change from
-# what is already measured: same threshold, same degree, only the library moves.
+# Completes the library series in closed loop. The ladder gives kappa 8.2 (raw) -> 24.5
+# (physics_no_cross) -> 53.4 (physics); these two recipes carry the full library, the
+# worst-conditioned end of the series. Both are a one-step change from what is already
+# measured: same threshold, same degree, only the library moves.
 PHYS_ENS = {
     "feature_variant": "physics",
     "library_degree": 1,
@@ -212,7 +195,7 @@ CONTROLLERS_EXT = ["sindy_mpc_raw", "sindy_mpc_raw_ens",
                    "sindy_mpc_notuboil", "sindy_mpc_notuboil_ens"]
 
 # ── Controllers ──────────────────────────────────────────────────────────────
-# `sindy_mpc_lowthr` replaces the old `grey_box_mpc` label (same computation, honest name).
+# `sindy_mpc_lowthr`: the physics_no_cross library at threshold 1e-6 (see LOWTHR above).
 CONTROLLERS_CHEAP = ["rule_based", "sindy_mpc_conf", "sindy_mpc_dense",
                      "sindy_mpc_lowthr", "nn_mpc"]
 CONTROLLERS_DAGGER = ["sindy_mpc_conf_dagger", "sindy_mpc_dense_dagger"]
@@ -239,39 +222,26 @@ EXPECTED_MAIN_ROWS = len(ALL_CONTROLLERS) * len(TEST_YEARS) * len(SEEDS)   # 10*
 # faults and design on 30, the main table on 60. The paper presents them side by side without saying so. Here they
 # all use the canonical season, and the window is recorded per row regardless.
 
-# Identification ladder: the 42 configurations the pre-specification chose from.
-# 3 libraries x 2 degrees x 4 optimisers x 3 denoisers = 72 cells; the historical ladder
-# has 42 because the infeasible combinations were skipped. We enumerate all 72 and let
-# the gates reject; the count is then an outcome, not an assumption.
+# Identification ladder: 3 libraries x 2 degrees x 4 optimisers x 3 denoisers = 72 cells.
+# All 72 are enumerated and the gates reject what they reject, so the pass count is an
+# outcome rather than an assumption.
 LADDER_VARIANTS = ("raw", "physics", "physics_no_cross")
 LADDER_DEGREES = (1, 2)
 LADDER_OPTIMIZERS = ("stlsq", "sr3", "constrained", "ensemble")
 LADDER_DENOISE = ("none", "savgol", "kalman")
-# Open-loop rollout horizons for the ladder, IN STEPS -- the same defaults the original
-# ladder used (`evaluate_sindy`'s `rollout_horizons=(4, 20, 96)`), i.e. 1 h / 5 h / 1 day.
-#
-# The first regen got this wrong and it produced a false alarm worth recording. An earlier
-# draft said the frozen recipe barely diverges "at a forecast length of at least 3 days".
-# That reads as a rollout horizon, so this
-# constant was named ..._BUDGETS_DAYS = (1, 3, 7) and fed to evaluate_sindy as horizons of
-# 96/288/672 steps -- up to SEVEN days of free running. Everything diverges over seven days:
-# the frozen recipe scored diverged_frac 0.21 and rollout RMSE 12.4 against the historical
-# 0.0 and 2.76, on an identical fit (28 non-zero terms both times), and the harness
-# duly reported that the pre-specified recipe fails its own gates. It does not.
-#
-# The historical ladder table settles it: `budget_days` there is the TRAINING-DATA budget
-# (1 day -> diverged 0.55, 3 days and up -> 0.0), not a forecast horizon. That table is
-# `../results_e0_e3_final/tables/e2_stability_vs_budget.csv` in the project repository and
-# is NOT part of this package. The manuscript states the quantity in control steps, so the
-# conflation cannot recur there.
+# Open-loop rollout horizons for the ladder, IN STEPS (`evaluate_sindy`'s defaults):
+# 4, 20 and 96 steps = 1 h, 5 h and 1 day. The unit is spelled out because a rollout
+# horizon and a training-data budget are both naturally quoted in days and must not be
+# confused: fed as horizons, budgets of 1/3/7 days become 96/288/672 steps of free running,
+# over which every fit diverges. The manuscript states horizons in control steps.
 #
 # Deliberately NOT part of `_declared()`/config_hash: it only affects the ladder, and adding
 # it would invalidate the hash of every already-computed wave. The value is recorded per row
 # instead, so ladder provenance stays self-contained.
 LADDER_ROLLOUT_HORIZONS_STEPS = (4, 20, 96)
 
-# The training-data budget curve (the ladder's other axis). Not swept by the ladder;
-# kept here so the two ideas cannot silently merge again.
+# The training-data budget curve (the ladder's other axis), in days. Not swept by the
+# ladder; declared beside the horizons so that the two quantities stay distinct.
 LADDER_TRAIN_BUDGETS_DAYS = (1, 3, 7, 14, 30, 60)
 
 # Online adaptation: static surrogate vs data aggregation vs EKF/RLS, on the OOD years.
@@ -411,12 +381,8 @@ def test_scenario(pc, year: int) -> dict:
 
 
 def build_train_dataset(pc, seed: int, fast: bool = False):
-    """Identification dataset = rule-based + PRBS over ALL declared train years (D3).
-
-    The 2026-07 runners used only train_scenarios()[0] (2018), contradicting the Methods
-    text. Aggregating both years changes every downstream number -- which is the point of
-    a regen, and must be stated in the paper.
-    """
+    """Identification dataset: rule-based control plus PRBS excitation over ALL declared
+    training years, aggregated into one trajectory set, as the Methods state."""
     parts = []
     for sc in pc.train_scenarios():
         cfg = pc.cfg_for(sc, seed=seed)
@@ -435,20 +401,14 @@ def build_train_dataset(pc, seed: int, fast: bool = False):
 
 
 def build_true_greybox(*_a, **_kw):
-    """NOT IMPLEMENTED, deliberately.
+    """Placeholder: no first-principles grey-box model exists in this package.
 
-    The paper claims an independent "reduced first-principles grey-box model" that the
-    repaired surrogate converges onto. No such model exists in this repository: the old
-    `grey_box_mpc` was `fit_sindy(physics_no_cross, degree 1, threshold=1e-6)` -- the same
-    data-driven estimator as `sindy_mpc_dense` with a marginally lower threshold, so their
-    agreement (3.79 vs 3.81) is an identity, not a convergence.
-
-    Two honest options, both requiring a human decision:
-      (a) drop the first-principles claim and report the controller as `sindy_mpc_lowthr`
-          (what regen-v2 does by default); or
-      (b) author a genuine grey-box: fix the energy/mass-balance coefficients of the
-          t_in / co2 / rh equations from GreenLight's documented parameters, leave only the
-          unknown transfer coefficients free, fit those, and embed via build_mpc_controller.
+    The controller once labelled `grey_box_mpc` is `fit_sindy(physics_no_cross, degree 1,
+    threshold=1e-6)`, the same data-driven estimator as `sindy_mpc_dense` at a lower
+    threshold, and is reported as `sindy_mpc_lowthr`. A genuine grey box would fix the
+    energy and mass-balance coefficients of the t_in / co2 / rh equations from GreenLight's
+    documented parameters, fit only the unknown transfer coefficients, and embed the result
+    via build_mpc_controller.
     """
     raise NotImplementedError(
-        "no first-principles grey-box exists; see build_true_greybox.__doc__ (README G-1)")
+        "no first-principles grey-box exists; see build_true_greybox.__doc__")

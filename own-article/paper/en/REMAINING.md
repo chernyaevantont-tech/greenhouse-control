@@ -1,18 +1,19 @@
 # REMAINING — open items in the English manuscript
 
-Rewritten **2026-08-28**, after the Word build was made the submission route and
+Rewritten **2026-08-28** and extended **2026-09-14** (Section 0), after the Word build was made the submission route and
 the figure and equation defects it exposed were fixed.  The previous rewrite was
 2026-08-14, before the `notuboil` wave and before the retarget at *Agronomy*.
 
 **Structural state at this assembly** (`verify_paper_en.py`):
-51/51 environments balanced · 1479/1479 braces · 2452 inline-math delimiters
+51/51 environments balanced · 1478/1478 braces · 2520 inline-math delimiters
 (even) · 0 dangling `\ref` · **5 numbered figures + the graphical abstract, and
 16 tables, all cited** · 48 `\cite` keys against 48 `\bibitem` entries, none
-unused, none missing, in first-citation order · abstract **188** words (MDPI
-limit 200) · 16 288 words of narrative prose.
+unused, none missing, in first-citation order · abstract **191** words (MDPI
+limit 200) · 16 465 words of narrative prose.
 
-**Word state** (`format_mdpi_docx.py`, then `.codex-tmp/mdpi-format/audit_mdpi.py`):
-13/13 formatting checks and the full package audit pass — 16 three-line tables
+**Word state** (`make_docx.py` 16/16, `format_mdpi_docx.py` 14/14, then
+`.codex-tmp/mdpi-format/audit_mdpi.py`):
+every check and the full package audit pass — 16 three-line tables
 with repeating header rows, 3 equation components with right-aligned numbers,
 6 figure captions, 48 references in MDPI style, back matter in MDPI order, A4
 geometry, continuous line numbering and the template's own headers, footers and
@@ -24,7 +25,174 @@ CSVs in this pass.
 
 ---
 
-## 0. What changed in this pass, and why the register was rewritten
+## 0. 2026-09-16 (evening) — deposit archive text audit applied
+
+Source: `mdpi-review-output/archive-text-audit-2026-09-16.md` §6, all six items. The manuscript
+source, the Word file (`08509bdf…`) and every figure PNG are unchanged; `make_numbers_md.py`
+re-run afterwards reproduces `results/final/NUMBERS.md` byte for byte (800 table cells,
+410 prose values, 0 mismatches). Archive rebuilt, deterministic (`89504527…`, 630 entries,
+5.99 MB); `ZENODO.md` carries the hash. Nothing committed.
+
+| Item | What changed |
+|---|---|
+| 1 NUMBERS.md | `make_tables.py` no longer writes a file of that name: its 14-row summary of the default-objective tree is `tables/SUMMARY.md` (also under `results_pull/raw/`, `git mv`). `results/final/NUMBERS.md` is now written by `paper/en/make_numbers_md.py` from `verify_tables.CHECKS` and `verify_prose.CHECKS`: every table cell and prose value, the recomputed value, the source files (parsed from the tex `\source` lines and from the checkers' loader calls) and the mismatch count. The four contradictions (ppo leader, knock-in +3.05, 30/72, 12 %) are gone with the old file. |
+| 2 pre-registered | `pre-specified` in the 11 code and doc sites; `analysis_notuboil.md` regenerated (heading "Verdict against the prediction stated in advance"). |
+| 3 SPEC.md | Out of the archive (`make_archive.FIGURE_FILES`); `README.txt` gained "Figures, and the files they are drawn from". `CLUSTER_REGEN_PLAN.md` (shelved plan, private hosts) excluded via `SKIP_NAMES`. |
+| 4 Docstrings | Revision history, `REVISION_LOG`/`REMAINING.md`/`*.tex:N` pointers, "reviewer item", "RETRACTION GUARD", dated notes and the assistant register (honest, genuinely, which is the point, worth recording, Do not restore/reintroduce) removed from `regen_config.py`, `run_regen.py`, `experiments_support.py`, `exp_draws.py`, `verify_regen.py`, `repro.py`, `analyze_notuboil.py`, `run_knockout_ablation.py`, `article_experiment_utils.py`, `e3_dagger_compare.py`, `_plotstyle.py`, `make_fig1..6.py`. Comments only; `config_hash` still `637c6b535a9e`; all six figure scripts re-run, self-checks pass, PNGs byte-identical to the embedded ones. |
+| 5 Private infrastructure | Two lines dropped from `requirements-cluster.txt`; `.venv-regen/Scripts/python.exe` paths in three docstrings became `python …`. |
+| 6 Archive | Rebuilt twice, same hash. Residual scan hits are literal uses (`superseded` for the two superseded trees, "shipped" for gl_gym data, "steps, not seasons") and the protocol's translated wording, which stays. |
+
+---
+
+## 0. 2026-09-16 — review items R-1…R-7 applied, environment wording reduced
+
+Source: `mdpi-review-output/review-2026-09-15.md` §3. Gates after this pass:
+`verify_paper_en` balanced (50/50), 0 dangling, 48/48, abstract 191, 17 257 words of prose;
+`verify_tables` **800**/0 (Table 7 gained a seed-level block); `verify_prose` **410**/0
+(passages `seedlevel`, `paneld` added, `config`/`bounds`/`conclusions` extended);
+`verify_manuscript` 2102 numbers, 0 unclaimed; `make_docx` 16/16, `format_mdpi_docx` 14/14,
+`AUDIT_OK`, one placeholder (data DOI); Word render 42 pages, equation (3) and Table 7
+inspected. Archive rebuilt, deterministic (`86f5bed3…`, 630 entries). Nothing committed.
+
+| Item | What changed |
+|---|---|
+| R-1 unit of analysis | §2.8 names the seed as the unit at which surrogates are independent and the seasons as repeated measures. Table 7 carries two new columns (wins/seeds, Holm over the same family of 15 on per-seed four-season means); `verify_tables.check_wilcoxon` verifies them. §3.3 reports the headline paired contrast (mean +1.23, median +1.58, 62/80, Holm 7.7·10⁻⁴) by season (20/20, 6/20 in 2021 with p = 2.3·10⁻³, 16/20, 20/20) and at seed level (16/20, Holm 8.4·10⁻³), and states that the count of controllers above the tuned heuristic is four at run level and two at seed level. Contribution (iii), Finding 2 and §4.6 say the same. |
+| R-2 RL budget | §2.3: 2·10⁵ steps (≈35 seasons) against the 2·10⁶ with tuned hyper-parameters of the GreenLight-Gym reference (Table 2 of arXiv:2410.05336); §4.6: PPO/SAC positions are conditional on that budget. The reference budget is recorded in `verify_prose.check_config_constants` as an external constant. |
+| R-3 | Contribution (i): "the closed-loop winner is the library that multi-step stability selects; neither criterion reproduces the full closed-loop ordering". |
+| R-4 | §3.6 opens with "A perfect model does not by itself secure a high margin"; the planner's rank is framed as a bound on what fidelity can show; the two prose uses of "oracle" became "full-model planner" (the `oracle_mpc` label is unchanged). |
+| R-5 | Conclusions: the stratification p is the seed-level 0.18 (3 against 17), the run-level 0.053 is gone; the headline test now has a Results home (§3.3). |
+| R-6 | §2.1: two 60-day training trajectories per replicate, PRBS ±0.3 redrawn every 16 steps (4 h), Gaussian 0.1 redrawn every 5 steps, actions clipped, `GreenLightTomato-v0` defaults; §2.4: the three states and a constant enter every library (15/18/22/21 columns per equation, 45/54/66/63 coefficients); equation (3) carries the move-suppression term with R = diag(10, 5, 100, 50, 1, 1) and the hard bounds. All read from code by new `config`/`bounds` checks. |
+| R-7 | §3.5 paragraph on Figure 1d: surviving |ξ| 0.06–0.08 (raw, median 0.069, 11/20), 0.06–0.07 (no-cross, median 0.061, 3/20), the full library split 5 in [0.05, 0.07] and 6 in [0.14, 0.19] (median 0.143); cut coefficients are stored as zero, so nothing is claimed about them. |
+| Environment wording | §2.9, §3 preamble, §4.6 and the DAS no longer name the `image` field, the container image, the base image or the OS: "a Linux compute cluster under Python 3.11" and "a workstation under Python 3.14", "every result row records which". The deposit README keeps the `image` values because the CSV column exists; "Windows" was dropped there too. |
+| Build | `make_docx.py` strips `\cmidrule` lines before pandoc (they leaked as "2-5(lr)6-7" into the first header cell of Table 7); the hard-coded "2-3(lr)4-5 Library" patch in `format_mdpi_docx.py` became an assertion. |
+
+---
+
+## 0. 2026-09-15 (afternoon) — readiness re-check applied
+
+Source: `mdpi-review-output/review-2026-09-15.md`. Every gate re-run afterwards:
+`verify_paper_en` balanced, 0 dangling, 48/48, abstract 191; `verify_tables` 758/0;
+`verify_prose` **340**/0 (four checks added); `verify_manuscript` 1975 numbers, 0 unclaimed;
+Word build 14/14, `AUDIT_OK`, one placeholder (the data DOI). Archive rebuilt, deterministic
+(`b314d528…`, 630 entries).
+
+| Item | What changed |
+|---|---|
+| D-1 glyph | pandoc drops `{\DJ}`; the submission file printed **Ećim-urić** three times. `Đ` is now a literal in `01-introduction.tex`, `04-discussion.tex` and the `ecimduric2024` bibitem. Rule: non-ASCII letters as literals, never as letter macros — `audit_mdpi.py` and `verify_*` cannot see this class of defect. |
+| D-2 counts | §2.9: 20 manifests / 11 SHAs → **21 / 12** (the `notuboil` wave). `verify_prose.check_structural_counts` now counts manifests, distinct `git_sha` and the absence of an env block from the tree, because the coverage walk claims by value and 20/11 collided with 20 seeds / 11 features. |
+| D-11 environments | The `image` column of every result row (from `REGEN_IMAGE`, default `local`) shows **two** environments, not one: `final/main.csv`, `mechanism*`, `faults`, `design*`, `parity`, `ladder*` carry `greenhouse-regen:v1` (cluster container, `python:3.11-slim`; `draws.csv` is `v4`), everything else including `final/adapt.csv` and `final/guard.csv` is `local` (workstation, Python 3.14). So the "two harnesses" of the heuristic drift (−1.2061 vs −1.2264) are the two platforms, and the seed-matched priced−default deltas of §3.3 cross them for the five `physics_no_cross` controllers and `nn_mpc` (the raw pair is within-environment). §2.9, §3 preamble, §4.6 and Conclusions Finding 5 now say this; the "single environment" wording is gone. The DAS, `regen/README.md`, `ARCHIVE_README.txt` and `ZENODO.md` agree. **Authors to confirm** that `local` is the Windows workstation for every local wave. |
+| D-5 versions | §2.9 opens with the full pinned stack (NumPy … gl_gym 0.3.1); `cluster/requirements-cluster.txt` is now shipped at the archive root and named in `README.txt`. |
+| D-6 CoI | `authors.json → conflicts_of_interest` carries MDPI's funder-role sentence. |
+| D-7 DAS | Cut from ~400 words of run commands to five sentences; the DOI sentence still arrives through `@@DATA_LOCATION@@`. Table 16's caption no longer names `own-article/regen/results/`. |
+| D-8 letter | `cover_letter.docx`: Special Issue → *Intelligent Control of Greenhouse Climate* (Guest Editor Dan Xu, deadline 31 Dec 2026); "registered a prediction" → "stated the prediction in advance"; "confirms the mechanism" → "establishes that the closed-loop outcome depends on survival of that term". Degrees in the signature block are still the authors' to confirm. |
+| D-9 | `paper_en_mdpi_simulation_short_captions.docx` removed (`git rm`, not committed). |
+
+Not applied, by design: the scientific items R-1…R-7 of the review (unit of analysis, RL
+budget, contribution (i) wording, §3.6 opening, headline test in Results, Methods detail,
+Figure 1d) and the GenAI-disclosure decision. Nothing is committed.
+
+---
+
+## 0. 2026-09-15 — table typography in the Word build
+
+Table 16 (the headline-quantities table) was unreadable in `paper_en_mdpi.docx`: every cell
+centred, the panel headings split over two or three rows exactly where the LaTeX source had
+broken them by hand, three equal columns, file paths carrying a stray space
+(`ladder_rerun/ ladder_rerun*.csv`) and hyphenated by Word (`phys-lib.csv`), and the notes set
+as body text. The same centring and autofit defects were visible in the three other prose
+tables (1, 2 and 15). Fixed at the source of each:
+
+| Where | What changed |
+|---|---|
+| `05-conclusions-abstract.tex` | The five panel rows of `tab:headline` are one wrapping row each (`\multicolumn{3}{@{}p{\panelwidth}@{}}`, `\panelwidth` = the three column widths plus the two gaps) instead of hand-broken `@{}l` lines; the four break-hint spaces inside paths became `\allowbreak`; column widths 0.34/0.28/0.32 (were 0.36/0.24/0.34) so the p-values do not wrap inside the maths. No number or word changed. |
+| `make_docx.py` | Any `\multicolumn` spec pandoc cannot read (`@{}`, a p-column) is mapped to `l`; a tabular with a p-column gets a width for every column (p-widths kept, l/c/r columns at their LaTeX natural width, normalised to the full width) so pandoc emits fixed columns — Tables 1, 2, 15, 16; the five note blocks under tables become a `tablenotes` Div that a Lua filter maps onto `MDPI_4.3_table_footer`; `\allowbreak` becomes a zero-width space. Two post-checks added (16/16). |
+| `format_mdpi_docx.py` | Alignment follows the cells: a table with a prose column (a body cell over 40 characters) sets its first column and every prose column flush left and its cells to the top; numeric tables stay centred. Panel rows are flush left in every table, spaced 3 pt off the block above and kept with the row they label. Automatic hyphenation is off inside table cells; prose-table rows get 2 pt after. |
+
+Rendered through Word (COM → PDF) and read page by page: Table 16 now sits on one page with
+its caption and notes, the paths break after the directory without a hyphen, the numeric
+tables are unchanged apart from the flush-left panel labels, and the page count is still 40.
+Gates: `verify_paper_en` balanced; `verify_tables` 758/0; `verify_prose` 336/0;
+`verify_manuscript` 1974 numbers walked, 0 unclaimed; `AUDIT_OK` with the single data-DOI
+placeholder. Not done, and worth a look: `\texttt` has no character style in the Word build
+(the template defines no `Verbatim Char`), so every path and identifier prints in Palatino —
+defining one (Courier New at the body size) would make the *Source file* column and the
+controller labels read as code, as the LaTeX intends.
+
+---
+
+## 0. 2026-09-14 — the 07.09 review is now in the canonical source
+
+The MDPI review of 2026-09-07/08 (`mdpi-review-output/`) edited **copies** of the five
+section files; the canonical files were then edited separately on 2026-09-09 (pre-specified
+wording, italics removal, reference re-check), so the two trees diverged and the submission
+file still carried the review's two Critical findings. This pass three-way-merged the
+review copies onto the canonical files (base: the tree at `998014a`), resolved 12
+conflicts by hand, and rebuilt everything.
+
+**Ported, and now in `paper_en_mdpi.docx`:**
+
+| Item | What changed |
+|---|---|
+| **C-3** | Violation axis defined as *variable-steps summed over the three corridor variables* (Methods §2.2, Results §3 preamble, Figure 2 caption and regenerated axis label). |
+| **C-4** | Table 16 row relabelled *default objective* (the `design_priced_real` wave was scored on the hard-coded weights); provenance comment corrected. |
+| **C-5** | Conclusions: "same shape under the other estimator" → the raw-over-physics *direction* reproduces; the intermediate library was not run under STLSQ. |
+| **C-6** | `physics_no_tuboil` (17 features) defined in §2.4; its two controllers added to Table 2 below a rule, outside the 15-controller comparison and the Holm family. |
+| M-21 / M-22 / M-23 / M-25 / M-26 | Span sentence recast (max − min, peaking at +5.40); Figure 2 caption quotes 5.3 steps; `nn_mpc` removed from the Figure 3 survival strip; Figure 2 caption gained the marker→controller key; the non-priced objective is *default* everywhere (the review had left ten *original* sites in Results). |
+| A-7 … A-23 | Five (not four) one-factor labels; three (not two) things follow for practice; "declared" not "pre-declared" family; RMSE/PPO/SAC expanded at first use; A-17 stale "untested experiment" sentence; unit spacing `EUR\,m$^{-2}$`; tense and antecedent fixes. |
+| Language / MDPI | optimizer → optimiser (15), numerals ≥10 as digits mid-sentence (24), overlong sentence split, bold-for-emphasis removed. |
+| Anti-slop | Paired ` -- X -- ` inserts in prose 29 → **0** (three the review's scan had missed included); dashes before conjunctions removed; single ` -- ` connectors in prose 116 → 32, tables and comments excluded. Eight sentences where the review's dash→comma rule had left a *dangling* opening dash were recast with parentheses or a colon. |
+| Bold lead-ins (owner, same day) | The run-in bold sentences that opened the five Conclusions findings, the four Introduction contributions, the term-deletion paragraph in §4.1 and the fifteen Limitations items, plus one mid-sentence bold in §2.8, were removed as an AI tell; the Conclusions enumerate became five prose paragraphs, the contributions keep their (i)–(iv) signposts, the Limitations list keeps its items. Bold now occurs only in table headers, best-value cells and panel labels. Wording and every number unchanged. |
+| Figures | `make_fig1/2/3/4/6.py`, `_plotstyle.py`: axis labels (variable-steps, *indicator*), `nn_mpc` tick removed, coefficient spelling unified, label halos/legend frames against overlaps. All six regenerated: 48/48, 61/61, VERIFY OK, waterfalls close, graphical-abstract self-check OK. |
+
+**Decided differently from the review copy — check if you disagree:**
+
+- Results §3.1 (×3) and Discussion §4.2 say **"applied (open-loop) gates/axes"**, the
+  review's wording, not the 09.09 "pre-specified". Reason: Methods §2.5 states that what
+  was applied (the 0.05 threshold, the active-term axis) differs from what the protocol
+  pre-specified, so calling the applied axes pre-specified contradicted §2.5. The Methods
+  §2.5 title keeps *pre-specified*. `verify_prose.py` anchors moved with the wording.
+- §2.5 carries **one** protocol pointer, naming `EXPERIMENT_PROTOCOL.md` in the archived
+  package "named in the Data Availability Statement". The review's second red
+  `[[ARCHIVE DOI REQUIRED]]` placeholder was **not** adopted: the canonical build fills the
+  DOI once, from `authors.json → data_location`, and `apply-zenodo-doi.py` targets the
+  review copy, not this tree. The review's "committed before any wave was generated"
+  clause was also left out — true of the Russian original (2026-06-26), but the deposited
+  file is the 09.09 English translation and does not itself record that date.
+- The review's °C normalisation residues were reverted to the canonical spellings
+  (`verify_prose.py` anchors on them), and the Figure 2 caption key uses quotes, not
+  `\emph`, in line with the 09.09 italics decision.
+
+**Gates after the merge:** `verify_paper_en` balanced, 0 dangling refs, 48/48 references,
+abstract **191** words; `verify_tables` 758 cells / 0 mismatches; `verify_prose` 336 values
+/ 0 mismatches; `verify_manuscript` 1980 printed numbers walked, 0 unclaimed; Word build
+14/14 and `AUDIT_OK` with the single expected placeholder (the data DOI). The deposit
+archive was rebuilt because it ships the figure generators (629 entries, SHA-256
+`a65db4be…`, recorded in `ZENODO.md`).
+
+**AI-marker pass (2026-09-14, evening; `mdpi-review-output/ai-marker-audit-2026-09-14.md`).** The
+current-model register (aphoristic closers, `What X does` clefts, `X, not Y` tails, staged candour,
+`buys`/`genuinely`, duplicated caveats) was removed in 124 wording-only edits across the five section
+files; the tuning outcome now lives in Results 3.2 only (Methods 2.6 points there), the one-sample-test
+caveat in Methods 2.8 and the table notes, §4.3 is titled *Sparsity and the library effect*, and
+Acknowledgments stays `Not applicable` by the authors' decision. Nine `verify_prose.py` anchors were
+re-pointed. Later the same evening the 15-item Limitations list (§4.6) was recast as seven prose
+paragraphs (every sentence, number and `%%` provenance note kept; the `format_mdpi_docx.py`
+validation anchor now matches the lower-case `there is no physical-greenhouse validation`), and
+person usage was checked: Methods and Results are impersonal throughout, `we`/`our` appears 17 times
+(Introduction 2, Discussion 12, Conclusions 1, abstract 1) only for the authors' choices, claims and
+interpretations, the paper is `this study`/`the present study`, and there is no `I`/`the author`;
+MDPI permits either voice and asks only for consistency, so the scheme was left as it is. Gates after the pass: `verify_paper_en` balanced, 0 dangling refs, 48/48 references, abstract
+191 words; `verify_tables` 758/0; `verify_prose` 336/0; `verify_manuscript` 1974 numbers walked, 0
+unclaimed; Word build 14/14 and `AUDIT_OK` with the single data-DOI placeholder.
+
+**Still open from the review, author's call** (unchanged, see
+`mdpi-review-output/plugin-review-findings.md`): M-5 … M-19 and the hedging of causal
+verbs — every one of them changes a claim's strength or adds content, which this pass did
+not do.
+
+---
+
+## 0 (2026-08-28). What changed in that pass, and why the register was rewritten
 
 The 2026-08-14 register was written before three things happened: the `notuboil`
 wave settled the one experiment it listed as un-run, the manuscript was
@@ -202,15 +370,19 @@ Survival is **measured, not manipulated** at library level; the only randomised
 contrast anywhere is the `+0.21` ablation. A fourth library could disturb the
 pattern as the third disturbed the one before it.
 
-### 3.3 Cross-environment reproducibility was never measured
+### 3.3 Cross-environment reproducibility of any single wave was never measured
 
-No wave records an environment: `repro.py` can emit a fingerprint, but the `env`
+No manifest records an environment: `repro.py` can emit a fingerprint, but the `env`
 block is absent from **all 21** `regen_manifest.json` files, from every
-run log, and `final/NUMBERS.md` prints `env_hash: n/a`. Waves are separated
-only by `git_sha` (12 distinct values at one `config_hash`). The in-tree evidence
-that survives is the deterministic heuristic drifting between two harnesses at
-identical `config_hash`: `-1.2061` (`final/main.csv`) against `-1.2264`
-(`n2_tune/tune_rb_n2.csv`), per-season |Δ| 0.0031 / 0.0134 / 0.0266 / 0.0381.
+run log, and `final/NUMBERS.md` prints `env_hash: n/a`. Manifests are separated
+only by `git_sha` (12 distinct values at one `config_hash`). The **row-level `image`
+column** does record the environment class, and it shows two (see §0, D-11): the
+canonical `final/` blocks ran in the cluster container, everything else on the
+workstation. The in-tree cross-platform evidence is the deterministic heuristic
+drifting between those two at identical `config_hash`: `-1.2061` (`final/main.csv`,
+container) against `-1.2264` (`n2_tune/tune_rb_n2.csv`, workstation), per-season
+|Δ| 0.0031 / 0.0134 / 0.0266 / 0.0381; and §3.8's 80 default-objective design cells,
+75 of them within 0.2 EUR m⁻² across the two.
 
 **Do not restore** the stronger figures (0 of 180 cells, mean |Δ| 1.33, max 11.6)
 without committing that wave under `regen/results/`.

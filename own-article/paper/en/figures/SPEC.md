@@ -130,7 +130,7 @@ STLSQ replicate: raw +3.8333 at 0.50, physics +2.4762 at 0.55.
 κ 52.28 (49.4–57.3 across seeds, `notuboil/ladder_notuboil.csv`), rollout median
 24.17 °C, diverged 0.084; closed loop EPI **+2.11 ± 3.51** (ensemble) and
 **+2.28 ± 3.55** (STLSQ), survival **0.40** (8/20, Wilson [0.22, 0.61]).
-The registered detour prediction was collapse onto `physics_no_cross`
+The detour prediction, stated in advance, was collapse onto `physics_no_cross`
 (≈ +0.3 / ≈ 0.15), falsified 2026-08-18 (`notuboil/analysis_notuboil.md`).
 Surviving \|ξ_uBoil\|, median 0.0685 / 0.0609 / 0.1430; libraries 11 / 14 / 18
 terms, and only `physics` contains the bilinear `t_uBoil`

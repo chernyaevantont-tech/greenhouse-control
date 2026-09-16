@@ -19,14 +19,13 @@ dependency one-way at import time.
 """
 from __future__ import annotations
 
-# WARNING (2026-08-13). The blocks below hard-coded objective="full" and therefore
-# SILENTLY ignored the driver's --objective flag. The E-E wave, launched with
-# --objective priced, was in fact scored on the hard-coded weights: confirmed
-# empirically -- EPI at h=20 is 3.86 against the canonical 3.63 (a difference within
-# seed sampling), while the mechanism block, which goes through rollout(), rose
-# 3.68 -> 6.58. Every block now reads R._OBJECTIVE.
-# Consequence: the adapt/guard/faults/design results in this tree were produced on the
-# HARD-CODED weights.
+# OBJECTIVE OF THE SUPPORTING BLOCKS. The adapt, guard, faults and design results shipped
+# with this package were produced by a version of these blocks that scored every rollout
+# on the default stage-cost weights regardless of the driver's --objective flag; the flag
+# was consumed only by the main and mechanism blocks. Every row in those files is therefore
+# a default-objective result, whatever its output directory is named. The current code
+# reads R._OBJECTIVE, so a re-run under --objective priced will differ from the shipped
+# files by construction.
 
 import time
 from pathlib import Path
@@ -43,20 +42,18 @@ import regen_config as C
 def exp_ladder(args, seeds, pc, econ, out: Path) -> int:
     """Reproduce the configuration sweep the confirmatory recipe was frozen from.
 
-    The paper says 42 configurations were compared and the winner frozen by open-loop
-    criteria. We enumerate the full 3x2x4x3 = 72 grid and let the gates reject, so the
-    surviving count is an outcome rather than an assumption -- and so a reader can check
-    that the frozen recipe really is the one the stated criteria select.
+    The confirmatory recipe was frozen by open-loop criteria from a configuration sweep.
+    The full 3x2x4x3 = 72 grid is enumerated and the gates reject what they reject, so the
+    surviving count is an outcome rather than an assumption, and a reader can check that
+    the frozen recipe is the one the stated criteria select.
 
-    Everything here is open-loop by construction: that is the point. No closed-loop number
-    is computed, exactly as the pre-registration required.
+    Everything here is open loop by construction; no closed-loop number is computed, as the
+    pre-specified protocol required.
     """
     import run_regen as R
 
     rows, path = [], out / f"ladder_{args.tag}.csv"
-    # Horizons in STEPS, matching the original ladder. See regen_config for why this is
-    # day count -- the first regen fed 7-day horizons here and wrongly concluded that the
-    # pre-registered recipe fails its own open-loop gates.
+    # Horizons in STEPS (regen_config.LADDER_ROLLOUT_HORIZONS_STEPS; see there for the unit).
     horizons = C.LADDER_ROLLOUT_HORIZONS_STEPS[:2] if args.fast else C.LADDER_ROLLOUT_HORIZONS_STEPS
     variants = C.LADDER_VARIANTS[:2] if args.fast else C.LADDER_VARIANTS
     degrees = (1,) if args.fast else C.LADDER_DEGREES
@@ -101,9 +98,8 @@ def exp_ladder(args, seeds, pc, econ, out: Path) -> int:
 def _openloop_stability(bundle, data, horizons) -> dict:
     """Multi-step rollout error and divergence fraction -- the frozen selection criteria.
 
-    `horizons` are STEPS and are passed straight through. They used to be days, converted
-    here into steps; that turned the ladder's 1-day worst case into a 7-day one and made
-    configuration look unstable. See regen_config.LADDER_ROLLOUT_HORIZONS_STEPS.
+    `horizons` are STEPS and are passed straight through
+    (regen_config.LADDER_ROLLOUT_HORIZONS_STEPS).
     """
     out = {}
     try:
@@ -328,8 +324,8 @@ def _one_step_abs_error(bundle, data) -> np.ndarray:
 def exp_faults(args, seeds, pc, econ, out: Path) -> int:
     """Six sensor/actuator faults, each with and without the residual-based supervisor.
 
-    The paper's honest finding here is that the supervisor reliably cuts violations but does
-    not always improve economics; both columns are therefore recorded per fault.
+    The supervisor reliably cuts violations but does not always improve economics; both
+    columns are therefore recorded per fault.
     """
     import run_regen as R
 
@@ -530,15 +526,11 @@ def exp_holdout(args, seeds, pc, econ, out):
     return 0
 
 
-# N-2 (defect register, G-4). The paper calls the rule-based reference "tuned", and the
-# whole fairness-of-comparison argument rests on that -- but no tuning artifact exists:
-# the setpoints are hard-coded in make_rule_based_controller, while the learning
-# controllers were given an explicit 16-trial budget. N-7 made this matter more: the
-# headline is that the raw library beats every comparator, and beating an UNtuned
-# reference is a far weaker claim than beating a tuned one.
-#
-# The search covers the economically significant setpoints; the ranges are agronomically
-# sensible and centred on the value currently hard-coded.
+# The rule-based reference is searched rather than taken at its hard-coded setpoints
+# (make_rule_based_controller), with the same 16-trial budget the learning controllers
+# were allocated; beating an unsearched reference is a weaker claim than beating a searched
+# one. The search covers the economically significant setpoints; the ranges are
+# agronomically sensible and centred on the hard-coded values.
 RB_TUNE_SPACE = {
     "temp_setpoint_day":   (17.0, 23.0),     # hard-coded value: 19.5
     "temp_setpoint_night": (14.0, 20.0),     # hard-coded value: 16.5
@@ -549,11 +541,11 @@ RB_TUNE_TRIALS = 16                          # exactly the RL controllers' budge
 
 
 def exp_tune_rb(args, seeds, pc, econ, out):
-    """N-2: search the heuristic's setpoints on the TRAINING years, best one on the test years.
+    """Search the heuristic's setpoints on the TRAINING years; run the best on the test years.
 
-    Selection uses 2018-2019 only; the 2020-2023 test seasons take no part in it, so the
-    comparison stays honest. The heuristic is deterministic, so the seed only decides which
-    trial points are drawn: one run per configuration.
+    Selection uses 2018-2019 only; the 2020-2023 test seasons take no part in it. The
+    heuristic is deterministic, so the seed only decides which trial points are drawn: one
+    run per configuration.
     """
     import run_regen as R
 

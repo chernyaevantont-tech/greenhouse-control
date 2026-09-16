@@ -270,10 +270,47 @@ def check_wilcoxon():
         prev = a
         adj[k] = a
 
+    # The seed-level block: the same one-sample test on per-seed four-season means. The
+    # four seasons of one seed share one identified surrogate, so the seed is the unit at
+    # which the replicates are independent; Holm over the same family of 15.
+    seed_deltas, seed_raw_p = {}, {}
+    for m in methods:
+        g = pool[pool.method == m]
+        per = (g["epi"] - g["test_year"].map(constant)).groupby(g["seed"]).mean()
+        d = np.asarray(per, float)
+        d = d[~np.isnan(d)]
+        seed_deltas[m] = d
+        seed_raw_p[m] = wilcoxon(d)[1] if len(d) > 1 and np.any(d != 0) else 1.0
+    items = sorted(seed_raw_p.items(), key=lambda kv: kv[1])
+    seed_adj, prev = {}, 0.0
+    for i, (k, pv) in enumerate(items):
+        a = min(1.0, max(prev, (15 - i) * float(pv)))
+        prev = a
+        seed_adj[k] = a
+
+    def p_cell(label: str, what: str, got: float, pcell: str) -> None:
+        pv = nums(pcell)
+        if not pv:
+            return
+        if "10^" in pcell or "times" in pcell:
+            want = pv[0] * 10 ** pv[1] if len(pv) > 1 else pv[0]
+            tol = 0.05 * want
+        else:
+            want = pv[0]
+            tol = max(0.0005, 0.02 * want)
+        cmp(label, what, got, want, tol)
+
     for cells in table_body("tab:wilcoxon"):
         method = name_of(cells[0]).split(" ")[0]
         if method not in deltas or len(cells) < 5:
             continue
+        if len(cells) >= 7:
+            ds = seed_deltas[method]
+            wins = nums(cells[5])
+            if len(wins) == 2:
+                cmp("tab:wilcoxon", f"{method} seed-level wins", int((ds > 0).sum()), wins[0], 0.5)
+                cmp("tab:wilcoxon", f"{method} seeds", len(ds), wins[1], 0.5)
+            p_cell("tab:wilcoxon", f"{method} seed-level p_Holm", seed_adj[method], cells[6])
         d = deltas[method]
         mean = nums(cells[1])
         if mean:

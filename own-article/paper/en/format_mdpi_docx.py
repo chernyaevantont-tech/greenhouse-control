@@ -21,6 +21,7 @@ from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import qn
+from docx.shared import Pt
 from docx.text.paragraph import Paragraph
 
 import authorship
@@ -408,19 +409,94 @@ def repeat_header_row(table) -> None:
         tr_pr.append(OxmlElement("w:tblHeader"))
 
 
+#: A body cell longer than this wraps in every column the template can give it,
+#: so the column is prose and is set flush left rather than centred.
+TEXT_CELL = 40
+
+#: pPr children that the schema orders after w:suppressAutoHyphens.
+_AFTER_SUPPRESS_HYPHENS = (
+    "w:kinsoku", "w:wordWrap", "w:overflowPunct", "w:topLinePunct",
+    "w:autoSpaceDE", "w:autoSpaceDN", "w:bidi", "w:adjustRightInd",
+    "w:snapToGrid", "w:spacing", "w:ind", "w:contextualSpacing",
+    "w:mirrorIndents", "w:suppressOverlap", "w:jc", "w:textDirection",
+    "w:textAlignment", "w:textboxTightWrap", "w:outlineLvl", "w:divId",
+    "w:cnfStyle", "w:rPr", "w:sectPr", "w:pPrChange",
+)
+
+
+def suppress_hyphenation(paragraph: Paragraph) -> None:
+    ppr = paragraph._p.get_or_add_pPr()
+    if ppr.find(qn("w:suppressAutoHyphens")) is None:
+        ppr.insert_element_before(OxmlElement("w:suppressAutoHyphens"),
+                                  *_AFTER_SUPPRESS_HYPHENS)
+
+
+def _cell_text(tc) -> str:
+    """Every character in a cell, maths included (python-docx's .text skips m:t)."""
+    return "".join(t.text or "" for t in tc.iter() if t.tag in (qn("w:t"), qn("m:t")))
+
+
+def _grid_cells(table):
+    """(row, first grid column, span, tc) for each real cell.
+
+    python-docx's row.cells repeats a spanning cell once per grid column it
+    covers, which would count a panel row as three long cells.
+    """
+    for r, tr in enumerate(table._tbl.tr_lst):
+        col = 0
+        for tc in tr.tc_lst:
+            yield r, col, tc.grid_span, tc
+            col += tc.grid_span
+
+
 def style_tables(doc: Document) -> None:
+    """Three-line style, repeating header, and alignment by what the cells hold.
+
+    pandoc centres nothing and the template centres everything; the MDPI look
+    is right for the numeric tables and unreadable for the four whose cells are
+    sentences (Tables 1, 2, 15 and 16).  A table with any prose column is set
+    like the LaTeX p-columns it comes from: the first column and every prose
+    column flush left, cells aligned to the top.  Numeric tables stay centred.
+    Panel rows -- one cell spanning the table -- are flush left everywhere, as
+    their \\multicolumn{..}{@{}l} source says, spaced off the block above and
+    kept with the row they label.
+    """
     for table in doc.tables:
         table.style = doc.styles["MDPI_4.1_three_line_table"]
         repeat_header_row(table)
-        for row in table.rows:
-            for cell in row.cells:
-                cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
-                for paragraph in cell.paragraphs:
-                    if paragraph.text.strip() == "2-3(lr)4-5 Library":
-                        clear_paragraph(paragraph)
-                        paragraph.add_run("Library")
-                    paragraph.style = doc.styles["MDPI_4.2_table_body"]
-                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        n_cols = len(table.columns)
+        longest = [0] * n_cols
+        for r, col, span, tc in _grid_cells(table):
+            if r > 0 and span == 1:
+                longest[col] = max(longest[col], len(_cell_text(tc).strip()))
+        text_table = max(longest) > TEXT_CELL
+
+        for r, col, span, tc in _grid_cells(table):
+            panel = span == n_cols and n_cols > 1
+            if panel or (text_table and (col == 0 or longest[col] > TEXT_CELL)):
+                alignment = WD_ALIGN_PARAGRAPH.LEFT
+            else:
+                alignment = WD_ALIGN_PARAGRAPH.CENTER
+            cell = table.cell(r, col)
+            cell.vertical_alignment = (
+                WD_CELL_VERTICAL_ALIGNMENT.TOP if text_table and not panel
+                else WD_CELL_VERTICAL_ALIGNMENT.CENTER
+            )
+            for paragraph in cell.paragraphs:
+                # \cmidrule residue ("2-3(lr)4-5 Library") used to be patched here;
+                # make_docx.py now strips the rules before pandoc sees them.
+                assert "(lr)" not in paragraph.text, f"cmidrule residue: {paragraph.text!r}"
+                paragraph.style = doc.styles["MDPI_4.2_table_body"]
+                paragraph.alignment = alignment
+                # The template hyphenates the whole document; inside a cell that
+                # cuts file names and quantities ("vi-olation", "phys-lib.csv").
+                suppress_hyphenation(paragraph)
+                if panel:
+                    paragraph.paragraph_format.space_before = Pt(3)
+                    paragraph.paragraph_format.keep_with_next = True
+                elif text_table and r > 0:
+                    paragraph.paragraph_format.space_after = Pt(2)
 
 
 def validate(doc: Document, n_equations: int = 0) -> None:
@@ -428,7 +504,7 @@ def validate(doc: Document, n_equations: int = 0) -> None:
     checks = {
         "in-silico title": "an in silico study" in text,
         "simulation scope in abstract": "comparative simulation evidence" in text,
-        "physical-validation limitation": "There is no physical-greenhouse validation" in text,
+        "physical-validation limitation": "there is no physical-greenhouse validation" in text,
         "five numbered sections": all(f"{i}. " in text for i in range(1, 6)),
         "sixteen table captions": sum(
             p.style.style_id == "MDPI41tablecaption" for p in doc.paragraphs

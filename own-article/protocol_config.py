@@ -159,7 +159,7 @@ CANONICAL_RECIPE = {
 def load_frozen_recipe() -> dict[str, Any]:
     """The one identification recipe every runner must agree on.
 
-    Reads results_scenarios/recipe_frozen.json (the pre-registered confirmatory recipe);
+    Reads results_scenarios/recipe_frozen.json (the pre-specified confirmatory recipe);
     falls back to CANONICAL_RECIPE if the file is missing. Centralised so the surrogate
     identification stays IDENTICAL across the closed-loop benchmark, online
     adaptation and generalization -- the adaptation and generalization runners once

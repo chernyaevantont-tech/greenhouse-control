@@ -1,7 +1,6 @@
 {
   "figure": "Figure 1 -- selection reversal and survival of the actuator pathway",
   "label": "fig:kappa",
-  "rebuilt": "2026-08-14; supersedes the conditioning-mechanism version",
   "sources": {
     "ladder": [
       "ladder_rerun\\ladder_rerun.csv",

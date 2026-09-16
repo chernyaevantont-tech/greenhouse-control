@@ -9,9 +9,9 @@ acceptance gates), and the experiment protocol, which fixed the open-loop select
 criteria the manuscript calls pre-specified.
 
 What stays out, and why: `log_*.txt` (a megabyte of per-shard run logs that duplicate what
-the CSVs already record), `k8s/` and `submit.sh` (infrastructure for one Kubernetes cluster,
-not a dependency of the results), and caches. Excluding them is a choice, so it is written
-down here rather than performed by hand.
+the CSVs already record), `k8s/`, `submit.sh` and `CLUSTER_REGEN_PLAN.md` (infrastructure
+and planning for one Kubernetes cluster, not a dependency of the results), and caches.
+Excluding them is a choice, so it is written down here rather than performed by hand.
 
 The archive is deterministic: entries are sorted, each carries a fixed timestamp, and the
 line endings of text entries are normalised to LF, so rebuilding it from an unchanged tree
@@ -34,6 +34,8 @@ KEEP_SUFFIXES = {".py", ".md", ".csv", ".json"}
 KEEP_NAMES = {"VERIFY.txt"}
 #: Directories never included.
 SKIP_DIRS = {"__pycache__", ".ruff_cache", "k8s", ".ipynb_checkpoints"}
+#: Files never included: planning documents for the cluster, not part of the results.
+SKIP_NAMES = {"CLUSTER_REGEN_PLAN.md"}
 #: A fixed DOS timestamp (2026-01-01 00:00:00) so the zip does not change on rebuild.
 FIXED_DATE = (2026, 1, 1, 0, 0, 0)
 
@@ -54,7 +56,10 @@ PARENT_MODULES = ("article_experiment_utils.py", "protocol_config.py",
 #: The protocol records which gates were declared for the identification ladder, so a
 #: reader can hold the plan against what Section 2.5 of the manuscript reports as applied.
 #: The English translation is deposited; the Russian original stays in the project tree.
-PARENT_DOCS = {"EXPERIMENT_PROTOCOL_EN.md": "EXPERIMENT_PROTOCOL.md"}
+#: The pinned package list is the software record Agronomy asks for and the README
+#: refers to; it is the same list in both computing environments the waves ran in.
+PARENT_DOCS = {"EXPERIMENT_PROTOCOL_EN.md": "EXPERIMENT_PROTOCOL.md",
+               "cluster/requirements-cluster.txt": "requirements-cluster.txt"}
 
 #: Suffixes treated as text when line endings are normalised.
 TEXT_SUFFIXES = KEEP_SUFFIXES | {".txt"}
@@ -72,10 +77,12 @@ def payload(src: Path) -> bytes:
 #: The figure layer, shipped as `figures/` beside `regen/`. `_plotstyle` owns the dedup key
 #: and the solver-abort rule -- how a CSV becomes a number reported in the paper -- and
 #: `analyze_notuboil` imports it. The six make_figN.py scripts are included with it, so the
-#: figures are reproducible from this archive and not only from the repository.
+#: figures are reproducible from this archive and not only from the repository. The
+#: figure specification kept beside them in the repository is an editorial working
+#: document and is not deposited; README.txt carries the figure-to-source table.
 FIGURE_DIR = Path("paper") / "en" / "figures"
 FIGURE_FILES = ("_plotstyle.py", "make_fig1.py", "make_fig2.py", "make_fig3.py",
-                "make_fig4.py", "make_fig5.py", "make_fig6.py", "SPEC.md")
+                "make_fig4.py", "make_fig5.py", "make_fig6.py")
 
 
 def selected(root: Path) -> list[Path]:
@@ -85,7 +92,7 @@ def selected(root: Path) -> list[Path]:
             continue
         if SKIP_DIRS & set(path.relative_to(root).parts):
             continue
-        if path.name.startswith("log_"):
+        if path.name.startswith("log_") or path.name in SKIP_NAMES:
             continue
         if path.suffix.lower() in KEEP_SUFFIXES or path.name in KEEP_NAMES:
             out.append(path)

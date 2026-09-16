@@ -33,8 +33,9 @@ dominance rather than combined into one score.
 
 One row is one simulated season: one controller, one identification replicate, one test
 year. Files are grouped by experimental wave; `results/final/` holds the merged blocks and
-the derived tables, and `results/final/NUMBERS.md` maps each claim in the article to the
-column it comes from.
+the derived tables, `results/final/tables/SUMMARY.md` summarises that tree, and
+`results/final/NUMBERS.md` lists every quantity the article states with the value recomputed
+from the tree and the files it comes from.
 
 The schema is not identical across waves. The outcome and constraint columns below appear
 everywhere. The rest depend on what the wave varied, and two conventions differ:
@@ -137,7 +138,7 @@ the library ordering from the evaluation year.
 From the deposited results, without re-running any simulation:
 
 ```bash
-python make_tables.py --out results/final     # every derived table, and NUMBERS.md
+python make_tables.py --out results/final     # every derived table, and tables/SUMMARY.md
 python verify_regen.py --out results/final    # acceptance gates; non-zero exit = do not publish
 ```
 
@@ -172,11 +173,21 @@ holding the trajectories at their nominal-price optimum, which is what a claim a
 
 ### Software
 
-Produced with Python 3.14 and numpy 1.26.4, scipy 1.17.1, pandas 2.3.3, scikit-learn 1.8.0,
-pysindy 2.1.0, casadi 3.7.2, do-mpc 5.1.1, gl_gym 0.3.1, gymnasium 1.2.3, torch 2.11.0,
-stable-baselines3 2.9.0. `python repro.py --fingerprint` prints the full record, and every
-results directory carries a `regen_manifest.json` with the configuration hash, the
-environment hash and the package versions the wave was produced with.
+Package versions, identical in both environments below: numpy 1.26.4, scipy 1.17.1,
+pandas 2.3.3, scikit-learn 1.8.0, pysindy 2.1.0, casadi 3.7.2 (bundled IPOPT), do-mpc 5.1.1,
+gl_gym 0.3.1, gymnasium 1.2.3, torch 2.11.0, stable-baselines3 2.9.0; the pinned list is
+`requirements-cluster.txt` at the archive root.
+
+Two computing environments produced the waves, and the `image` column of every result row
+records which. The canonical default-objective blocks (`final/main.csv`, `mechanism*.csv`,
+`faults.csv`, `design*.csv`, `parity.csv`, `ladder*.csv` and, as `v4`, `draws.csv`) were
+produced on a compute cluster in a Linux container built from `python:3.11-slim`
+(`image == "greenhouse-regen:v1"`). Every other file, including `final/adapt.csv` and
+`final/guard.csv` and all the later waves, was produced on a workstation under
+Python 3.14 (`image == "local"`). `python repro.py --fingerprint` prints the full record of
+the environment it runs in; the `regen_manifest.json` of each results directory carries the
+configuration hash and the git commit but no environment fingerprint and no package
+versions -- the row-level image tag is the only per-wave record of where it ran.
 
 `repro.py --selftest` runs the pipeline twice in one process and compares SHA-256 digests of
 the training data, the identified coefficient matrices, the network weights and the

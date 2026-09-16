@@ -1,0 +1,796 @@
+# SHELVED 2026-09-16 (see CLUSTER_REGEN_PLAN.md): kept for a possible revision round, never applied.
+# Single-environment regeneration (decision of 2026-09-16): every wave the manuscript reads
+# that was produced on the workstation (image == "local") is re-run on the cluster, so the
+# whole results tree comes from one platform. The canonical blocks of final/ (main,
+# mechanism, faults, design, parity, ladder, draws) are already cluster-produced and are
+# NOT re-run here.
+#
+# Prerequisites (see CLUSTER_REGEN_PLAN.md):
+#   1. image greenhouse-regen:v5 built from the CURRENT tree (the v1..v4 images predate the
+#      notuboil library, the --objective flag and the horizon/budget overrides) and pushed
+#      to the admin-01 registry; own-article/cluster/weather/Rostov-on-Don/ must hold
+#      2014..2023 (make_weather.py --years 2014,2015,2016,2017) before the build, because
+#      the nodes have no internet and the unseen-season wave needs those four years.
+#   2. the smoke job of 10-smoke.yaml rebuilt against v5 and its gate output read.
+#   3. results are written to per-wave directories under /results so that the pull lands
+#      them where figures/_plotstyle.py and the verifiers already look; each wave is then
+#      merged into the single file name those loaders expect (plan, step 6).
+#
+# Every wave shards round-robin by seed (completions = number of seeds). Tags reproduce
+# the file names of the workstation waves so the dedup key and the loaders are unchanged.
+---
+# --- the priced pool: five SINDy controllers, 20 seeds x 4 seasons ------------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-priced-main
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: priced-main }
+spec:
+  completionMode: Indexed
+  completions: 20
+  parallelism: 20
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: priced-main }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v5
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment main --objective priced
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 20
+              --controllers sindy_mpc_conf,sindy_mpc_dense,sindy_mpc_lowthr,sindy_mpc_raw,sindy_mpc_raw_ens
+              --tag "priced${JOB_COMPLETION_INDEX}" --out /results/priced_main
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v5" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+# --- the priced neural MPC: 10 seeds (the manuscript's n = 40), ~30 min per season ---------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-priced-nn
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: priced-nn }
+spec:
+  completionMode: Indexed
+  completions: 10
+  parallelism: 10
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: priced-nn }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v5
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment main --objective priced
+              --seeds-all 0,1,2,3,4,5,6,7,8,9
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 10
+              --controllers nn_mpc
+              --tag "pricedNN${JOB_COMPLETION_INDEX}" --out /results/priced_main
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v5" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+# --- the two on-policy re-identification variants under the priced objective --------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-priced-dagger
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: priced-dagger }
+spec:
+  completionMode: Indexed
+  completions: 20
+  parallelism: 20
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: priced-dagger }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v5
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment main --objective priced
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 20
+              --controllers sindy_mpc_conf_dagger,sindy_mpc_dense_dagger
+              --tag "pricedDag${JOB_COMPLETION_INDEX}" --out /results/priced_dagger
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v5" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+# --- the full physics library, both estimators, priced --------------------------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-phys-lib
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: phys-lib }
+spec:
+  completionMode: Indexed
+  completions: 20
+  parallelism: 20
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: phys-lib }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v5
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment main --objective priced
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 20
+              --controllers sindy_mpc_phys,sindy_mpc_phys_ens
+              --tag "physlib${JOB_COMPLETION_INDEX}" --out /results/phys_lib
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v5" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+# --- the 17-feature deletion library, priced, plus its open-loop ladder arm ---------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-notuboil
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: notuboil }
+spec:
+  completionMode: Indexed
+  completions: 20
+  parallelism: 20
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: notuboil }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v5
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment main --objective priced
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 20
+              --controllers sindy_mpc_notuboil,sindy_mpc_notuboil_ens
+              --tag "notuboil${JOB_COMPLETION_INDEX}" --out /results/notuboil
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v5" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-notuboil-ladder
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: notuboil-ladder }
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: notuboil-ladder }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v5
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          # ladder_notuboil.py writes results/notuboil/ladder_notuboil.csv relative to the
+          # regen directory (40 fits, minutes); copy it onto the volume when done.
+          args:
+            - >
+              python ladder_notuboil.py &&
+              mkdir -p /results/notuboil &&
+              cp results/notuboil/ladder_notuboil.csv /results/notuboil/
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v5" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+# --- the mechanism block under the priced objective (lambda sweep, knock, cross; 2020) ----
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-priced-mech
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: priced-mech }
+spec:
+  completionMode: Indexed
+  completions: 20
+  parallelism: 20
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: priced-mech }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v5
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment mechanism --objective priced
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 20
+              --tag "pricedMech${JOB_COMPLETION_INDEX}" --out /results/priced_mech
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v5" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+# --- the raw-library controllers under the DEFAULT objective (the default end of the
+#     library-effect waterfall) --------------------------------------------------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-n7-raw-default
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: n7 }
+spec:
+  completionMode: Indexed
+  completions: 20
+  parallelism: 20
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: n7 }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v5
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment main
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 20
+              --controllers sindy_mpc_raw,sindy_mpc_raw_ens
+              --tag "n7_${JOB_COMPLETION_INDEX}" --out /results/n7
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v5" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+# --- four unseen seasons 2014-2017, default objective, 8 seeds (needs the 2014-2017 weather
+#     baked into the image) -----------------------------------------------------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-n5-unseen
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: n5 }
+spec:
+  completionMode: Indexed
+  completions: 8
+  parallelism: 8
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: n5 }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v5
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment main
+              --test-years 2014,2015,2016,2017
+              --seeds-all 0,1,2,3,4,5,6,7
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 8
+              --controllers rule_based,sindy_mpc_conf,sindy_mpc_dense,sindy_mpc_raw_ens
+              --tag "n5_${JOB_COMPLETION_INDEX}" --out /results/n5_years
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v5" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+# --- horizon 8 for the four MPCs that have a default-objective counterpart ----------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-ec-h8
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: ec-h8 }
+spec:
+  completionMode: Indexed
+  completions: 20
+  parallelism: 20
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: ec-h8 }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v5
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment main --horizon 8
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 20
+              --controllers sindy_mpc_conf,sindy_mpc_dense,sindy_mpc_lowthr,sindy_mpc_raw_ens
+              --tag "ec_h8_${JOB_COMPLETION_INDEX}" --out /results/ec_h8
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v5" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+# --- the identification ladder, step-indexed recomputation (the ladder the paper reads) ----
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-ladder-rerun
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: ladder-rerun }
+spec:
+  completionMode: Indexed
+  completions: 20
+  parallelism: 20
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: ladder-rerun }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v5
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment ladder
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 20
+              --tag "ladder_rerun${JOB_COMPLETION_INDEX}" --out /results/ladder_rerun
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v5" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+# --- the held-out identification block, 10 seeds ------------------------------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-holdout
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: holdout }
+spec:
+  completionMode: Indexed
+  completions: 10
+  parallelism: 10
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: holdout }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v5
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment holdout
+              --seeds-all 0,1,2,3,4,5,6,7,8,9
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 10
+              --tag "holdout${JOB_COMPLETION_INDEX}" --out /results/holdout
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v5" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+# --- the rule-based reference: 16 random trials + stock, selection on 2018-2019 ------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-tune-rb
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: tune-rb }
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: tune-rb }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v5
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment tune_rb --seeds 0
+              --tag "n2" --out /results/n2_tune
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v5" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+# --- the bootstrap-draw axis of the later wave: 6 seeds x 6 draws, five controllers --------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-ea-draws
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: ea-draws }
+spec:
+  completionMode: Indexed
+  completions: 6
+  parallelism: 6
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: ea-draws }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v5
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment draws --draws 6
+              --seeds-all 0,1,2,3,4,5
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 6
+              --controllers sindy_mpc_conf,sindy_mpc_conf_dagger,sindy_mpc_dense,sindy_mpc_raw,sindy_mpc_raw_ens
+              --tag "ea${JOB_COMPLETION_INDEX}" --out /results/ea_draws
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v5" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+# --- the finer design grid (horizon / threshold / coefficient perturbation), 10 seeds x 4
+#     repetitions, default objective by construction of the support harness --------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-design-fine
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: design-fine }
+spec:
+  completionMode: Indexed
+  completions: 10
+  parallelism: 10
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: design-fine }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v5
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment design
+              --seeds-all 0,1,2,3,4,5,6,7,8,9
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 10
+              --tag "designPriced${JOB_COMPLETION_INDEX}" --out /results/design_priced_real
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v5" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+# --- adaptation and guard blocks with the draw axis (20 seeds x 10 draws x 3 seasons each);
+#     the two long poles of this file, ~44 and ~30 CPU-hours -----------------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-adapt-draws
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: adapt-draws }
+spec:
+  completionMode: Indexed
+  completions: 20
+  parallelism: 20
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: adapt-draws }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v5
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment adapt --draws 10
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 20
+              --tag "a${JOB_COMPLETION_INDEX}" --out /results/adapt_draws
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v5" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-guard-draws
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: guard-draws }
+spec:
+  completionMode: Indexed
+  completions: 20
+  parallelism: 20
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: guard-draws }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v5
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment guard --draws 10
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 20
+              --tag "g${JOB_COMPLETION_INDEX}" --out /results/guard_draws
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v5" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+# --- the action replay along the full-model planner's trajectory, 5 seeds, season 2020
+#     (re-runs the planner: ~2 h per seed) -------------------------------------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-v3-parity
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: v3-parity }
+spec:
+  completionMode: Indexed
+  completions: 5
+  parallelism: 5
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: v3-parity }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v5
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment parity --blocks replay
+              --seeds-all 0,1,2,3,4
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 5
+              --tag "v3_${JOB_COMPLETION_INDEX}" --out /results/v3_parity
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v5" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }
+---
+# --- the planner's 2022 season at a thousandfold solver budget, 2 seeds ------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: regen-oracle-budget
+  namespace: greenhouse-regen
+  labels: { app: greenhouse-regen, wave: oracle-budget }
+spec:
+  completionMode: Indexed
+  completions: 2
+  parallelism: 2
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 172800
+  template:
+    metadata:
+      labels: { app: greenhouse-regen, wave: oracle-budget }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: docker.io/agro/greenhouse-regen:v5
+          imagePullPolicy: IfNotPresent
+          workingDir: /app/own-article/regen
+          command: ["sh", "-c"]
+          args:
+            - >
+              python run_regen.py --experiment main
+              --controllers oracle_mpc --test-years 2022 --max-solver-failures 100000
+              --seeds-all 0,1
+              --shard-index "$JOB_COMPLETION_INDEX" --num-shards 2
+              --tag "orcbudget${JOB_COMPLETION_INDEX}" --out /results/oracle_budget
+          env:
+            - { name: OMP_NUM_THREADS, value: "1" }
+            - { name: REGEN_IMAGE, value: "greenhouse-regen:v5" }
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { cpu: "4", memory: 8Gi }
+          volumeMounts: [{ name: results, mountPath: /results }]
+      volumes:
+        - name: results
+          persistentVolumeClaim: { claimName: regen-results }

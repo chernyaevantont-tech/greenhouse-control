@@ -16,10 +16,11 @@ Panel (b)  Nine-cell price grid (3 fruit prices x 3 energy scales), one line per
            formula of ``make_tables.table_prices`` via ``_plotstyle.price_grid()``,
            which cross-checks itself against ``final/tables/sensitivity_prices.csv``.
 
-TWO LABELS THE CAPTION MUST CARRY (SPEC.md, Figure 4):
-  (i)  Despite the directory name, ``priced_design/`` holds ORIGINAL-objective runs
-       -- ``experiments_support.py`` hard-codes ``objective="full"`` in every
-       supporting block.  Panel (a) is never to be captioned as priced.
+TWO LABELS THE CAPTION CARRIES:
+  (i)  Despite the directory name, ``priced_design/`` holds DEFAULT-objective runs:
+       the supporting blocks of ``experiments_support.py`` scored every rollout on
+       the default weights when this wave was produced.  Panel (a) is captioned
+       as default-objective.
   (ii) The price grid RE-SCORES fixed trajectories rather than re-optimising, and
        covers only the ten canonical-wave controllers: NEITHER raw-library
        controller is in it.  It therefore says nothing about the ranking the paper
@@ -172,10 +173,10 @@ def panel_a(ax, runs: pd.DataFrame, stats: pd.DataFrame, rng_seed: int = 4) -> d
     ax.legend(handles=handles, loc="lower left", bbox_to_anchor=(0.0, 0.16),
               ncol=1, handlelength=1.4, borderaxespad=0.2)
 
-    # The span sentence used to be a free text at the left and the replication
-    # counts a corner note at the right; at this width they met in the middle.
+    # One corner note carries both the span sentence and the replication counts;
+    # two separate notes met in the middle at this width.
     ps.annotate_n(ax, f"n = {int(stats['n'].iloc[0])} per level, season {ps.IN_DIST_YEAR}; "
-                      "original objective (see caption)\n"
+                      "default objective (see caption)\n"
                       f"span of the mean {span_mean:.2f} vs span of the median "
                       f"{span_med:.2f} EUR m$^{{-2}}$", loc="lower left")
     drawn["span_mean"], drawn["span_median"] = span_mean, span_med
@@ -228,15 +229,21 @@ def panel_b(ax, wide: pd.DataFrame, winners: pd.DataFrame, spans: pd.Series) -> 
         ax.text(3 * k + 1.0, ytxt, f"fruit {pf:g} EUR kg$^{{-1}}$", fontsize=6.5,
                 color="#444444", ha="center", va="top")
 
+    # Opaque frame: the black heuristic curve dips through this corner and was
+    # crossing the legend text.
     ax.legend(loc="lower left", bbox_to_anchor=(0.0, 0.19), handlelength=1.6,
-              borderaxespad=0.2)
+              borderaxespad=0.2, frameon=True, framealpha=0.92,
+              facecolor="white", edgecolor="none")
 
     excluded = ", ".join(ps.METHOD_LABEL.get(m, m) for m in wide.attrs["excluded_controllers"])
     ax.text(0.02, 0.03,
             "re-scores fixed trajectories, does not re-optimise; grey = other "
             f"{len(wide) - len(win_methods)} controllers\n"
             f"absent from this grid: {excluded}",
-            transform=ax.transAxes, fontsize=6.5, color="#333333", ha="left", va="bottom")
+            transform=ax.transAxes, fontsize=6.5, color="#333333", ha="left",
+            va="bottom", zorder=7,
+            bbox=dict(facecolor="white", alpha=0.88, edgecolor="none",
+                      boxstyle="square,pad=0.15"))
     ps.annotate_n(ax, f"{len(wide)} controllers, season {ps.IN_DIST_YEAR}\n"
                       f"per-controller span {spans.min():.1f}-{spans.max():.1f}, "
                       f"median {float(spans.median()):.1f} EUR m$^{{-2}}$",
@@ -290,11 +297,9 @@ def verify(axes, da, db, runs, stats, wide, winners) -> int:
             pts.append(off)
     pts = np.vstack(pts)
     # ax_a.collections yields the strip points, the open mean symbols AND the rings drawn
-    # over early-terminated runs -- and a ring sits at the same y as the point it marks,
-    # so the canvas is not a set-equal copy of {runs} + {means}. Exact multiset equality
-    # was the original check and it failed for that reason, not because a value was wrong.
-    # What actually has to hold: every plotted y is a real datum, and every datum is
-    # plotted. That is what is asserted here.
+    # over early-terminated runs; a ring sits at the same y as the point it marks, so the
+    # canvas is not a set-equal copy of {runs} + {means}. What has to hold is that every
+    # plotted y is a real datum and every datum is plotted, which is what is asserted.
     # One further wrinkle: the early-termination annotation contributes one marker per
     # level at y = 0. Those are furniture, not data -- five exact zeros, and no run EPI
     # is exactly zero -- so they are excluded before the comparison rather than silently
@@ -369,7 +374,7 @@ def main() -> int:
     print("=== Figure 4: values plotted ===")
     print(f"sources (a): {ps.coef_perturbation().attrs.get('source_files')}")
     print("panel (a) -- coefficient perturbation, season "
-          f"{ps.IN_DIST_YEAR}, original objective")
+          f"{ps.IN_DIST_YEAR}, default objective")
     print(stats.rename(columns={"value": "perturb"})
                .assign(early_term=lambda d: d["early_term"].astype(str) + "/" + d["n"].astype(str))
                .round(4).to_string(index=False))
