@@ -249,14 +249,21 @@ def draw_nonmonotone(ax, one_factor: pd.DataFrame,
                 ecolor="#666666", elinewidth=0.9, capsize=2.4, capthick=0.9,
                 zorder=3)
     ax.plot(x, t["epi"], color="#444444", lw=1.0, alpha=0.8, zorder=2)
+    v_bottom = int(np.argmin(t["epi"].to_numpy(float)))
     for i, r in enumerate(t.itertuples()):
         ax.scatter([i], [r.epi], s=58, color=ps.LIB_COLOR[r.library],
                    edgecolors="white", linewidths=0.7, zorder=5)
         # Anchor the value above the top of its own error bar rather than above the
         # marker: at the middle library the bar is longer than the offset, so a
-        # marker-anchored label was drawn across it.
-        ax.annotate(f"{r.epi:+.2f}", (i, r.epi + r.epi_se_seed),
-                    textcoords="offset points", xytext=(0, 8), ha="center",
+        # marker-anchored label was drawn across it. The bottom of the V goes below
+        # its bar instead: above it, the line falling from the first library runs
+        # through the label.
+        if i == v_bottom:
+            anchor, offset, va = (i, r.epi - r.epi_se_seed), (0, -6), "top"
+        else:
+            anchor, offset, va = (i, r.epi + r.epi_se_seed), (0, 8), "baseline"
+        ax.annotate(f"{r.epi:+.2f}", anchor,
+                    textcoords="offset points", xytext=offset, ha="center", va=va,
                     fontsize=7, fontweight="bold",
                     color=ps.LIB_COLOR[r.library], zorder=6)
     ax.axhline(0.0, color="#888888", lw=0.6, ls=(0, (3, 2)), zorder=0)
@@ -274,9 +281,13 @@ def draw_nonmonotone(ax, one_factor: pd.DataFrame,
              ls=(0, (4, 2)), marker="s", ms=4.2, mfc="white",
              mec=ps.OKABE_ITO["grey"], mew=0.9, zorder=4)
     for i, r in enumerate(t.itertuples()):
+        # The first label sits above its marker: on the right, the margin line
+        # falling from the first library to the second crosses it, and on the
+        # left it lands on the y axis.
+        offset, ha, va = ((0, 6), "center", "bottom") if i == 0 else ((8, -3), "left", "baseline")
         ax2.annotate(f"{r.survival:.2f}", (i, r.survival),
-                     textcoords="offset points", xytext=(8, -3),
-                     ha="left", fontsize=7, color="#555555", zorder=6)
+                     textcoords="offset points", xytext=offset,
+                     ha=ha, va=va, fontsize=7, color="#555555", zorder=6)
     ax2.set_ylabel("boiler-term survival", color="#555555", fontsize=7)
     ax2.set_ylim(-0.08, 1.08)
     _SURVIVAL_YLIM = ax2.get_ylim()
@@ -413,7 +424,9 @@ def draw_pareto(ax, t: pd.DataFrame) -> None:
     _ = (d_row, l_row)
 
     ax.set_xlabel("mean violation variable-steps per season (T, CO$_2$, RH summed)")
-    ax.set_ylabel("mean economic performance indicator  (EUR m$^{-2}$)")
+    # The same wording as panel (b): the longer "economic performance indicator"
+    # ran above the axes and into the panel letter.
+    ax.set_ylabel("mean closed-loop EPI  (EUR m$^{-2}$)")
 
     n_front = int(t["on_front"].sum())
     ps.panel_label(ax, "c", dx=-0.20)

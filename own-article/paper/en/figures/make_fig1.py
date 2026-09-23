@@ -157,9 +157,12 @@ def panel_a(ax, lad: pd.DataFrame) -> dict:
         Line2D([], [], marker="o", ls="", mfc=grey, mec=grey, ms=4, label="STLSQ"),
         Line2D([], [], marker="s", ls="", mfc=grey, mec=grey, ms=4, label="ensemble"),
         Line2D([], [], marker="o", ls="", mfc="none", mec=grey, ms=4,
-               label="open: fails the divergence gate"),
+               label="open: fails the\ndivergence gate"),
     ]
-    ax.legend(handles=handles, loc="lower left", ncol=1, fontsize=7,
+    # Upper right is the one empty corner: in the lower left the legend text ran
+    # over two physics_no_cross fits and into the raw cluster at 1.80. The long
+    # label is broken so the legend stays right of every fit.
+    ax.legend(handles=handles, loc="upper right", ncol=1, fontsize=7,
               handletextpad=0.4, borderaxespad=0.2, labelspacing=0.22)
 
     ax.set_ylim(top=60.0)

@@ -1,6 +1,6 @@
 # NUMBERS — every quantity the manuscript states, recomputed, with its source
 
-Generated 2026-09-16 by `paper/en/make_numbers_md.py` from the checks that gate the manuscript build (`verify_tables.py`, `verify_prose.py`): 800 table cells and 410 values in the running text, each compared with the value recomputed from this tree at half a unit in the last printed digit. Mismatches at generation time: 0. Configuration hash of every wave read: `637c6b535a9e`.
+Generated 2026-09-23 by `paper/en/make_numbers_md.py` from the checks that gate the manuscript build (`verify_tables.py`, `verify_prose.py`): 800 table cells and 410 values in the running text, each compared with the value recomputed from this tree at half a unit in the last printed digit. Mismatches at generation time: 0. Configuration hash of every wave read: `637c6b535a9e`.
 
 Each block names the files the values are computed from, relative to `regen/results/`. The loaders behind every recomputation (`figures/_plotstyle.py`) apply one deduplication key, (method or block, seed, test year), and one exclusion rule, solver-aborted seasons, before any average is taken.
 

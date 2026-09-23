@@ -127,8 +127,9 @@ models at crop scale is expensive. We therefore conducted an in silico study usi
 the published GreenLight tomato greenhouse model driven by ERA5 weather. Seventy-two
 sparse-identification configurations were screened, and 15 controllers were
 compared over four 60-day test seasons with up to 20 identification replicates.
-Outcome measures were simulated seasonal margin and climate-corridor violations. One-step
-accuracy and multi-step stability ranked the feature libraries oppositely:
+Outcome measures were simulated seasonal margin and climate-corridor violations. Among
+first-order, undenoised configurations under sparse estimators, one-step accuracy and
+multi-step stability ranked the feature libraries oppositely:
 physically motivated features reduced one-step temperature root-mean-square error
 (RMSE) from 1.86 to
 1.68~\textdegree C but increased median 24~h rollout RMSE from 2.67 to
@@ -1034,7 +1035,7 @@ replicates. Tests at run level treat the (seed, season) pairs as exchangeable, a
 levels are optimistic to the extent that seasons of one seed agree; every run-level test
 in the main comparison is therefore repeated on per-seed four-season means (20 values, 10
 for the neural MPC), and the two are reported side by side wherever they disagree
-(Table~\ref{tab:wilcoxon}, Section~\ref{sec:res-main}).
+(Section~\ref{sec:res-main}).
 
 Three accounting rules are applied before any average is computed. First, several waves
 were resumed after
@@ -1253,7 +1254,7 @@ three libraries monotonically on that criterion, and the ordering reproduces on 
 year (below), but it does not transfer to the closed loop. The same three libraries,
 compared one factor at a time (ensemble estimator, threshold $0.05$, only the library
 changed), return $+4.32$, $+0.28$ and $+2.75$ EUR\,m$^{-2}$ over four test seasons
-(Table~\ref{tab:main}), so the worst-conditioned library outscores the middle one by a
+(Section~\ref{sec:res-main}), so the worst-conditioned library outscores the middle one by a
 factor of 10 and the series in $\kappa$ is non-monotone in closed loop. This subsection
 therefore does not explain the economic result; Section~\ref{sec:res-mech} attributes that
 result to actuator-pathway survival.
@@ -1287,7 +1288,7 @@ still on the applied open-loop axes (63rd of 72 on median rollout error, 64th on
 This bounds what the selection rule can be claimed to do. The rule identifies the best
 library, since \texttt{raw} is first on multi-step stability and first in closed loop, but
 it does not order the other two. In closed loop the library the gate rejects scores $+2.75$
-EUR\,m$^{-2}$ and the library the gate passes scores $+0.28$ (Table~\ref{tab:main}), which
+EUR\,m$^{-2}$ and the library the gate passes scores $+0.28$ (Section~\ref{sec:res-main}), which
 reverses their open-loop ranking. Multi-step stability is therefore a better selection
 criterion than one-step accuracy and picks the best of the three libraries, although it
 does not rank them.
@@ -3049,7 +3050,9 @@ Also changed
 value means the raw library is ahead. Bars show the contrast before adjustment, the effect
 of the safeguard, and the contrast that remains; the open circle is the mean, the heavy rule
 the median, and the whiskers one standard deviation. (\textbf{a})~Tuning the agronomic
-reference; the reference is deterministic, so its counts are one-sample rather than paired.
+reference; the reference is deterministic, so its counts are one-sample rather than paired,
+and the four short horizontal lines at the correction bar mark where the contrast would end
+if the correction were the tuning gain of a single test season.
 (\textbf{b})~Aligning the MPC stage-cost weights with the evaluation prices, paired on
 replicate and test season.}
 \label{fig:disc-corrections}
@@ -3574,6 +3577,10 @@ inside a private repository is not sufficient.]]}
 %%                         -- cited as preprints; the arXiv identifier is the
 %%                            locator and no journal version exists (or, for the
 %%                            survey, none with a volume yet).
+%%   wei2024               -- TMLR publishes without volume, pages or DOI; the
+%%                            OpenReview forum (id tQVZgvXhZb, TMLR 2024, checked
+%%                            against the ML Anthology record 2026-09-23) is the
+%%                            locator.
 %%
 %% ONE DOI IS A ZENODO CONCEPT DOI, deliberately.  openmeteo2023 carries
 %% 10.5281/zenodo.7970649, which is what the project's own CITATION.cff asks for and
@@ -3745,7 +3752,8 @@ reinforcement learning. \textit{Proc. Mach. Learn. Res. (AISTATS)} \textbf{2017}
 \bibitem{wei2024}
 Wei, R.; Lambert, N.; McDonald, A.; Garcia, A.; Calandra, R. A unified view on solving
 objective mismatch in model-based reinforcement learning. \textit{Trans. Mach. Learn. Res.}
-\textbf{2024}.
+\textbf{2024}. Available online: \url{https://openreview.net/forum?id=tQVZgvXhZb}
+(accessed on 23 September 2026).
 
 \bibitem{controlorientedsurvey2025}
 Sivaranjani, S.; Shi, Y.; Atanasov, N.; Duong, T.; Feng, J.; Martin, T.; Xu, Y.; Gupta, V.;

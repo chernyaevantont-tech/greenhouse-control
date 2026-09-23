@@ -25,6 +25,36 @@ CSVs in this pass.
 
 ---
 
+## 0. 2026-09-23 — pre-deposit fixes
+
+A pre-submission check found, beyond the data DOI, one scope defect in the abstract, figure
+labels over data, and the review's minor items still open. All applied; nothing committed.
+Gates: `verify_paper_en` balanced (50/50), 0 dangling, 48/48, abstract **198**, 17 255 words
+of prose; `verify_tables` 800/0; `verify_prose` 410/0; `verify_manuscript` 2102 numbers,
+0 unclaimed; figure self-checks 48/48 (Fig. 1), VERIFY OK (Fig. 4), 8/8 (graphical
+abstract); `make_docx` and `format_mdpi_docx` all checks; `AUDIT_OK`, one placeholder (data
+DOI); Word render 42 pages, pages 1, 15, 28, 36, 39 and 41 read. Tables 1–16 and Figures 1–5
+are now first cited in ascending order in the Word text. `make_numbers_md.py` re-run
+(date only). Archive rebuilt twice, deterministic: `f3cdd9cc…`, 630 entries; against
+`89504527…` exactly four entries differ (`make_fig1/4/6.py`, `NUMBERS.md`).
+
+| Item | What changed |
+|---|---|
+| Abstract scope | The abstract said "one-step accuracy and multi-step stability ranked the feature libraries oppositely" with no scope, while §3.1 and Finding 1 confine the reversal to the first-order, undenoised block under the two sparse estimators (pooled over all 72 labels the raw library also wins one step ahead). `MDPI_SUBMISSION.md` §3 listed that qualifier as not to be cut; it fell out when the abstract was restructured for MDPI. Now "Among first-order, undenoised configurations under sparse estimators, …" (+7 words, 191 → 198). |
+| Cover letter | Same scope in paragraph 3; "the criterion the literature most often reports is the wrong one" → "can point to the wrong model"; "the criterion ranks candidate models in the opposite order to the one that decides the closed-loop outcome" → "among those configurations the one-step criterion ranks the closed-loop winner last, while multi-step stability selects it" (R-3: neither criterion reproduces the full closed-loop ordering). `make_cover_letter.js` was stale since the D-8 edits of 09-15 (made in the docx only); its four paragraph strings now match the docx. |
+| Table order (M-20, wider than the review saw) | Table 7 was first cited in Methods §2.8 and Table 6 twice in §3.1, so first citations ran 1, 2, 3, 7, 4, 6, 5. The three forward pointers now name Section 3.3 instead. |
+| Graphical abstract | Panel (b): the margin line crossed "+0.28" and "0.55"; the V-bottom value now sits below its bar and the first survival value above its marker. Panel (c): y label "mean closed-loop EPI", as in (b); the longer label ran into the panel letter. |
+| Figure 1a | Legend moved to the empty upper-right corner; in the lower left its text ran over two `physics_no_cross` fits and into the raw cluster at 1.80. |
+| Figure 4b | The opaque legend hid the lowest point of the heuristic curve; the bottom band is widened (0.34 → 0.62 of the data range) and the legend and note sit below the data. "-- wins" → ": wins"; the excluded-controller list is joined with semicolons; the note is three lines inside the axes; "31.5-50.2" → "31.5 to 50.2". |
+| Figure 5a | Caption now explains the four short lines at the correction bar (where the contrast would end under a single season's tuning gain). |
+| `wei2024` | TMLR has no volume, pages or DOI; OpenReview forum `tQVZgvXhZb` added as the locator (checked against the ML Anthology record), with an accessed-on date. |
+
+Still open, and not for this pass: the data DOI; the authors' confirmations in §2.1 below;
+the review's content items M-9, M-15, M-16, M-18, the notation pass and the Introduction
+length (each changes a claim or the structure); the GenAI-disclosure decision (D-10).
+
+---
+
 ## 0. 2026-09-16 (evening) — deposit archive text audit applied
 
 Source: `mdpi-review-output/archive-text-audit-2026-09-16.md` §6, all six items. The manuscript
@@ -255,9 +285,8 @@ Technical University, across four units: the World-Class Research Centre
 Thermal Processes (one), Cybersecurity of Information Systems (one) and the
 Research Administration Office (one). Names are transliterated and the English
 unit names are translations — **both have to be confirmed by the authors**, a
-misspelt name being what gets indexed. `A.T.C.` is set as the corresponding
-author; if it should be the head of the centre instead, move
-`"corresponding": true` one entry and rebuild.
+misspelt name being what gets indexed. `I.I.N.`, the head of the centre, is the
+corresponding author (moved from `A.T.C.` on 2026-09-02 at the authors' request).
 
 `author_contributions` is a **proposal derived from the stated positions**, not
 a statement anyone has made yet: every author must confirm the CRediT roles

@@ -132,7 +132,8 @@ reinforcement learning. \textit{Proc. Mach. Learn. Res. (AISTATS)} \textbf{2017}
 \textit{54}, 1486--1494.""",
 'wei2024': r"""Wei, R.; Lambert, N.; McDonald, A.; Garcia, A.; Calandra, R. A unified view on solving
 objective mismatch in model-based reinforcement learning. \textit{Trans. Mach. Learn. Res.}
-\textbf{2024}.""",
+\textbf{2024}. Available online: \url{https://openreview.net/forum?id=tQVZgvXhZb}
+(accessed on 23 September 2026).""",
 'controlorientedsurvey2025': r"""Sivaranjani, S.; Shi, Y.; Atanasov, N.; Duong, T.; Feng, J.; Martin, T.; Xu, Y.; Gupta, V.;
 Allg\"ower, F. Control-oriented system identification: Classical, learning, and
 physics-informed approaches. \textit{arXiv} \textbf{2025}, arXiv:2512.06315; accepted for
@@ -432,6 +433,10 @@ FOOTER = r"""
 %%                         -- cited as preprints; the arXiv identifier is the
 %%                            locator and no journal version exists (or, for the
 %%                            survey, none with a volume yet).
+%%   wei2024               -- TMLR publishes without volume, pages or DOI; the
+%%                            OpenReview forum (id tQVZgvXhZb, TMLR 2024, checked
+%%                            against the ML Anthology record 2026-09-23) is the
+%%                            locator.
 %%
 %% ONE DOI IS A ZENODO CONCEPT DOI, deliberately.  openmeteo2023 carries
 %% 10.5281/zenodo.7970649, which is what the project's own CITATION.cff asks for and

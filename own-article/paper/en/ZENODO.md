@@ -9,10 +9,10 @@ greenhouse-control-regen-data-v1.0.zip
 ```
 
 At the repository root. 5.99 MB, 630 entries, SHA-256
-`89504527cae5c44851a897557b05b6821f1edfcd6ad187ad69dcb31ee6bd070c` (rebuilt 2026-09-16
-after the text audit of the archive: `results/final/NUMBERS.md` regenerated from the
-manuscript's own checks, `figures/SPEC.md` and the cluster plan taken out, working notes
-removed from the script headers).
+`f3cdd9cc5179273753961e7f76360ccaefcc864f60e072d0f57cbafeff50a54f` (rebuilt 2026-09-23
+after label-placement fixes in `figures/make_fig1.py`, `make_fig4.py` and `make_fig6.py`
+and a regeneration of `results/final/NUMBERS.md`, whose only change is its date; every
+other entry is byte-identical to the 2026-09-16 build, `89504527…`, which is superseded).
 
 Nothing else is deposited: not the manuscript (MDPI publishes it), not the cover letter,
 not the repository. Rebuild the archive with `python own-article/regen/make_archive.py`;

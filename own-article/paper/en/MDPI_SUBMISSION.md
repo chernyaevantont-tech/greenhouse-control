@@ -129,16 +129,17 @@ public, the statement must say so and say why — silence is not an option.
 
 ## 3. Abstract length — within limit, keep it there
 
-MDPI's limit is **200 words**. The abstract measures **188** at the last structural
-check (198 before the *Agronomy* retarget, 248 before the mechanism rewrite). Twelve
-words of headroom is a real margin, but re-run `verify_paper_en.py` after every edit
+MDPI's limit is **200 words**. The abstract measures **198** at the last structural
+check (2026-09-23). Two words of headroom: re-run `verify_paper_en.py` after every edit
 to the abstract.
 
-Do **not** cut, in any trim: *"in the first-order, undenoised block under sparse
-estimators"*, *"against three comparators"*, *"deterministic reference"*, or the Pareto
-sentence. Each is a scope limit that was added to fix an overstatement, and removing one
-re-creates a defect the verification passes were run to remove. `REMAINING.md` §4.15
-lists the cheapest 48 words to lose instead.
+Do **not** cut, in any trim: *"Among first-order, undenoised configurations under sparse
+estimators"* or the Pareto sentence. Each is a scope limit that was added to fix an
+overstatement, and removing one re-creates a defect the verification passes were run to
+remove. The first of them fell out once already, when the abstract was restructured for
+MDPI, and was restored on 2026-09-23. The two other qualifiers this list used to name
+(*"against three comparators"*, *"deterministic reference"*) left with the test
+statistics they qualified when that restructuring took the p-values out of the abstract.
 
 ---
 
@@ -233,31 +234,34 @@ markers and should disappear with them.
 
 Author-supplied, and nothing else can proceed without them:
 
+State on 2026-09-23.
+
 - [x] Author names and affiliations supplied (nine authors, four DSTU units) —
       **confirm the transliterated names and the English unit names**
-- [ ] Confirm who is the corresponding author (`A.T.C.` at present)
+- [x] Corresponding author: I.I.N. (set 2026-09-02 at the authors' request)
 - [x] ORCID iD for the corresponding author (MDPI requires it); six of nine
       supplied — M.S.K., M.S.Kh. and M.N.K. have none, which does not block
 - [x] Institutional e-mail for every author
 - [ ] Author Contributions: a draft by position is in `authors.json`; **every
       author confirms the roles attributed to them**
-- [ ] Funding statement supplied (or the explicit "no external funding" sentence)
-- [ ] Conflicts of Interest: "The authors declare no conflicts of interest." is
-      in the file — it must be true of every author, or be replaced
-- [ ] Acknowledgments written, or set to "Not applicable."
+- [x] Funding statement supplied (agreement no. 075-15-2025-592)
+- [ ] Conflicts of Interest: "The authors declare no conflicts of interest", with
+      MDPI's funder-role sentence, is in the file — it must be true of every author
+- [x] Acknowledgments set to "Not applicable." (authors' decision, 2026-09-14)
 - [ ] Replication tree archived, DOI minted, Data Availability statement completed
 
 Mechanical, and done unless noted:
 
-- [x] Abstract ≤200 words (188 at last check) and no scope qualifier lost
+- [x] Abstract ≤200 words (198 at last check) and no scope qualifier lost
+- [x] Tables 1–16 and Figures 1–5 first cited in ascending order (2026-09-23)
 - [x] `fig5.pdf` also written as `fig5_corrections_waterfall.pdf`
 - [x] Graphical abstract unnumbered, in the LaTeX and in the Word build
 - [x] Display equations numbered (1)–(3) at the right margin
 - [x] Every table repeats its header row; page fields refresh on open
 - [x] `assemble_paper_en.py`, `verify_paper_en.py`, `make_docx.py`,
       `format_mdpi_docx.py` and `audit_mdpi.py` all re-run clean
-- [ ] Close and delete `paper_en_mdpi_simulation_short_captions.docx` (open in Word)
-- [ ] Re-export the `.docx` from Word and re-read the pages after the author fields
-      are filled in — the front matter reflows
+- [x] `paper_en_mdpi_simulation_short_captions.docx` removed (2026-09-15)
+- [ ] Re-export the `.docx` from Word and re-read the back matter once the DOI is
+      in — the Data Availability Statement reflows
 - [ ] No `[[...REQUIRED]]` string survives anywhere in the exported PDF
 - [ ] Only if a `.tex` submission is wanted: `pdflatex` on a machine with TeX

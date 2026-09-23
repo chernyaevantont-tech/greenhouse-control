@@ -202,7 +202,7 @@ def panel_b(ax, wide: pd.DataFrame, winners: pd.DataFrame, spans: pd.Series) -> 
         y = wide.loc[m].to_numpy(float)
         ax.plot(x, y, color=color_of[m], lw=1.4, zorder=4,
                 label=f"{ps.METHOD_LABEL.get(m, m)}"
-                      f" -- wins {int((winners['method'] == m).sum())}/{len(cells)}")
+                      f": wins {int((winners['method'] == m).sum())}/{len(cells)}")
 
     for i, r in enumerate(winners.itertuples()):
         ax.scatter([x[i]], [r.j], s=22, color=color_of[r.method], zorder=6,
@@ -216,8 +216,10 @@ def panel_b(ax, wide: pd.DataFrame, winners: pd.DataFrame, spans: pd.Series) -> 
     lo = float(wide.to_numpy().min())
     hi = float(wide.to_numpy().max())
     # Top band: the note and the fruit-price headers both live above the data
-    # instead of on top of it.
-    ax.set_ylim(lo - 0.34 * (hi - lo), hi + 0.34 * (hi - lo))
+    # instead of on top of it. Bottom band: the legend and the three-line note
+    # live below the data. At 0.34 the legend covered the lowest point of the
+    # heuristic curve at the cheapest fruit price.
+    ax.set_ylim(lo - 0.62 * (hi - lo), hi + 0.34 * (hi - lo))
     ax.set_xlim(-0.45, len(cells) - 0.55)
     ax.set_xticks(x)
     ax.set_xticklabels([f"{ke:g}" for _, ke in cells])
@@ -229,23 +231,26 @@ def panel_b(ax, wide: pd.DataFrame, winners: pd.DataFrame, spans: pd.Series) -> 
         ax.text(3 * k + 1.0, ytxt, f"fruit {pf:g} EUR kg$^{{-1}}$", fontsize=6.5,
                 color="#444444", ha="center", va="top")
 
-    # Opaque frame: the black heuristic curve dips through this corner and was
-    # crossing the legend text.
-    ax.legend(loc="lower left", bbox_to_anchor=(0.0, 0.19), handlelength=1.6,
+    # The legend sits in the bottom band, below the lowest curve; the frame stays
+    # opaque in case a future grid reaches into it.
+    ax.legend(loc="lower left", bbox_to_anchor=(0.0, 0.15), handlelength=1.6,
               borderaxespad=0.2, frameon=True, framealpha=0.92,
               facecolor="white", edgecolor="none")
 
-    excluded = ", ".join(ps.METHOD_LABEL.get(m, m) for m in wide.attrs["excluded_controllers"])
-    ax.text(0.02, 0.03,
-            "re-scores fixed trajectories, does not re-optimise; grey = other "
-            f"{len(wide) - len(win_methods)} controllers\n"
-            f"absent from this grid: {excluded}",
+    # Controller labels carry commas of their own, so the list is joined with
+    # semicolons; three short lines keep the note inside the axes.
+    excluded = "; ".join(ps.METHOD_LABEL.get(m, m) for m in wide.attrs["excluded_controllers"])
+    ax.text(0.02, 0.02,
+            "re-scores fixed trajectories, does not re-optimise;\n"
+            f"grey = other {len(wide) - len(win_methods)} controllers; "
+            "absent from this grid:\n"
+            f"{excluded}",
             transform=ax.transAxes, fontsize=6.5, color="#333333", ha="left",
             va="bottom", zorder=7,
             bbox=dict(facecolor="white", alpha=0.88, edgecolor="none",
                       boxstyle="square,pad=0.15"))
     ps.annotate_n(ax, f"{len(wide)} controllers, season {ps.IN_DIST_YEAR}\n"
-                      f"per-controller span {spans.min():.1f}-{spans.max():.1f}, "
+                      f"per-controller span {spans.min():.1f} to {spans.max():.1f}, "
                       f"median {float(spans.median()):.1f} EUR m$^{{-2}}$",
                   loc="upper left")
     return drawn
