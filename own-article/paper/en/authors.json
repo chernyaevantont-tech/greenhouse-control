@@ -59,6 +59,15 @@
       "corresponding": false
     },
     {
+      "name": "Elena O. Chernyaeva",
+      "initials": "E.O.C.",
+      "position": "Technician, World-Class Research Centre \"Agroengineering of the Future\"",
+      "orcid": "0009-0003-3829-3486",
+      "email": "echernyaeva@donstu.ru",
+      "affiliation": 1,
+      "corresponding": false
+    },
+    {
       "name": "Mariya S. Kilina",
       "initials": "M.S.K.",
       "position": "Associate Professor, Department of Hydraulics, Hydropneumatic Automation and Thermal Processes",
@@ -74,15 +83,6 @@
       "orcid": "0000-0003-1119-5221",
       "email": "mpismenskova@donstu.ru",
       "affiliation": 3,
-      "corresponding": false
-    },
-    {
-      "name": "Elena O. Chernyaeva",
-      "initials": "E.O.C.",
-      "position": "Technician, World-Class Research Centre \"Agroengineering of the Future\"",
-      "orcid": "0009-0003-3829-3486",
-      "email": "echernyaeva@donstu.ru",
-      "affiliation": 1,
       "corresponding": false
     },
     {
