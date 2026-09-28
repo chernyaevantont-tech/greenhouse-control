@@ -14,12 +14,10 @@
     "does not block submission -- MDPI does display an iD for anyone who has one,",
     "so add them here if they exist.",
     "",
-    "STILL PENDING, printed as [[...]] markers until supplied:",
-    "  - the DOI of the archived replication tree (data_location).",
-    "  - the DOI of the archived replication tree (data_location).",
     "author_contributions below is a PROPOSAL derived from the stated positions;",
     "every author has to confirm the roles attributed to them before submission.",
     "",
+    "Data location: public replication tree pinned to commit 516e167; the Zenodo DOI identifies the separate analysis-code archive.",
     "authorship.py refuses this file if a name, initials or affiliation is missing;",
     "empty strings in the pending fields are allowed and stay visible.",
     "CRediT role names keep the em dash (writing---original draft preparation): that is the wording the official Agronomy template prescribes. Everywhere else the manuscript uses a spaced en dash."
@@ -117,5 +115,5 @@
   "funding": "This research was funded by the Ministry of Science and Higher Education of the Russian Federation under the Agreement on the provision of a grant from the federal budget in the form of a subsidy for state support of the development programmes of world-class research centres performing research in priority areas of scientific and technological development, agreement no. 075-15-2025-592 of 24 June 2025.",
   "acknowledgments": "Not applicable.",
   "conflicts_of_interest": "The authors declare no conflicts of interest. The funders had no role in the design of the study; in the collection, analyses, or interpretation of data; in the writing of the manuscript; or in the decision to publish the results.",
-  "data_location": ""
+  "data_location": "The complete replication tree is openly available at \\url{https://github.com/chernyaevantont-tech/greenhouse-control/tree/516e167920bd060a33c7a311d504ee54529c769b/own-article}, fixed to the commit identified in the URL."
 }

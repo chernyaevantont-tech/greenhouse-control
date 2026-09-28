@@ -80,6 +80,8 @@ def _collapse(text: str) -> str:
 def _strip_layout(text: str) -> str:
     """Remove the parts of LaTeX that carry numbers which are not claims."""
     text = re.sub(r"(?m)^%%.*$", "", text)
+    # Repository URLs and DOI locators identify sources; their digits are not numerical claims.
+    text = re.sub(r"\\url\{[^}]*\}", " ", text)
     text = re.sub(r"\\cite\{[^}]*\}|\\ref\{[^}]*\}|\\label\{[^}]*\}", " ", text)
     text = re.sub(r"\\includegraphics[^\n]*|\\bibitem\{[^}]*\}", " ", text)
     text = re.sub(r"p\{[\d.]+\\textwidth\}|\{@\{\}[^}]*@\{\}\}", " ", text)

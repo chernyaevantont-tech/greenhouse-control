@@ -445,9 +445,9 @@ def check_tune():
             per = [float(tuned.loc[y, "epi"]) - float(stock.loc[y, "epi"]) for y in years]
             viol = float(tuned.loc[years, "violation_steps_total"].mean()
                          - stock.loc[years, "violation_steps_total"].mean())
-        printed = nums(cells[1]) + nums(cells[2]) + nums(cells[3])
+        printed = [value for cell in cells[1:] for value in nums(cell)]
         if len(printed) != 6:
-            continue
+            raise ValueError(f"tab:tune {label}: expected six reported values, got {len(printed)}")
         for i, y in enumerate(years):
             cmp("tab:tune", f"{label} {y}", per[i], printed[i], 0.005)
         cmp("tab:tune", f"{label} mean", float(np.mean(per)), printed[4], 0.005)

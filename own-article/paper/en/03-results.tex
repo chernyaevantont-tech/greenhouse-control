@@ -219,20 +219,20 @@ only). EPI in EUR\,m$^{-2}$; one deterministic run per
 season. Source: \texttt{regen/results/n2\_tune/tune\_rb\_n2.csv}.}
 \label{tab:tune}
 \small
-\begin{tabular}{@{}lccc@{}}
+\begin{tabular}{@{}lrrrrrr@{}}
 \toprule
-Setpoint & Range searched & Hard-coded & Selected \\
+Setpoint & \multicolumn{2}{c}{Range searched} & \multicolumn{2}{c}{Hard-coded} & \multicolumn{2}{c}{Selected} \\
 \midrule
-Day temperature ($^\circ$C)      & 17.0--23.0  & 19.5 & 22.92 \\
-Night temperature ($^\circ$C)    & 14.0--20.0  & 16.5 & 14.38 \\
-Daytime CO$_2$ (ppm)             & 400--1200   & 800  & 828.3 \\
-Lamp radiation-sum limit         & 5.0--25.0   & 10   & 7.62 \\
+Day temperature ($^\circ$C) & \multicolumn{2}{c}{17.0--23.0} & \multicolumn{2}{c}{19.5} & \multicolumn{2}{c}{22.92} \\
+Night temperature ($^\circ$C) & \multicolumn{2}{c}{14.0--20.0} & \multicolumn{2}{c}{16.5} & \multicolumn{2}{c}{14.38} \\
+Daytime CO$_2$ (ppm) & \multicolumn{2}{c}{400--1200} & \multicolumn{2}{c}{800} & \multicolumn{2}{c}{828.3} \\
+Lamp radiation-sum limit & \multicolumn{2}{c}{5.0--25.0} & \multicolumn{2}{c}{10} & \multicolumn{2}{c}{7.62} \\
 \midrule
-Test season & 2020 \quad 2021 & 2022 \quad 2023 & Mean \quad Violations \\
+Test season & 2020 & 2021 & 2022 & 2023 & Mean & Violations \\
 \midrule
-Hard-coded & $+4.63$ \quad $-6.98$ & $+1.30$ \quad $-3.85$ & $-1.23$ \quad 2813 \\
-Tuned      & $+6.29$ \quad $-1.99$ & $+2.81$ \quad $+1.94$ & $\mathbf{+2.26}$ \quad 4339 \\
-Gain       & $+1.66$ \quad $+4.99$ & $+1.50$ \quad $+5.79$ & $\mathbf{+3.49}$ \quad $+1526$ \\
+Hard-coded & $+4.63$ & $-6.98$ & $+1.30$ & $-3.85$ & $-1.23$ & 2813 \\
+Tuned & $+6.29$ & $-1.99$ & $+2.81$ & $+1.94$ & $\mathbf{+2.26}$ & 4339 \\
+Gain & $+1.66$ & $+4.99$ & $+1.50$ & $+5.79$ & $\mathbf{+3.49}$ & $+1526$ \\
 \bottomrule
 \end{tabular}
 \end{table}

@@ -215,6 +215,10 @@ def style_body(doc: Document) -> None:
         )
         text = paragraph.text.strip()
 
+        if style_id in {"Heading1", "Heading2", "Heading3"}:
+            paragraph.paragraph_format.keep_with_next = True
+            paragraph.paragraph_format.keep_together = True
+
         if style_id == "Heading1":
             if text == "References":
                 paragraph.style = doc.styles["MDPI_2.1_heading1"]
@@ -246,11 +250,14 @@ def style_body(doc: Document) -> None:
         if style_id == "TableCaption":
             table_no += 1
             paragraph.style = doc.styles["MDPI_4.1_table_caption"]
+            paragraph.paragraph_format.keep_with_next = True
+            paragraph.paragraph_format.keep_together = True
             prepend_run(paragraph, f"Table {table_no}. ", bold=True)
             continue
 
         if style_id == "ImageCaption":
             paragraph.style = doc.styles["MDPI_5.1_figure_caption"]
+            paragraph.paragraph_format.keep_together = True
             if text.lower().startswith("graphical abstract"):
                 prepend_run(paragraph, "Graphical Abstract. ", bold=True)
                 # Drop the duplicate words already at the start while retaining
@@ -266,6 +273,7 @@ def style_body(doc: Document) -> None:
 
         if style_id == "CaptionedFigure":
             paragraph.style = doc.styles["MDPI_5.2_figure"]
+            paragraph.paragraph_format.keep_with_next = True
             continue
 
         if re.fullmatch(r"\(\d+\)", text):
@@ -464,6 +472,15 @@ def style_tables(doc: Document) -> None:
     for table in doc.tables:
         table.style = doc.styles["MDPI_4.1_three_line_table"]
         repeat_header_row(table)
+        # Keep each row intact. Short tables also stay together as one block.
+        for row_index, row in enumerate(table.rows):
+            row_props = row._tr.get_or_add_trPr()
+            if row_props.find(qn("w:cantSplit")) is None:
+                row_props.append(OxmlElement("w:cantSplit"))
+            if len(table.rows) <= 9:
+                for cell in row.cells:
+                    for paragraph in cell.paragraphs:
+                        paragraph.paragraph_format.keep_with_next = row_index < len(table.rows) - 1
 
         n_cols = len(table.columns)
         longest = [0] * n_cols

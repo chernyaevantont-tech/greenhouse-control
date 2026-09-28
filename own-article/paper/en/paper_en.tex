@@ -906,8 +906,8 @@ differ on both counts. The divergence criterion was operationalised as a fixed t
 of 0.05 in the table generator, and the transparency column is empty in all 1440 rows,
 so that gate was never evaluated. Under embeddability and the 0.05 threshold, 32 of the
 72 labels pass. The protocol that
-fixed these criteria, \texttt{EXPERIMENT\_PROTOCOL.md}, is included in the archived
-replication package named in the Data Availability Statement.
+fixed these criteria, \texttt{EXPERIMENT\_PROTOCOL.md}, is included in the public
+replication tree linked in the Data Availability Statement.
 Figure~\ref{fig:kappa}a shows the degree-1 undenoised block of this grid in the plane of
 the two prediction criteria, with the 0.05 gate encoded by marker fill.
 
@@ -1410,20 +1410,20 @@ only). EPI in EUR\,m$^{-2}$; one deterministic run per
 season. Source: \texttt{regen/results/n2\_tune/tune\_rb\_n2.csv}.}
 \label{tab:tune}
 \small
-\begin{tabular}{@{}lccc@{}}
+\begin{tabular}{@{}lrrrrrr@{}}
 \toprule
-Setpoint & Range searched & Hard-coded & Selected \\
+Setpoint & \multicolumn{2}{c}{Range searched} & \multicolumn{2}{c}{Hard-coded} & \multicolumn{2}{c}{Selected} \\
 \midrule
-Day temperature ($^\circ$C)      & 17.0--23.0  & 19.5 & 22.92 \\
-Night temperature ($^\circ$C)    & 14.0--20.0  & 16.5 & 14.38 \\
-Daytime CO$_2$ (ppm)             & 400--1200   & 800  & 828.3 \\
-Lamp radiation-sum limit         & 5.0--25.0   & 10   & 7.62 \\
+Day temperature ($^\circ$C) & \multicolumn{2}{c}{17.0--23.0} & \multicolumn{2}{c}{19.5} & \multicolumn{2}{c}{22.92} \\
+Night temperature ($^\circ$C) & \multicolumn{2}{c}{14.0--20.0} & \multicolumn{2}{c}{16.5} & \multicolumn{2}{c}{14.38} \\
+Daytime CO$_2$ (ppm) & \multicolumn{2}{c}{400--1200} & \multicolumn{2}{c}{800} & \multicolumn{2}{c}{828.3} \\
+Lamp radiation-sum limit & \multicolumn{2}{c}{5.0--25.0} & \multicolumn{2}{c}{10} & \multicolumn{2}{c}{7.62} \\
 \midrule
-Test season & 2020 \quad 2021 & 2022 \quad 2023 & Mean \quad Violations \\
+Test season & 2020 & 2021 & 2022 & 2023 & Mean & Violations \\
 \midrule
-Hard-coded & $+4.63$ \quad $-6.98$ & $+1.30$ \quad $-3.85$ & $-1.23$ \quad 2813 \\
-Tuned      & $+6.29$ \quad $-1.99$ & $+2.81$ \quad $+1.94$ & $\mathbf{+2.26}$ \quad 4339 \\
-Gain       & $+1.66$ \quad $+4.99$ & $+1.50$ \quad $+5.79$ & $\mathbf{+3.49}$ \quad $+1526$ \\
+Hard-coded & $+4.63$ & $-6.98$ & $+1.30$ & $-3.85$ & $-1.23$ & 2813 \\
+Tuned & $+6.29$ & $-1.99$ & $+2.81$ & $+1.94$ & $\mathbf{+2.26}$ & 4339 \\
+Gain & $+1.66$ & $+4.99$ & $+1.50$ & $+5.79$ & $\mathbf{+3.49}$ & $+1526$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -3332,7 +3332,7 @@ result file it is read from, so that each can be checked at source.
 \centering
 \caption{Headline quantities of the study and the result files they are read
 from. All paths are relative to the results tree, \texttt{regen/results/} in the
-archived replication package. EPI is the
+public replication tree. EPI is the
 seasonal economic performance indicator (margin) returned by the simulator;
 $n$ counts runs after deduplication on (method, seed, test year). Where three
 values are given they are the three feature libraries in the order raw /
@@ -3514,10 +3514,7 @@ and the ERA5-derived weather of Section~\ref{sec:sim}, retrieved from the Open-M
 historical archive API \cite{hersbach2020,openmeteo2023}. Bit-level reproduction is
 established within one computing environment only (Section~\ref{sec:repro}).
 Analysis code: \url{https://doi.org/10.5281/zenodo.22939740}. The record does not include per-run result tables.
-\textcolor{red}{[[REQUIRED BEFORE SUBMISSION: a public, citable location for this
-tree -- a repository URL and an archived release with a DOI (Zenodo, figshare or
-equivalent). MDPI requires a link or an explicit statement of restriction; a path
-inside a private repository is not sufficient.]]}
+The complete replication tree is openly available at \url{https://github.com/chernyaevantont-tech/greenhouse-control/tree/516e167920bd060a33c7a311d504ee54529c769b/own-article}, fixed to the commit identified in the URL.
 
 \noindent\textbf{Acknowledgments:} Not applicable.
 
